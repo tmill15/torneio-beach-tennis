@@ -28,6 +28,8 @@ export default function Home() {
     tournament.categorias[0] || ''
   );
 
+  const [viewMode, setViewMode] = useState<'classificacao' | 'jogos'>('classificacao');
+
   // Filtra e ordena grupos pela fase
   const groupsInCategory = tournament.grupos
     .filter((g) => g.categoria === selectedCategory)
@@ -103,6 +105,34 @@ export default function Home() {
               })}
             </div>
           )}
+
+          {/* Toggle de Visualização */}
+          {groupsInCategory.length > 0 && (
+            <div className="flex justify-center mt-6">
+              <div className="inline-flex gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('classificacao')}
+                  className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                    viewMode === 'classificacao'
+                      ? 'bg-white dark:bg-gray-800 text-primary shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  📊 Classificação
+                </button>
+                <button
+                  onClick={() => setViewMode('jogos')}
+                  className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                    viewMode === 'jogos'
+                      ? 'bg-white dark:bg-gray-800 text-primary shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  🎾 Jogos
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Grupos */}
@@ -117,6 +147,7 @@ export default function Home() {
                   group={group}
                   ranking={ranking}
                   gameConfig={tournament.gameConfig}
+                  viewMode={viewMode}
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                 />

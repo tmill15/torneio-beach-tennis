@@ -46,6 +46,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ### ✅ Interface - COMPLETO
 - [x] Interface de configuração completa
 - [x] Dashboard com cards de grupos
+- [x] Toggle de visualização (Classificação/Jogos)
 - [x] Design responsivo (mobile, tablet, desktop)
 - [x] Dark mode suportado
 - [x] Navegação intuitiva
@@ -53,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.0  
+**Versão:** v0.4.2  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -151,6 +152,46 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.2 - Toggle de Visualização no Dashboard ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Toggle global no dashboard para alternar entre "Classificação" e "Jogos"
+- ✅ Botões estilizados com estado ativo/inativo
+- ✅ Renderização condicional nos GroupCards baseada no modo de visualização
+- ✅ Interface mais limpa e focada: usuário vê apenas o que escolheu
+
+**Modificado:**
+- 🔄 Componente `GroupCard` agora aceita prop `viewMode`
+- 🔄 Layout do dashboard com controles de visualização centralizados
+- 🔄 Experiência mobile melhorada com menos scroll
+
+**Benefícios:**
+- Foco: Usuário pode se concentrar apenas em classificação ou apenas em jogos
+- Performance: Renderiza menos conteúdo por vez
+- UX: Interface mais organizada e menos sobrecarregada
+- Mobile-friendly: Reduz significativamente o scroll em dispositivos móveis
+
+**Impacto nos dados:** Nenhum (apenas mudança de apresentação)
+
+### v0.4.1 - Sistema de Proteção de Dados ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Versionamento automático de dados (campo `version` no Tournament)
+- ✅ Sistema de backup automático antes de qualquer modificação
+- ✅ Migração inteligente de v0.3.0 para v0.4.0 (preserva jogadores)
+- ✅ Histórico de backups automáticos (mantém últimos 5)
+- ✅ Validação robusta de estrutura de dados
+
+**Modificado:**
+- 🔄 Hook `useTournament` agora cria backup antes de qualquer alteração
+- 🔄 Função `migrateV030ToV040` converte duplas em jogadores individuais
+- 🔄 Validação `isValidTournamentStructure` mais permissiva
+
+**Contexto:**
+Implementado após detectar perda de dados durante refatoração v0.3.0 → v0.4.0. Garante que futuras atualizações não causem perda de dados dos torneios em andamento.
 
 ### v0.4.0 - Sistema Individual com Duplas nos Jogos ✅
 **Data:** 10/01/2026
@@ -320,5 +361,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.0  
-**Status:** ✅ ATIVO - Sistema individual com Round Robin de pareamentos implementado!
+**Versão atual:** v0.4.2  
+**Status:** ✅ ATIVO - Sistema individual com Round Robin de pareamentos e toggle de visualização implementados!
