@@ -11,6 +11,7 @@ import { useTournament } from '@/hooks/useTournament';
 import { GameConfigForm } from '@/components/GameConfigForm';
 import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
+import { validateThreePhaseTournament } from '@/services/phaseValidation';
 
 export default function ConfigPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -28,6 +29,7 @@ export default function ConfigPage() {
     formGroups,
     resetAndRedrawGroups,
     importTournament,
+    getMaxPhase,
   } = useTournament();
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function ConfigPage() {
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
   const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('torneio');
+  const [selectedPhaseForReset, setSelectedPhaseForReset] = useState<number>(1);
 
   const waitingListStats = getWaitingListStats(tournament);
 
@@ -58,22 +61,62 @@ export default function ConfigPage() {
   };
 
   const handleFormGroups = (categoria: string) => {
-    if (window.confirm(`Formar grupos da categoria "${categoria}"?`)) {
+    const waitingCount = tournament.waitingList.filter(p => p.categoria === categoria).length;
+    const validation = validateThreePhaseTournament(waitingCount);
+    
+    if (!validation.isValid) {
+      alert(
+        `⚠️ Impossível formar torneio de 3 fases!\n\n` +
+        `${validation.blockingReason}\n\n` +
+        `Ajuste o número de jogadores antes de continuar.`
+      );
+      return;
+    }
+    
+    // Preview do caminho
+    const pathPreview = validation.path.map(p => 
+      `Fase ${p.phase}: ${p.groups} grupo${p.groups > 1 ? 's' : ''} de ${p.playersPerGroup}\n` +
+      `   → ${p.qualificationRule}`
+    ).join('\n\n');
+    
+    // Calcular jogadores que ficarão na lista de espera
+    const groupsPlayers = validation.path[0].groups * 4;
+    const waitingListPlayers = waitingCount - groupsPlayers;
+    
+    const confirmMessage = 
+      `Formar torneio de 3 fases para "${categoria}"?\n\n` +
+      `Total de inscritos: ${waitingCount} jogadores\n` +
+      (waitingListPlayers > 0 
+        ? `Jogarão: ${groupsPlayers} jogadores\n` +
+          `Lista de espera: ${waitingListPlayers} jogadores\n\n` +
+          `(Jogadores na lista de espera aguardarão próximo torneio)\n\n`
+        : `Todos os ${waitingCount} jogadores jogarão\n\n`) +
+      `${pathPreview}\n\n` +
+      `Continuar?`;
+    
+    if (window.confirm(confirmMessage)) {
       formGroups(categoria, 1);
     }
   };
 
   const handleRedrawGroups = (categoria: string) => {
-    const groupsCount = tournament.grupos.filter(g => g.categoria === categoria).length;
-    const message = `Tem certeza que deseja resortear?\n\n` +
+    const maxPhase = getMaxPhase(categoria);
+    const groupsInPhase = tournament.grupos.filter(g => g.categoria === categoria && g.fase === selectedPhaseForReset);
+    
+    if (groupsInPhase.length === 0) {
+      alert(`Não há grupos na Fase ${selectedPhaseForReset} para resortear.`);
+      return;
+    }
+    
+    const message = `Tem certeza que deseja resortear a Fase ${selectedPhaseForReset}?\n\n` +
       `Isso irá:\n` +
-      `- Apagar ${groupsCount} grupo(s)\n` +
-      `- Apagar todos os jogos e placares\n` +
-      `- Retornar todos os jogadores para lista de espera\n\n` +
+      `- Apagar ${groupsInPhase.length} grupo(s) da Fase ${selectedPhaseForReset}\n` +
+      `- Apagar todos os jogos e placares desta fase\n` +
+      `- Retornar jogadores desta fase para lista de espera\n\n` +
       `Esta ação não pode ser desfeita!`;
     
     if (window.confirm(message)) {
-      resetAndRedrawGroups(categoria);
+      resetAndRedrawGroups(categoria, selectedPhaseForReset);
     }
   };
 
@@ -390,6 +433,18 @@ export default function ConfigPage() {
                             <span className="text-sm text-gray-600 dark:text-gray-400">
                               {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                             </span>
+                            {/* Seletor de Fase para Resorteio */}
+                            <select
+                              value={selectedPhaseForReset}
+                              onChange={(e) => setSelectedPhaseForReset(Number(e.target.value))}
+                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            >
+                              {[1, 2, 3].map(phase => (
+                                <option key={phase} value={phase}>
+                                  Fase {phase === 3 ? 'Final' : phase}
+                                </option>
+                              ))}
+                            </select>
                             <button
                               onClick={() => handleRedrawGroups(categoria)}
                               className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded font-medium transition-colors"

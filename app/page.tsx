@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GroupCard } from '@/components/GroupCard';
+import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -23,6 +24,11 @@ export default function Home() {
     resolveTieRandom,
     generateSinglesMatch,
     undoTiebreak,
+    advanceToNextPhase,
+    getPhaseAdvancePreview,
+    isPhaseComplete,
+    getMaxPhase,
+    isFinalPhase,
   } = useTournament();
 
   useEffect(() => {
@@ -34,11 +40,26 @@ export default function Home() {
   );
 
   const [viewMode, setViewMode] = useState<'classificacao' | 'jogos'>('classificacao');
+  const [selectedPhase, setSelectedPhase] = useState<number>(1); // Estado para a fase selecionada
+
+  // Atualizar selectedPhase quando mudar de categoria ou quando a fase máxima muda
+  useEffect(() => {
+    if (selectedCategory) {
+      const maxPhase = getMaxPhase(selectedCategory);
+      if (maxPhase > 0) {
+        setSelectedPhase(maxPhase); // Sempre mostrar a fase mais recente
+      } else {
+        setSelectedPhase(1); // Se não há grupos, volta para Fase 1
+      }
+    }
+  }, [selectedCategory, tournament.grupos, getMaxPhase]); // Depende de tournament.grupos para reagir a mudanças de fase
 
   // Filtra e ordena grupos pela fase
   const groupsInCategory = tournament.grupos
     .filter((g) => g.categoria === selectedCategory)
     .sort((a, b) => a.fase - b.fase);
+
+  const groupsInSelectedPhase = groupsInCategory.filter(g => g.fase === selectedPhase);
 
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
     finalizeMatch(groupId, matchId, sets);
@@ -115,6 +136,44 @@ export default function Home() {
             </div>
           )}
 
+          {/* Navegação de Fases (Sempre visível) */}
+          {groupsInCategory.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Fase:
+                </span>
+                <div className="flex gap-1 overflow-x-auto pb-2">
+                  {[1, 2, 3].map((phase) => {
+                    const phaseGroupsExist = groupsInCategory.some(g => g.fase === phase);
+                    const maxPhase = getMaxPhase(selectedCategory);
+                    const isLocked = phase > maxPhase;
+                    const isCurrent = phase === selectedPhase;
+
+                    return (
+                      <button
+                        key={phase}
+                        onClick={() => setSelectedPhase(phase)}
+                        disabled={isLocked && !phaseGroupsExist}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                          isCurrent
+                            ? 'bg-primary text-white'
+                            : isLocked && !phaseGroupsExist
+                              ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {phase === 3 ? 'FINAL' : `Fase ${phase}`}
+                        {isLocked && !phaseGroupsExist && <span className="ml-1">🔒</span>}
+                        {isCurrent && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Toggle de Visualização */}
           {groupsInCategory.length > 0 && (
             <div className="flex justify-center mt-6">
@@ -146,10 +205,46 @@ export default function Home() {
           )}
         </div>
 
+        {/* Botão de Avançar Fase / Campeão */}
+        {selectedPhase === getMaxPhase(selectedCategory) && 
+         isPhaseComplete(selectedCategory, selectedPhase) && 
+         !isFinalPhase(selectedPhase) && (
+          <div className="mb-6">
+            <PhaseAdvanceCard
+              categoria={selectedCategory}
+              currentPhase={selectedPhase}
+              preview={getPhaseAdvancePreview(selectedCategory, selectedPhase)}
+              onAdvance={() => advanceToNextPhase(selectedCategory, selectedPhase)}
+            />
+          </div>
+        )}
+
+        {/* Mostrar campeão se fase 3 está completa */}
+        {selectedPhase === 3 && isPhaseComplete(selectedCategory, 3) && groupsInSelectedPhase.length === 1 && (
+          <div className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 border-4 border-yellow-600 rounded-lg p-8 text-center">
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-3xl font-bold text-white mb-2">
+              CAMPEÃO DA CATEGORIA {selectedCategory.toUpperCase()}
+            </h2>
+            <div className="text-2xl font-bold text-white bg-black/20 rounded-lg py-4 px-6 inline-block">
+              {(() => {
+                const finalGroup = groupsInSelectedPhase[0];
+                if (finalGroup) {
+                  const ranking = getGroupRanking(finalGroup.id);
+                  if (ranking.length > 0) {
+                    return ranking[0].player.nome;
+                  }
+                }
+                return '???';
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Grupos */}
-        {groupsInCategory.length > 0 ? (
+        {groupsInSelectedPhase.length > 0 ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            {groupsInCategory.map((group) => {
+            {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
 
               return (
@@ -180,7 +275,7 @@ export default function Home() {
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {selectedCategory
-                  ? `Não há grupos na categoria "${selectedCategory}". Adicione jogadores e forme grupos nas configurações.`
+                  ? `Não há grupos na categoria "${selectedCategory}" para a Fase ${selectedPhase}. Adicione jogadores e forme grupos nas configurações.`
                   : 'Crie categorias e adicione jogadores para começar o torneio.'}
               </p>
               <Link
@@ -193,7 +288,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Info Stats */}
+        {/* Info Stats (filtradas pela categoria selecionada) */}
         {groupsInCategory.length > 0 && (
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">

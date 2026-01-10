@@ -54,10 +54,10 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.6.3  
+**Versão:** v0.7.0  
 **Status:** ✅ Pronto para uso
 
-Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
+Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
 
 ## 📦 Status dos Módulos
 
@@ -152,6 +152,110 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.7.0 - Sistema de 3 Fases Progressivas ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ **Sistema completo de 3 fases fixas:**
+  - Fase 1: Múltiplos grupos de 4 (Round Robin)
+  - Fase 2: Múltiplos grupos de 4 com repescagem
+  - Fase 3 (FINAL): 1 único grupo final
+- ✅ **Validação automática de torneio viável** (`phaseValidation.ts`)
+  - Bloqueia formação se número de jogadores não permite 3 fases simétricas
+  - Integrado com lista de espera (jogadores excedentes ficam aguardando)
+  - Preview do caminho completo das 3 fases antes de formar grupos
+- ✅ **Lógica de classificação dinâmica:**
+  - Fase 1 → 2: Top 2 de cada grupo + repescagem flexível (melhores 3º)
+  - Fase 2 → 3: Regras dinâmicas baseadas no nº de grupos:
+    - ≤2 grupos: Top 2 de cada
+    - 3 grupos: Top 1 cada + melhor 2º
+    - ≥4 grupos: Top 1 de cada
+- ✅ **Distribuição uniforme de seeds em TODAS as fases**
+  - Seeds sempre separados em grupos diferentes
+  - Garante competição equilibrada e progressão justa
+- ✅ **Navegação por fases no dashboard:**
+  - 3 abas fixas sempre visíveis (Fase 1, Fase 2, FINAL)
+  - Abas bloqueadas (🔒) quando fase não foi gerada
+  - Abas concluídas marcadas com ✓
+- ✅ **PhaseAdvanceCard component:**
+  - Preview de quem classificou (diretos + repescagem)
+  - Botão "Avançar para Fase X" com confirmação
+  - Estilo especial para botão "Avançar para GRUPO FINAL" (gradiente 🏆)
+- ✅ **Banner de CAMPEÃO:**
+  - Exibido automaticamente quando Fase Final está completa
+  - Design gradiente amarelo/laranja com borda dourada
+  - Nome do campeão destacado
+- ✅ **Badges de status de classificação no ranking:**
+  - CLASSIFICADO (verde) - classificou direto
+  - REPESCAGEM (amarelo) - classificou por repescagem
+  - ELIMINADO (vermelho) - eliminado nesta fase
+- ✅ **Seletor de fase para resorteio:**
+  - Permite resortear apenas uma fase específica
+  - Jogadores retornam à lista de espera
+  - Preserva dados de outras fases
+- ✅ **Tipos atualizados:**
+  - `Player.eliminatedInPhase?: number`
+  - `Player.qualificationType?: 'direct' | 'repechage'`
+  - `QualifiedPlayer` interface para tracking de classificação
+
+**Modificado:**
+- 🔄 `useTournament` hook:
+  - `advanceToNextPhase(categoria, currentPhase)` - avança para próxima fase
+  - `getPhaseAdvancePreview(categoria, phase)` - preview de classificados
+  - `resetAndRedrawGroups(categoria, fase)` - agora aceita fase específica
+  - `isPhaseComplete(categoria, phase)` - verifica se fase está completa
+  - `getMaxPhase(categoria)` - retorna fase máxima da categoria
+  - `isFinalPhase(phase)` - verifica se é fase final
+- 🔄 Dashboard (`app/page.tsx`):
+  - Filtro de grupos por fase selecionada
+  - PhaseAdvanceCard quando fase está completa
+  - Banner de campeão quando Final está completa
+  - Estatísticas continuam filtradas por categoria
+- 🔄 Config Page (`app/config/page.tsx`):
+  - Validação integrada ao formar grupos
+  - Preview claro do caminho de 3 fases
+  - Aviso se jogadores ficarão na lista de espera
+  - Seletor de fase para resorteio
+- 🔄 GroupCard:
+  - Badges de classificação/eliminação no ranking
+  - Preserva funcionalidades de desempate
+
+**Novos Services:**
+- `services/phaseValidation.ts` - Validação de viabilidade de 3 fases
+- `services/phaseGenerator.ts` - Lógica completa de geração e transição de fases
+
+**Novos Components:**
+- `components/PhaseAdvanceCard.tsx` - Card de avanço de fase com preview
+
+**Exemplo Prático:**
+
+```
+20 jogadores inscritos na categoria "Normal":
+
+Fase 1 (5 grupos de 4):
+- Top 2 cada = 10 diretos
+- 10 % 4 = 2 (sobra) → Pega 2 melhores 3º
+- Total: 12 classificados
+
+Fase 2 (3 grupos de 4):
+- Top 1 cada = 3 diretos
+- Melhor 2º lugar = 1 repescado
+- Total: 4 classificados
+
+Fase 3 (1 grupo final de 4):
+- Top 1 = CAMPEÃO 🏆
+```
+
+**Regras de Bloqueio:**
+
+- ✅ 8+ jogadores: Torneio pode ser formado
+- ❌ <8 jogadores: Bloqueado (mínimo 2 grupos na Fase 1)
+- ✅ Lista de espera: Sobras não bloqueiam (ex: 18 jogadores → 16 jogam, 2 aguardam)
+
+**Compatibilidade:**
+
+Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
 
 ### v0.6.3 - Estatísticas por Categoria ✅
 **Data:** 10/01/2026
@@ -741,5 +845,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.6.3  
-**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), estatísticas contextualizadas por categoria, detecção inteligente de empates, card visual elegante para partidas geradas, e navegação controlada pelo usuário!
+**Versão atual:** v0.7.0  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, e todas as funcionalidades anteriores mantidas!

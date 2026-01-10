@@ -13,6 +13,15 @@ import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer 
 import { generatePairsFor4Players } from '@/services/matchGenerator';
 import { updateMatchResult, calculateRanking } from '@/services/rankingService';
 import { createEmptyTournament, isValidTournamentStructure, isV030Structure, migrateV030ToV040 } from '@/services/backupService';
+import {
+  isPhaseComplete as isPhaseCompleteService,
+  generateNextPhase,
+  markEliminatedPlayers,
+  getMaxPhase as getMaxPhaseService,
+  getPhase1ToPhase2Classification,
+  getPhase2ToPhase3Classification,
+  isFinalPhase as isFinalPhaseService
+} from '@/services/phaseGenerator';
 
 const TOURNAMENT_STORAGE_KEY = 'beachtennis-tournament';
 
@@ -315,18 +324,30 @@ export function useTournament() {
    * Reseta e resorteia grupos de uma categoria
    * Remove todos os grupos e retorna jogadores para lista de espera
    */
-  const resetAndRedrawGroups = useCallback((categoria: string) => {
+  /**
+   * Resortear grupos (aplicar apenas à fase ativa)
+   */
+  const resetAndRedrawGroups = useCallback((categoria: string, fase: number) => {
     updateTournament(prev => {
-      // 1. Coletar todos os jogadores dos grupos desta categoria
-      const playersInGroups = prev.grupos
-        .filter(g => g.categoria === categoria)
-        .flatMap(g => g.players.map(p => ({ ...p, status: 'waiting' as const })));
+      // 1. Coletar jogadores dos grupos da fase específica
+      const playersInPhase = prev.grupos
+        .filter(g => g.categoria === categoria && g.fase === fase)
+        .flatMap(g => g.players.map(p => ({ 
+          ...p, 
+          status: 'waiting' as const, 
+          tiebreakOrder: undefined,
+          tiebreakMethod: undefined,
+          eliminatedInPhase: undefined, // Limpa status de eliminação
+          qualificationType: undefined // Limpa tipo de qualificação
+        })));
       
-      // 2. Remover grupos desta categoria
-      const remainingGroups = prev.grupos.filter(g => g.categoria !== categoria);
+      // 2. Remover grupos da fase específica
+      const remainingGroups = prev.grupos.filter(
+        g => !(g.categoria === categoria && g.fase === fase)
+      );
       
       // 3. Adicionar jogadores de volta à lista de espera
-      const newWaitingList = [...prev.waitingList, ...playersInGroups];
+      const newWaitingList = [...prev.waitingList, ...playersInPhase];
       
       return {
         ...prev,
@@ -471,6 +492,99 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Avança para a próxima fase (com lógica específica por fase)
+   */
+  const advanceToNextPhase = useCallback((categoria: string, currentPhase: number) => {
+    updateTournament(prev => {
+      const categoryGroups = prev.grupos.filter(
+        g => g.categoria === categoria && g.fase === currentPhase
+      );
+      
+      // Obter classificados baseado na fase
+      let direct, repechage;
+      if (currentPhase === 1) {
+        ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, currentPhase));
+      } else if (currentPhase === 2) {
+        ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase));
+      } else {
+        return prev; // Não avançar além da Fase 3
+      }
+      
+      const allQualified = [...direct, ...repechage];
+      
+      // Marcar eliminados
+      let updated = markEliminatedPlayers(prev, currentPhase, allQualified);
+      
+      // Marcar tipo de classificação
+      updated = {
+        ...updated,
+        grupos: updated.grupos.map(group => {
+          if (group.fase !== currentPhase || group.categoria !== categoria) return group;
+          
+          return {
+            ...group,
+            players: group.players.map(player => {
+              const qualified = allQualified.find(q => q.player.id === player.id);
+              if (qualified) {
+                return { ...player, qualificationType: qualified.type };
+              }
+              return player;
+            })
+          };
+        })
+      };
+      
+      // Gerar próxima fase
+      updated = generateNextPhase(updated, currentPhase, categoria);
+      
+      return updated;
+    });
+  }, [updateTournament]);
+
+  /**
+   * Preview de classificados antes de avançar
+   */
+  const getPhaseAdvancePreview = useCallback((categoria: string, phase: number) => {
+    const categoryGroups = tournament.grupos.filter(
+      g => g.categoria === categoria && g.fase === phase
+    );
+    
+    let direct, repechage;
+    if (phase === 1) {
+      ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, phase));
+    } else if (phase === 2) {
+      ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, phase));
+    } else {
+      return { direct: [], repechage: [], total: 0, rule: '' };
+    }
+    
+    // Descrição da regra
+    const numGroups = categoryGroups.length;
+    let rule = '';
+    if (phase === 1) {
+      rule = `Top 2 de cada grupo`;
+      if (repechage.length > 0) {
+        rule += ` + ${repechage.length} melhores 3º lugares`;
+      }
+    } else if (phase === 2) {
+      if (numGroups <= 2) {
+        rule = 'Top 2 de cada grupo';
+      } else if (numGroups === 3) {
+        rule = 'Top 1 de cada grupo + melhor 2º colocado';
+      } else {
+        rule = 'Top 1 de cada grupo';
+      }
+    }
+      
+      return {
+      direct,
+      repechage,
+      total: direct.length + repechage.length,
+      rule
+    };
+  }, [tournament.grupos]);
+
+  /**
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
@@ -499,5 +613,13 @@ export function useTournament() {
     generateSinglesMatch,
     undoTiebreak,
     resetTournament,
+    // Funções do sistema de fases
+    advanceToNextPhase,
+    getPhaseAdvancePreview,
+    isPhaseComplete: (categoria: string, phase: number) => 
+      isPhaseCompleteService(tournament.grupos.filter(g => g.categoria === categoria), phase),
+    getMaxPhase: (categoria: string) => 
+      getMaxPhaseService(tournament.grupos, categoria),
+    isFinalPhase: isFinalPhaseService,
   };
 }

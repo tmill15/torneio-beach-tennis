@@ -123,6 +123,21 @@ export function GroupCard({
                             DESEMPATE
                           </span>
                         )}
+                        {entry.player.qualificationType === 'direct' && (
+                          <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">
+                            CLASSIFICADO
+                          </span>
+                        )}
+                        {entry.player.qualificationType === 'repechage' && (
+                          <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded">
+                            REPESCAGEM
+                          </span>
+                        )}
+                        {entry.player.status === 'eliminated' && (
+                          <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded">
+                            ELIMINADO
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-2 text-center text-gray-900 dark:text-white font-semibold">
                         {entry.vitorias}

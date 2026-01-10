@@ -17,6 +17,8 @@ export interface Player {
   status: PlayerStatus;
   tiebreakOrder?: number; // Ordem de desempate manual (1 = vencedor, 2+ = outros)
   tiebreakMethod?: 'manual' | 'random' | 'singles'; // Método usado para resolver desempate
+  eliminatedInPhase?: number; // Fase em que o jogador foi eliminado (1, 2, 3)
+  qualificationType?: 'direct' | 'repechage'; // Tipo de classificação para próxima fase
 }
 
 // ============================================
