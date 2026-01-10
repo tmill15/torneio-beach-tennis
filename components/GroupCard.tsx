@@ -125,12 +125,13 @@ export function GroupCard({
                             SEED
                           </span>
                         )}
-                        {/* Badges de desempate e classificação - APENAS em fases anteriores (read-only) */}
-                        {isReadOnly && entry.player.tiebreakOrder && (
+                        {/* Badge de desempate - sempre mostrar se existir (independente de read-only) */}
+                        {entry.player.tiebreakOrder && (
                           <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded" title="Classificado por desempate manual">
                             DESEMPATE
                           </span>
                         )}
+                        {/* Badges de classificação - APENAS em fases anteriores (read-only) */}
                         {isReadOnly && entry.player.qualificationType === 'direct' && (
                           <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">
                             CLASSIFICADO

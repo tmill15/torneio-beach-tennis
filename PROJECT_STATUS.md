@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.11.9  
+**Versão:** v0.12.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,34 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.12.0 - Correção: Badge de Desempate na Fase Final e Persistência ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Badge de DESEMPATE não aparecia na fase final:** Badge só aparecia em fases anteriores (read-only), mas desempates podem ocorrer na fase final
+  - **Problema:** Badge de DESEMPATE só aparecia quando `isReadOnly === true`, mas na fase final `isReadOnly === false`
+  - **Solução:** Badge de DESEMPATE agora aparece sempre que houver `tiebreakOrder`, independente de `isReadOnly`
+  - **Resultado:** Badge de DESEMPATE aparece corretamente na fase final após resolver desempate
+
+- 🐛 **Dados de desempate sendo perdidos ao recarregar página:** Migração estava limpando dados de desempate da Fase 3
+  - **Problema:** Migração v0.7.0 limpava `tiebreakOrder` e `tiebreakMethod` de todas as fases 2+, incluindo Fase 3
+  - **Solução:** Migração ajustada para limpar apenas da Fase 2, preservando dados de desempate da Fase 3 (fase final)
+  - **Resultado:** Dados de desempate da fase final são preservados ao recarregar página ou navegar entre páginas
+
+**Modificado:**
+- 🔄 `components/GroupCard.tsx`:
+  - Badge de DESEMPATE agora aparece sempre que houver `tiebreakOrder`, não apenas em read-only
+- 🔄 `hooks/useTournament.ts`:
+  - Migração v0.7.0 ajustada para não limpar dados de desempate da Fase 3
+  - Fase 3 (fase final) pode ter desempates e esses dados são preservados
+
+**Nota:**
+- Desempates podem ocorrer em qualquer fase, incluindo a fase final
+- Dados de desempate (`tiebreakOrder`, `tiebreakMethod`) são preservados corretamente em todas as fases
+- Badge de DESEMPATE aparece em todas as fases quando houver desempate resolvido
 
 ---
 

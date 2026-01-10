@@ -91,23 +91,25 @@ export function useTournament() {
     const hasPhase2Plus = rawTournament.grupos.some(group => group.fase > 1);
     
     if (hasPhase2Plus) {
+      // v0.11.9: NÃO limpar dados de desempate da Fase 3 (fase final)
+      // Desempates podem ocorrer na fase final e devem ser preservados
       const needsBadgeCleanup = rawTournament.grupos.some(group => 
-        group.fase > 1 && group.players.some(p => 
+        group.fase === 2 && group.players.some(p => 
           p.tiebreakOrder !== undefined || p.tiebreakMethod !== undefined
         )
       );
       
       if (needsBadgeCleanup) {
-        console.log('🧹 v0.7.0: Limpando badges de desempate em fases 2+...');
+        console.log('🧹 v0.7.0: Limpando badges de desempate na Fase 2 (Fase 3 preservada)...');
         const cleanedTournament = {
           ...rawTournament,
           grupos: rawTournament.grupos.map(group => {
-            // Só limpa se for fase 2 ou 3
-            if (group.fase > 1) {
+            // Só limpa se for fase 2 (não limpa fase 3 - fase final pode ter desempates)
+            if (group.fase === 2) {
               return {
                 ...group,
                 players: group.players.map(p => {
-                  // Remove tiebreakOrder e tiebreakMethod de fases novas
+                  // Remove tiebreakOrder e tiebreakMethod apenas da Fase 2
                   const { tiebreakOrder, tiebreakMethod, ...cleanPlayer } = p;
                   return {
                     ...cleanPlayer,
