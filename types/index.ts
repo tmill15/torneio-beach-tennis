@@ -170,5 +170,5 @@ export function formatDupla(jogador1: Player, jogador2: Player): string {
   if (!jogador1 || !jogador2) {
     return 'Dupla incompleta';
   }
-  return `${jogador1.nome} / ${jogador2.nome}`;
+  return `${jogador1.nome} e ${jogador2.nome}`;
 }

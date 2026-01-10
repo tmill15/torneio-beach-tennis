@@ -26,6 +26,7 @@ export default function ConfigPage() {
     addPlayer,
     removePlayer,
     formGroups,
+    resetAndRedrawGroups,
     importTournament,
   } = useTournament();
 
@@ -37,6 +38,7 @@ export default function ConfigPage() {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
+  const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('espera');
 
   const waitingListStats = getWaitingListStats(tournament);
 
@@ -60,6 +62,30 @@ export default function ConfigPage() {
       formGroups(categoria, 1);
     }
   };
+
+  const handleRedrawGroups = (categoria: string) => {
+    const groupsCount = tournament.grupos.filter(g => g.categoria === categoria).length;
+    const message = `Tem certeza que deseja resortear?\n\n` +
+      `Isso irá:\n` +
+      `- Apagar ${groupsCount} grupo(s)\n` +
+      `- Apagar todos os jogos e placares\n` +
+      `- Retornar todos os jogadores para lista de espera\n\n` +
+      `Esta ação não pode ser desfeita!`;
+    
+    if (window.confirm(message)) {
+      resetAndRedrawGroups(categoria);
+    }
+  };
+
+  // Jogadores na lista de espera
+  const waitingPlayers = tournament.waitingList.filter(
+    p => p.categoria === selectedCategory
+  );
+
+  // Jogadores já alocados em grupos
+  const enrolledPlayers = tournament.grupos
+    .filter(g => g.categoria === selectedCategory)
+    .flatMap(g => g.players);
 
   // Evita erro de hydration - só renderiza após montar no cliente
   if (!isMounted) {
@@ -246,71 +272,159 @@ export default function ConfigPage() {
               </div>
             </div>
 
-            {/* Lista de Espera */}
+            {/* Participantes (com Abas) */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Lista de Espera
+                Participantes
               </h2>
 
-              {Object.entries(waitingListStats).map(([categoria, stats]) => (
-                <div key={categoria} className="mb-6 last:mb-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-gray-900 dark:text-white">
-                      {categoria}
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
-                      </span>
-                      {stats.canFormGroup && (
-                        <button
-                          onClick={() => handleFormGroups(categoria)}
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors"
-                        >
-                          Formar {stats.groupsReady} Grupo{stats.groupsReady !== 1 ? 's' : ''}
-                        </button>
+              {/* Tabs */}
+              <div className="mb-6">
+                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => setActiveTab('espera')}
+                    className={`px-4 py-2 font-medium transition-colors ${
+                      activeTab === 'espera'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    Lista de Espera ({waitingPlayers.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('torneio')}
+                    className={`px-4 py-2 font-medium transition-colors ${
+                      activeTab === 'torneio'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    No Torneio ({enrolledPlayers.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Conteúdo da Aba: Lista de Espera */}
+              {activeTab === 'espera' && (
+                <>
+                  {Object.entries(waitingListStats).map(([categoria, stats]) => (
+                    <div key={categoria} className="mb-6 last:mb-0">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-medium text-gray-900 dark:text-white">
+                          {categoria}
+                        </h3>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
+                          </span>
+                          {stats.canFormGroup && (
+                            <button
+                              onClick={() => handleFormGroups(categoria)}
+                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors"
+                            >
+                              Formar {stats.groupsReady} Grupo{stats.groupsReady !== 1 ? 's' : ''}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {tournament.waitingList
+                          .filter((p) => p.categoria === categoria)
+                          .map((player) => (
+                            <div
+                              key={player.id}
+                              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                            >
+                              <span className="text-gray-900 dark:text-white">
+                                {player.nome}
+                                {player.isSeed && (
+                                  <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
+                                    SEED
+                                  </span>
+                                )}
+                              </span>
+                              <button
+                                onClick={() => removePlayer(player.id)}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+
+                      {stats.remaining > 0 && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          {stats.remaining} jogador{stats.remaining !== 1 ? 'es' : ''} restante{stats.remaining !== 1 ? 's' : ''} (precisa de 4 para formar grupo)
+                        </p>
                       )}
                     </div>
-                  </div>
+                  ))}
 
-                  <div className="space-y-2">
-                    {tournament.waitingList
-                      .filter((p) => p.categoria === categoria)
-                      .map((player) => (
-                        <div
-                          key={player.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
-                        >
-                          <span className="text-gray-900 dark:text-white">
-                            {player.nome}
-                            {player.isSeed && (
-                              <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
-                                SEED
-                              </span>
-                            )}
-                          </span>
-                          <button
-                            onClick={() => removePlayer(player.id)}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-
-                  {stats.remaining > 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      {stats.remaining} jogador{stats.remaining !== 1 ? 'es' : ''} restante{stats.remaining !== 1 ? 's' : ''} (precisa de 4 para formar grupo)
+                  {tournament.waitingList.length === 0 && (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                      Nenhum jogador na lista de espera
                     </p>
                   )}
-                </div>
-              ))}
+                </>
+              )}
 
-              {tournament.waitingList.length === 0 && (
-                <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                  Nenhum jogador na lista de espera
-                </p>
+              {/* Conteúdo da Aba: No Torneio */}
+              {activeTab === 'torneio' && (
+                <>
+                  {tournament.categorias.map((categoria) => {
+                    const groupsInCategory = tournament.grupos.filter(g => g.categoria === categoria);
+                    if (groupsInCategory.length === 0) return null;
+
+                    return (
+                      <div key={categoria} className="mb-6 last:mb-0">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            {categoria}
+                          </h3>
+                          <button
+                            onClick={() => handleRedrawGroups(categoria)}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded font-medium transition-colors"
+                          >
+                            Resortear Grupos
+                          </button>
+                        </div>
+
+                        {groupsInCategory.map((group) => (
+                          <div key={group.id} className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Grupo {group.nome} - Fase {group.fase}
+                            </h4>
+                            <div className="space-y-2">
+                              {group.players.map((player) => (
+                                <div
+                                  key={player.id}
+                                  className="flex items-center p-2 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                                >
+                                  <span className="text-gray-900 dark:text-white text-sm">
+                                    {player.nome}
+                                    {player.isSeed && (
+                                      <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
+                                        SEED
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+
+                  {tournament.grupos.length === 0 && (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                      Nenhum grupo formado ainda
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.2  
+**Versão:** v0.4.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,32 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.3 - Melhorias de Gestão de Torneio ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Sistema de abas na página de configuração (Lista de Espera / No Torneio)
+- ✅ Função para reabrir jogos finalizados e corrigir placares
+- ✅ Função para resortear grupos com confirmação
+- ✅ Botão "Reabrir" em jogos concluídos
+- ✅ Botão "Resortear Grupos" na aba "No Torneio"
+- ✅ Visualização de jogadores por grupo na aba "No Torneio"
+
+**Modificado:**
+- 🔄 Hook `useTournament` com funções `reopenMatch` e `resetAndRedrawGroups`
+- 🔄 Componente `MatchList` aceita prop `onReopenMatch`
+- 🔄 Componente `GroupCard` passa handler de reabrir
+- 🔄 Página de configuração reorganizada com sistema de abas
+- 🔄 Separação clara entre jogadores em espera e jogadores alocados em grupos
+
+**Benefícios:**
+- Correção de placares: Jogos finalizados podem ser reabertos para edição
+- Flexibilidade: Possibilidade de refazer sorteio de grupos quando necessário
+- Organização: Visualização clara do status dos jogadores (espera vs torneio)
+- UX melhorada: Interface mais intuitiva para gerenciar participantes
+
+**Impacto nos dados:** Sistema de backup automático protege contra perda ao resortear
 
 ### v0.4.2 - Toggle de Visualização no Dashboard ✅
 **Data:** 10/01/2026
@@ -361,5 +387,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.2  
-**Status:** ✅ ATIVO - Sistema individual com Round Robin de pareamentos e toggle de visualização implementados!
+**Versão atual:** v0.4.3  
+**Status:** ✅ ATIVO - Sistema completo com gestão avançada: abas de participantes, resortear grupos e reabrir jogos!

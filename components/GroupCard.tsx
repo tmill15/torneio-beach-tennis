@@ -15,6 +15,7 @@ interface GroupCardProps {
   viewMode: 'classificacao' | 'jogos';
   onUpdateScore: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (groupId: string, matchId: string, sets: SetScore[]) => void;
+  onReopenMatch: (groupId: string, matchId: string) => void;
 }
 
 export function GroupCard({
@@ -24,6 +25,7 @@ export function GroupCard({
   viewMode,
   onUpdateScore,
   onFinalizeMatch,
+  onReopenMatch,
 }: GroupCardProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -118,6 +120,7 @@ export function GroupCard({
             gameConfig={gameConfig}
             onUpdateScore={(matchId, sets) => onUpdateScore(group.id, matchId, sets)}
             onFinalizeMatch={(matchId, sets) => onFinalizeMatch(group.id, matchId, sets)}
+            onReopenMatch={(matchId) => onReopenMatch(group.id, matchId)}
           />
         </div>
       )}

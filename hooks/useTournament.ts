@@ -228,9 +228,9 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
-   * Finaliza uma partida
+   * Finaliza uma partida (atualiza placar e marca como finalizada)
    */
-  const finalizeMatch = useCallback((groupId: string, matchId: string) => {
+  const finalizeMatch = useCallback((groupId: string, matchId: string, sets: SetScore[]) => {
     updateTournament(prev => ({
       ...prev,
       grupos: prev.grupos.map(group => {
@@ -240,7 +240,29 @@ export function useTournament() {
           ...group,
           matches: group.matches.map(match => {
             if (match.id !== matchId) return match;
-            return { ...match, isFinished: true };
+            // Atualiza o placar E finaliza em uma única operação
+            const updatedMatch = updateMatchResult(match, sets);
+            return { ...updatedMatch, isFinished: true };
+          }),
+        };
+      }),
+    }));
+  }, [updateTournament]);
+
+  /**
+   * Reabre uma partida finalizada para edição
+   */
+  const reopenMatch = useCallback((groupId: string, matchId: string) => {
+    updateTournament(prev => ({
+      ...prev,
+      grupos: prev.grupos.map(group => {
+        if (group.id !== groupId) return group;
+
+        return {
+          ...group,
+          matches: group.matches.map(match => {
+            if (match.id !== matchId) return match;
+            return { ...match, isFinished: false };
           }),
         };
       }),
@@ -264,6 +286,31 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Reseta e resorteia grupos de uma categoria
+   * Remove todos os grupos e retorna jogadores para lista de espera
+   */
+  const resetAndRedrawGroups = useCallback((categoria: string) => {
+    updateTournament(prev => {
+      // 1. Coletar todos os jogadores dos grupos desta categoria
+      const playersInGroups = prev.grupos
+        .filter(g => g.categoria === categoria)
+        .flatMap(g => g.players.map(p => ({ ...p, status: 'waiting' as const })));
+      
+      // 2. Remover grupos desta categoria
+      const remainingGroups = prev.grupos.filter(g => g.categoria !== categoria);
+      
+      // 3. Adicionar jogadores de volta à lista de espera
+      const newWaitingList = [...prev.waitingList, ...playersInGroups];
+      
+      return {
+        ...prev,
+        grupos: remainingGroups,
+        waitingList: newWaitingList,
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
@@ -283,8 +330,10 @@ export function useTournament() {
     formGroups,
     updateMatchScore,
     finalizeMatch,
+    reopenMatch,
     getGroupRanking,
     importTournament,
+    resetAndRedrawGroups,
     resetTournament,
   };
 }

@@ -17,6 +17,7 @@ export default function Home() {
     tournament,
     updateMatchScore,
     finalizeMatch,
+    reopenMatch,
     getGroupRanking,
   } = useTournament();
 
@@ -36,8 +37,7 @@ export default function Home() {
     .sort((a, b) => a.fase - b.fase);
 
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
-    updateMatchScore(groupId, matchId, sets);
-    finalizeMatch(groupId, matchId);
+    finalizeMatch(groupId, matchId, sets);
   };
 
   // Evita erro de hydration - só renderiza após montar no cliente
@@ -112,23 +112,25 @@ export default function Home() {
               <div className="inline-flex gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('classificacao')}
-                  className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 min-w-[160px] px-6 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
                     viewMode === 'classificacao'
                       ? 'bg-white dark:bg-gray-800 text-primary shadow'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  📊 Classificação
+                  <span>📊</span>
+                  <span>Classificação</span>
                 </button>
                 <button
                   onClick={() => setViewMode('jogos')}
-                  className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 min-w-[160px] px-6 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
                     viewMode === 'jogos'
                       ? 'bg-white dark:bg-gray-800 text-primary shadow'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  🎾 Jogos
+                  <span>🎾</span>
+                  <span>Jogos</span>
                 </button>
               </div>
             </div>
@@ -150,6 +152,7 @@ export default function Home() {
                   viewMode={viewMode}
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
+                  onReopenMatch={reopenMatch}
                 />
               );
             })}

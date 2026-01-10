@@ -14,6 +14,7 @@ interface MatchListProps {
   gameConfig: GameConfig;
   onUpdateScore: (matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (matchId: string, sets: SetScore[]) => void;
+  onReopenMatch: (matchId: string) => void;
 }
 
 export function MatchList({
@@ -21,6 +22,7 @@ export function MatchList({
   gameConfig,
   onUpdateScore,
   onFinalizeMatch,
+  onReopenMatch,
 }: MatchListProps) {
   const finishedMatches = matches.filter(m => m.isFinished);
   const pendingMatches = matches.filter(m => !m.isFinished);
@@ -59,6 +61,13 @@ export function MatchList({
                       </p>
                     )}
                   </div>
+                  <button
+                    onClick={() => onReopenMatch(match.id)}
+                    className="ml-4 px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                    title="Reabrir para editar"
+                  >
+                    Reabrir
+                  </button>
                 </div>
               </div>
             ))}
