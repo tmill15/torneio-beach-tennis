@@ -794,8 +794,15 @@ export function useTournament() {
       // 2. Remover todos os grupos da categoria
       const remainingGroups = prev.grupos.filter(g => g.categoria !== categoria);
 
-      // 3. Adicionar jogadores de volta à lista de espera
-      const newWaitingList = [...prev.waitingList, ...allPlayers];
+      // 3. Adicionar jogadores de volta à lista de espera, evitando duplicatas
+      // Criar um Set com IDs dos jogadores que já estão na lista de espera
+      const existingPlayerIds = new Set(prev.waitingList.map(p => p.id));
+      
+      // Filtrar apenas jogadores que não estão na lista de espera
+      const newPlayers = allPlayers.filter(p => !existingPlayerIds.has(p.id));
+      
+      // Adicionar apenas os novos jogadores (sem duplicatas)
+      const newWaitingList = [...prev.waitingList, ...newPlayers];
 
       return {
         ...prev,
