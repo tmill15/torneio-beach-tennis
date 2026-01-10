@@ -194,11 +194,11 @@ export default function Home() {
         )}
 
         {/* Info Stats */}
-        {tournament.grupos.length > 0 && (
+        {groupsInCategory.length > 0 && (
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
               <div className="text-3xl font-bold text-primary mb-1">
-                {tournament.grupos.length}
+                {groupsInCategory.length}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Grupos Ativos
@@ -206,7 +206,7 @@ export default function Home() {
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
               <div className="text-3xl font-bold text-primary mb-1">
-                {tournament.grupos.reduce((sum, g) => sum + g.matches.length, 0)}
+                {groupsInCategory.reduce((sum, g) => sum + g.matches.length, 0)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Partidas Geradas
@@ -214,7 +214,7 @@ export default function Home() {
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
               <div className="text-3xl font-bold text-primary mb-1">
-                {tournament.grupos.reduce(
+                {groupsInCategory.reduce(
                   (sum, g) => sum + g.matches.filter((m) => m.isFinished).length,
                   0
                 )}

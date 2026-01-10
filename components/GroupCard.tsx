@@ -174,7 +174,7 @@ export function GroupCard({
         <div className="px-6 pb-6">
           <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
-              ⚠️ {ties.length} empate{ties.length > 1 ? 's' : ''} detectado{ties.length > 1 ? 's' : ''}
+              ⚠️ {ties.length > 1 ? `${ties.length} empates detectados` : 'Empate detectado'}
             </p>
             <div className="space-y-2">
               {ties.map((tie, idx) => (

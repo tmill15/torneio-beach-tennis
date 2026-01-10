@@ -308,6 +308,9 @@ export function detectTies(ranking: RankingEntry[]): TieGroup[] {
   const ties: TieGroup[] = [];
   
   for (let i = 0; i < ranking.length - 1; i++) {
+    // Não detectar empates se nenhum jogo foi finalizado ainda
+    if (ranking[i].jogos === 0) continue;
+    
     // Verificar se há empate com próximo jogador
     if (
       ranking[i].vitorias === ranking[i + 1].vitorias &&

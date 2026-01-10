@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.6.1  
+**Versão:** v0.6.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,84 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.6.3 - Estatísticas por Categoria ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 📊 Estatísticas do dashboard (Grupos Ativos, Partidas Geradas, Jogos Concluídos) agora refletem apenas a categoria selecionada
+- 🎯 Mudança de categoria atualiza as estatísticas em tempo real
+
+**Problema Identificado:**
+As estatísticas no rodapé do dashboard mostravam sempre os totais de **todas as categorias**, mesmo quando o usuário estava visualizando apenas uma categoria específica. Isso causava confusão, pois mostrava números que não correspondiam aos grupos visíveis na tela.
+
+**Exemplo do Bug:**
+```
+Categoria: Iniciante (0 grupos)
+Grupos visíveis: (nenhum)
+
+Estatísticas exibidas:
+- 5 Grupos Ativos      ← De TODAS as categorias ❌
+- 15 Partidas Geradas  ← De TODAS as categorias ❌
+- 6 Jogos Concluídos   ← De TODAS as categorias ❌
+```
+
+**Solução Implementada:**
+Substituído `tournament.grupos` por `groupsInCategory` no cálculo das estatísticas. Agora os cards mostram apenas os dados da categoria atualmente selecionada.
+
+**Resultado Esperado:**
+```
+Categoria: Iniciante (0 grupos)
+Grupos visíveis: (nenhum)
+
+Estatísticas exibidas:
+- 0 Grupos Ativos      ← Apenas Iniciante ✅
+- 0 Partidas Geradas   ← Apenas Iniciante ✅
+- 0 Jogos Concluídos   ← Apenas Iniciante ✅
+
+Categoria: Normal (5 grupos)
+Estatísticas exibidas:
+- 5 Grupos Ativos      ← Apenas Normal ✅
+- 15 Partidas Geradas  ← Apenas Normal ✅
+- 6 Jogos Concluídos   ← Apenas Normal ✅
+```
+
+**Tipo:** Patch (correção de bug nas estatísticas)
+
+### v0.6.2 - Correção de Detecção de Empates ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 Empates não são mais detectados em grupos sem jogos finalizados
+- 📝 Mensagem alterada de "1 empate detectado" para "Empate detectado"
+- ✨ Mensagem plural mantida para múltiplos empates: "2 empates detectados", "3 empates detectados", etc.
+
+**Problema Identificado:**
+1. Em grupos recém-criados (sem jogos finalizados), o sistema detectava "empate" porque todos os jogadores tinham 0 vitórias, 0 derrotas, 0 saldo. Isso causava confusão, pois não faz sentido resolver empate antes de qualquer jogo.
+2. A mensagem "1 empate detectado" era redundante e menos elegante que simplesmente "Empate detectado".
+
+**Solução Implementada:**
+1. **`rankingService.ts`**: Adicionada verificação `if (ranking[i].jogos === 0) continue;` na função `detectTies`
+2. Empates só são detectados quando há pelo menos 1 jogo finalizado no grupo
+3. **`GroupCard.tsx`**: Mensagem simplificada:
+   - 1 empate: "⚠️ Empate detectado"
+   - 2+ empates: "⚠️ 2 empates detectados"
+
+**Exemplo:**
+```
+Antes (v0.6.1):
+Grupo recém-criado (0 jogos):
+⚠️ 1 empate detectado  ← Confuso!
+
+Agora (v0.6.2):
+Grupo recém-criado (0 jogos):
+(Nenhum alerta)  ← Correto!
+
+Após jogos finalizados com empate:
+⚠️ Empate detectado  ← Mais limpo!
+```
+
+**Tipo:** Patch (correção de bug + melhoria de mensagem)
 
 ### v0.6.1 - Indicador de Partida de Desempate Gerada (UX) ✅
 **Data:** 10/01/2026
@@ -663,5 +741,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.6.1  
-**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), card visual elegante para partidas geradas, navegação controlada pelo usuário, e métodos claramente identificados!
+**Versão atual:** v0.6.3  
+**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), estatísticas contextualizadas por categoria, detecção inteligente de empates, card visual elegante para partidas geradas, e navegação controlada pelo usuário!
