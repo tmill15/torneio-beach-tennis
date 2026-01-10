@@ -34,6 +34,16 @@ export function MatchList({
     return `${set.gamesA}-${set.gamesB}`;
   };
 
+  // Função para formatar o nome dos jogadores (simples ou duplas)
+  const formatMatchPlayers = (match: Match): string => {
+    // Se é desempate de simples (jogadores duplicados)
+    if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
+      return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
+    }
+    // Se é duplas normal
+    return `${formatDupla(match.jogador1A, match.jogador2A)} × ${formatDupla(match.jogador1B, match.jogador2B)}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Jogos Concluídos */}
@@ -53,11 +63,10 @@ export function MatchList({
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       <span className="text-gray-500 dark:text-gray-400">R{match.rodada}:</span>{' '}
-                      {formatDupla(match.jogador1A, match.jogador2A)}{' '}
+                      {formatMatchPlayers(match)}{' '}
                       <span className="font-bold text-primary">
-                        {match.sets.length > 0 ? match.sets.map(formatSetScore).join(', ') : '0-0'}
-                      </span>{' '}
-                      {formatDupla(match.jogador1B, match.jogador2B)}
+                        ({match.sets.map(formatSetScore).join(', ')})
+                      </span>
                       {match.isTiebreaker && (
                         <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium">
                           DESEMPATE
@@ -95,7 +104,7 @@ export function MatchList({
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     <span className="text-gray-500 dark:text-gray-400">Rodada {match.rodada}:</span>{' '}
-                    {formatDupla(match.jogador1A, match.jogador2A)} × {formatDupla(match.jogador1B, match.jogador2B)}
+                    {formatMatchPlayers(match)}
                     {match.isTiebreaker && (
                       <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium">
                         DESEMPATE

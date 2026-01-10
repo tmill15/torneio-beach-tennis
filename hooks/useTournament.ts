@@ -232,22 +232,47 @@ export function useTournament() {
    * Finaliza uma partida (atualiza placar e marca como finalizada)
    */
   const finalizeMatch = useCallback((groupId: string, matchId: string, sets: SetScore[]) => {
-    updateTournament(prev => ({
-      ...prev,
-      grupos: prev.grupos.map(group => {
-        if (group.id !== groupId) return group;
+    updateTournament(prev => {
+      // Primeiro, encontrar a partida para verificar se é desempate
+      const group = prev.grupos.find(g => g.id === groupId);
+      const match = group?.matches.find(m => m.id === matchId);
+      
+      return {
+        ...prev,
+        grupos: prev.grupos.map(grp => {
+          if (grp.id !== groupId) return grp;
 
-        return {
-          ...group,
-          matches: group.matches.map(match => {
-            if (match.id !== matchId) return match;
-            // Atualiza o placar E finaliza em uma única operação
-            const updatedMatch = updateMatchResult(match, sets);
-            return { ...updatedMatch, isFinished: true };
-          }),
-        };
-      }),
-    }));
+          return {
+            ...grp,
+            matches: grp.matches.map(m => {
+              if (m.id !== matchId) return m;
+              // Atualiza o placar E finaliza em uma única operação
+              const updatedMatch = updateMatchResult(m, sets);
+              return { ...updatedMatch, isFinished: true };
+            }),
+            // Se for partida de desempate de simples, aplicar tiebreakOrder automaticamente
+            players: match?.isTiebreaker && match.jogador1A.id === match.jogador2A.id
+              ? grp.players.map(player => {
+                  const updatedMatch = updateMatchResult(match, sets);
+                  const winnerId = updatedMatch.setsWonA > updatedMatch.setsWonB 
+                    ? match.jogador1A.id 
+                    : match.jogador1B.id;
+                  const loserId = updatedMatch.setsWonA > updatedMatch.setsWonB 
+                    ? match.jogador1B.id 
+                    : match.jogador1A.id;
+                  
+                  if (player.id === winnerId) {
+                    return { ...player, tiebreakOrder: 1, tiebreakMethod: 'singles' as const };
+                  } else if (player.id === loserId) {
+                    return { ...player, tiebreakOrder: 2, tiebreakMethod: 'singles' as const };
+                  }
+                  return player;
+                })
+              : grp.players,
+          };
+        }),
+      };
+    });
   }, [updateTournament]);
 
   /**
@@ -399,26 +424,50 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
-   * Desfazer desempate manual (remove tiebreakOrder e tiebreakMethod)
+   * Desfazer desempate manual (remove tiebreakOrder, tiebreakMethod e partidas de simples)
    */
   const undoTiebreak = useCallback((groupId: string, playerIds: string[]) => {
-    updateTournament(prev => ({
-      ...prev,
-      grupos: prev.grupos.map(group => {
-        if (group.id !== groupId) return group;
-        
-        return {
-          ...group,
-          players: group.players.map(player => {
-            if (!playerIds.includes(player.id)) return player;
-            
-            // Remover tiebreakOrder e tiebreakMethod
-            const { tiebreakOrder, tiebreakMethod, ...playerWithoutTiebreak } = player;
-            return playerWithoutTiebreak;
-          }),
-        };
-      }),
-    }));
+    updateTournament(prev => {
+      const group = prev.grupos.find(g => g.id === groupId);
+      if (!group) return prev;
+      
+      // Verificar se algum jogador foi desempatado via partida de simples
+      const playersWithSinglesMethod = group.players.filter(
+        p => playerIds.includes(p.id) && p.tiebreakMethod === 'singles'
+      );
+      
+      return {
+        ...prev,
+        grupos: prev.grupos.map(grp => {
+          if (grp.id !== groupId) return grp;
+          
+          return {
+            ...grp,
+            players: grp.players.map(player => {
+              if (!playerIds.includes(player.id)) return player;
+              
+              // Remover tiebreakOrder e tiebreakMethod
+              const { tiebreakOrder, tiebreakMethod, ...playerWithoutTiebreak } = player;
+              return playerWithoutTiebreak;
+            }),
+            // Se foi desempate via partida de simples, remover a partida
+            matches: playersWithSinglesMethod.length > 0
+              ? grp.matches.filter(match => {
+                  // Remover partidas de desempate de simples entre esses jogadores
+                  if (!match.isTiebreaker) return true;
+                  if (match.jogador1A.id !== match.jogador2A.id) return true; // Não é simples
+                  
+                  const isMatchBetweenPlayers = 
+                    playerIds.includes(match.jogador1A.id) && 
+                    playerIds.includes(match.jogador1B.id);
+                  
+                  return !isMatchBetweenPlayers; // Remove se for entre os jogadores
+                })
+              : grp.matches,
+          };
+        }),
+      };
+    });
   }, [updateTournament]);
 
   /**

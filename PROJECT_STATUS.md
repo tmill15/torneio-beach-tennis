@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.8  
+**Versão:** v0.5.1  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,84 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.5.1 - Remoção de Partida de Simples ao Desfazer Desempate ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🗑️ Ao desfazer desempate resolvido via partida de simples, a partida é removida do grupo
+- 📊 Estatísticas (vitórias, saldo) da partida removida não contam mais no ranking
+- 🧹 Limpeza completa: remove `tiebreakOrder`, `tiebreakMethod` E a partida
+
+**Problema Identificado:**
+Ao desfazer um desempate resolvido via partida de simples (ex: Dayanna × Amanda), a partida R4 continuava existindo no grupo e suas estatísticas (vitória, saldo de games) continuavam sendo contabilizadas no ranking, mesmo após o desempate ser desfeito.
+
+**Solução Implementada:**
+1. `undoTiebreak` agora detecta se o desempate foi via `tiebreakMethod: 'singles'`
+2. Se sim, busca e remove as partidas de desempate de simples (`isTiebreaker: true`) entre esses jogadores
+3. Remove `tiebreakOrder` e `tiebreakMethod` dos jogadores
+4. Ranking é recalculado automaticamente sem a partida removida
+
+**Comportamento Esperado:**
+- **Antes de desfazer:** R4: Dayanna × Amanda (6-3) [DESEMPATE] ✓
+- **Após desfazer:** R4 desaparece, jogadores voltam ao empate original
+
+**Tipo:** Patch (correção de bug na lógica de desfazer desempate)
+
+### v0.5.0 - Resolução Automática de Desempate via Partida de Simples ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- 🎾 Resolução automática de desempate ao finalizar partida de simples
+- 🏆 Sistema aplica automaticamente `tiebreakOrder` e `tiebreakMethod: 'singles'` ao finalizar
+- 📊 Vencedor recebe `tiebreakOrder: 1`, perdedor recebe `tiebreakOrder: 2`
+- 💎 Card de "Desempates Resolvidos (Partida de Simples)" aparece automaticamente no dashboard
+
+**Como Funciona:**
+1. Usuário gera partida de simples para resolver empate entre 2 jogadores
+2. Partida é jogada normalmente (ex: Dayanna × Amanda)
+3. Ao finalizar o resultado (ex: 6-3), o sistema detecta que é `isTiebreaker: true`
+4. Automaticamente aplica o método de desempate:
+   - Vencedor: `tiebreakOrder: 1, tiebreakMethod: 'singles'`
+   - Perdedor: `tiebreakOrder: 2, tiebreakMethod: 'singles'`
+5. Dashboard exibe card azul: "ℹ️ Desempates Resolvidos (Partida de Simples)"
+
+**Exemplo:**
+```
+Antes de finalizar:
+⚠️ Empate detectado: Dayanna e Amanda (posições 2-3)
+[Gerar Partida de Simples]
+
+Após finalizar R4: Dayanna × Amanda (6-3):
+ℹ️ Desempates Resolvidos (Partida de Simples)
+• Dayanna (posição 2) - VENCEDOR
+• Amanda (posição 3)
+```
+
+**Tipo:** Minor (nova funcionalidade automática de resolução de desempate)
+
+### v0.4.9 - Exibição Correta de Partidas de Simples ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🎾 Partidas de simples (desempate) agora exibem apenas o nome de cada jogador uma vez
+- 🔧 Removida duplicação "Dayanna e Dayanna × Amanda e Amanda"
+- ✨ Nova função `formatMatchPlayers` para diferenciar simples de duplas
+
+**Problema Identificado:**
+Ao gerar uma partida de simples para desempate, o sistema duplicava o jogador (Dayanna + Dayanna como dupla) e exibia "Dayanna e Dayanna × Amanda e Amanda" ao invés de "Dayanna × Amanda".
+
+**Solução Implementada:**
+1. Criada função `formatMatchPlayers` que detecta se é simples ou duplas
+2. Para simples: Exibe apenas "Jogador1 × Jogador2"
+3. Para duplas: Usa `formatDupla` normal ("Jogador1 e Jogador2 × Jogador3 e Jogador4")
+4. Detecção: `isTiebreaker === true` E `jogador1A.id === jogador2A.id`
+
+**Exemplo:**
+- **Antes:** R4: Dayanna e Dayanna × Amanda e Amanda [DESEMPATE]
+- **Agora:** R4: Dayanna × Amanda [DESEMPATE]
+
+**Tipo:** Patch (correção de UX para partidas de simples)
 
 ### v0.4.8 - Identificação do Método de Desempate ✅
 **Data:** 10/01/2026
@@ -499,5 +577,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.8  
-**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente, sorteio funcionando corretamente e métodos claramente identificados!
+**Versão atual:** v0.5.1  
+**Status:** ✅ ATIVO - Sistema completo com resolução automática de desempates via partidas de simples, remoção correta de partidas ao desfazer, sorteio funcionando e métodos claramente identificados!
