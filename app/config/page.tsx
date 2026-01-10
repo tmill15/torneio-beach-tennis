@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GameConfigForm } from '@/components/GameConfigForm';
@@ -13,6 +13,8 @@ import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
 
 export default function ConfigPage() {
+  const [isMounted, setIsMounted] = useState(false);
+  
   const {
     tournament,
     updateTournamentName,
@@ -24,6 +26,10 @@ export default function ConfigPage() {
     formGroups,
     importTournament,
   } = useTournament();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -52,6 +58,20 @@ export default function ConfigPage() {
       formGroups(categoria, 1);
     }
   };
+
+  // Evita erro de hydration - só renderiza após montar no cliente
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -159,7 +179,7 @@ export default function ConfigPage() {
                   value={newPlayerName}
                   onChange={(e) => setNewPlayerName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
-                  placeholder="Nome da dupla"
+                  placeholder="Nome do jogador"
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                 />
 

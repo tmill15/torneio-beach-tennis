@@ -5,18 +5,24 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GroupCard } from '@/components/GroupCard';
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+  
   const {
     tournament,
     updateMatchScore,
     finalizeMatch,
     getGroupRanking,
   } = useTournament();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [selectedCategory, setSelectedCategory] = useState<string>(
     tournament.categorias[0] || ''
@@ -30,6 +36,20 @@ export default function Home() {
     updateMatchScore(groupId, matchId, sets);
     finalizeMatch(groupId, matchId);
   };
+
+  // Evita erro de hydration - só renderiza após montar no cliente
+  if (!isMounted) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
