@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.14.1  
+**Versão:** v0.14.2  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,27 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.14.2 - Melhoria: Reorganização do PDF por Fase ✅
+**Data:** 10/01/2026
+
+**Melhorado:**
+- 📄 **Estrutura do PDF reorganizada:** Resultados dos jogos agora aparecem logo após as classificações de cada fase
+  - **Antes:** Todas as classificações primeiro, depois todos os resultados
+  - **Agora:** Para cada fase, mostra classificações e resultados juntos
+  - **Estrutura:**
+    - Fase 1: Apresentação dos grupos → Resultados dos jogos
+    - Fase 2: Apresentação dos grupos → Resultados dos jogos
+    - Fase Final: Apresentação dos grupos → Resultados dos jogos
+  - **Resultado:** PDF mais organizado e fácil de navegar, com informações relacionadas agrupadas por fase
+
+**Modificado:**
+- 🔄 `services/pdfService.ts`:
+  - Movida lógica de resultados dos jogos para dentro do loop de fases
+  - Resultados aparecem imediatamente após as classificações de cada fase
+  - Removida seção duplicada de resultados no final
 
 ---
 

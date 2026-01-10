@@ -266,16 +266,9 @@ export function generateTournamentPDF(
       yPosition += 5; // Espaço entre grupos
     });
 
-    yPosition += 5; // Espaço entre fases
-  }
-
-  // ============================================
-  // RESULTADOS DE JOGOS POR FASE
-  // ============================================
-  for (let phase = 1; phase <= maxPhase; phase++) {
-    const phaseGroups = categoryGroups.filter(g => g.fase === phase);
-    if (phaseGroups.length === 0) continue;
-
+    // ============================================
+    // RESULTADOS DOS JOGOS DA FASE ATUAL
+    // ============================================
     // Verificar se precisa de nova página
     if (yPosition > pageHeight - 60) {
       doc.addPage();
@@ -288,6 +281,26 @@ export function generateTournamentPDF(
     doc.setTextColor(...primaryColor);
     doc.text(`RESULTADOS DOS JOGOS - FASE ${phase}${phase === 3 ? ' (FINAL)' : ''}`, margin, yPosition);
     yPosition += 8;
+
+    // Função auxiliar para formatar jogadores (definida uma vez por fase)
+    const formatMatchPlayers = (match: Match): string => {
+      if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
+        // Partida de simples (desempate)
+        return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
+      }
+      // Partida de duplas
+      const duplaA = formatDupla(match.jogador1A, match.jogador2A);
+      const duplaB = formatDupla(match.jogador1B, match.jogador2B);
+      return `${duplaA} × ${duplaB}`;
+    };
+
+    // Função auxiliar para formatar placar
+    const formatSetScore = (set: SetScore): string => {
+      if (set.tieBreakA !== undefined && set.tieBreakB !== undefined) {
+        return `${set.gamesA}-${set.gamesB} (${set.tieBreakA}-${set.tieBreakB})`;
+      }
+      return `${set.gamesA}-${set.gamesB}`;
+    };
 
     phaseGroups.forEach((group) => {
       // Verificar se precisa de nova página
@@ -307,26 +320,6 @@ export function generateTournamentPDF(
       doc.setTextColor(...darkGray);
       doc.text(`Grupo ${group.nome}`, margin, yPosition);
       yPosition += 6;
-
-      // Função auxiliar para formatar jogadores
-      const formatMatchPlayers = (match: Match): string => {
-        if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
-          // Partida de simples (desempate)
-          return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
-        }
-        // Partida de duplas
-        const duplaA = formatDupla(match.jogador1A, match.jogador2A);
-        const duplaB = formatDupla(match.jogador1B, match.jogador2B);
-        return `${duplaA} × ${duplaB}`;
-      };
-
-      // Função auxiliar para formatar placar
-      const formatSetScore = (set: SetScore): string => {
-        if (set.tieBreakA !== undefined && set.tieBreakB !== undefined) {
-          return `${set.gamesA}-${set.gamesB} (${set.tieBreakA}-${set.tieBreakB})`;
-        }
-        return `${set.gamesA}-${set.gamesB}`;
-      };
 
       // Ordenar jogos por rodada
       const sortedMatches = [...finishedMatches].sort((a, b) => a.rodada - b.rodada);
@@ -362,103 +355,7 @@ export function generateTournamentPDF(
       yPosition += 5; // Espaço entre grupos
     });
 
-    yPosition += 5; // Espaço entre fases
-  }
-
-  // ============================================
-  // RESULTADOS DE JOGOS POR FASE
-  // ============================================
-  for (let phase = 1; phase <= maxPhase; phase++) {
-    const phaseGroups = categoryGroups.filter(g => g.fase === phase);
-    if (phaseGroups.length === 0) continue;
-
-    // Verificar se precisa de nova página
-    if (yPosition > pageHeight - 60) {
-      doc.addPage();
-      yPosition = margin;
-    }
-
-    // Título da seção de jogos
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...primaryColor);
-    doc.text(`RESULTADOS DOS JOGOS - FASE ${phase}${phase === 3 ? ' (FINAL)' : ''}`, margin, yPosition);
-    yPosition += 8;
-
-    phaseGroups.forEach((group) => {
-      // Verificar se precisa de nova página
-      if (yPosition > pageHeight - 40) {
-        doc.addPage();
-        yPosition = margin;
-      }
-
-      const finishedMatches = group.matches.filter(m => m.isFinished);
-      if (finishedMatches.length === 0) {
-        yPosition += 5;
-        return;
-      }
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...darkGray);
-      doc.text(`Grupo ${group.nome}`, margin, yPosition);
-      yPosition += 6;
-
-      // Função auxiliar para formatar jogadores
-      const formatMatchPlayers = (match: Match): string => {
-        if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
-          // Partida de simples (desempate)
-          return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
-        }
-        // Partida de duplas
-        const duplaA = formatDupla(match.jogador1A, match.jogador2A);
-        const duplaB = formatDupla(match.jogador1B, match.jogador2B);
-        return `${duplaA} × ${duplaB}`;
-      };
-
-      // Função auxiliar para formatar placar
-      const formatSetScore = (set: SetScore): string => {
-        if (set.tieBreakA !== undefined && set.tieBreakB !== undefined) {
-          return `${set.gamesA}-${set.gamesB} (${set.tieBreakA}-${set.tieBreakB})`;
-        }
-        return `${set.gamesA}-${set.gamesB}`;
-      };
-
-      // Ordenar jogos por rodada
-      const sortedMatches = [...finishedMatches].sort((a, b) => a.rodada - b.rodada);
-
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-
-      sortedMatches.forEach((match) => {
-        if (yPosition > pageHeight - 20) {
-          doc.addPage();
-          yPosition = margin;
-        }
-
-        const playersText = formatMatchPlayers(match);
-        const scoreText = match.sets.map(formatSetScore).join(', ');
-        const isTiebreaker = match.isTiebreaker ? ' [DESEMPATE]' : '';
-        
-        // Truncar texto se muito longo
-        const maxWidth = pageWidth - 2 * margin - 10;
-        const matchText = `R${match.rodada}: ${playersText} (${scoreText})${isTiebreaker}`;
-        
-        // Quebrar linha se necessário
-        const lines = doc.splitTextToSize(matchText, maxWidth);
-        lines.forEach((line: string) => {
-          doc.text(line, margin + 5, yPosition);
-          yPosition += 4;
-        });
-        
-        yPosition += 2; // Espaço entre jogos
-      });
-
-      yPosition += 5; // Espaço entre grupos
-    });
-
-    yPosition += 5; // Espaço entre fases
+    yPosition += 10; // Espaço entre fases
   }
 
   // ============================================
