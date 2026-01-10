@@ -54,6 +54,42 @@ export function useTournament() {
   }, [setTournament]);
 
   /**
+   * Move uma categoria para cima na ordem
+   */
+  const moveCategoryUp = useCallback((categoria: string) => {
+    setTournament(prev => {
+      const index = prev.categorias.indexOf(categoria);
+      if (index <= 0) return prev; // Já está no topo ou não existe
+      
+      const newCategorias = [...prev.categorias];
+      [newCategorias[index - 1], newCategorias[index]] = [newCategorias[index], newCategorias[index - 1]];
+      
+      return {
+        ...prev,
+        categorias: newCategorias,
+      };
+    });
+  }, [setTournament]);
+
+  /**
+   * Move uma categoria para baixo na ordem
+   */
+  const moveCategoryDown = useCallback((categoria: string) => {
+    setTournament(prev => {
+      const index = prev.categorias.indexOf(categoria);
+      if (index < 0 || index >= prev.categorias.length - 1) return prev; // Já está no final ou não existe
+      
+      const newCategorias = [...prev.categorias];
+      [newCategorias[index], newCategorias[index + 1]] = [newCategorias[index + 1], newCategorias[index]];
+      
+      return {
+        ...prev,
+        categorias: newCategorias,
+      };
+    });
+  }, [setTournament]);
+
+  /**
    * Atualiza configurações de jogo
    */
   const updateGameConfig = useCallback((config: Tournament['gameConfig']) => {
@@ -172,6 +208,8 @@ export function useTournament() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    moveCategoryUp,
+    moveCategoryDown,
     updateGameConfig,
     addPlayer,
     removePlayer,

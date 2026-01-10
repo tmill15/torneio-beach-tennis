@@ -28,9 +28,10 @@ export default function Home() {
     tournament.categorias[0] || ''
   );
 
-  const groupsInCategory = tournament.grupos.filter(
-    (g) => g.categoria === selectedCategory
-  );
+  // Filtra e ordena grupos pela fase
+  const groupsInCategory = tournament.grupos
+    .filter((g) => g.categoria === selectedCategory)
+    .sort((a, b) => a.fase - b.fase);
 
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
     updateMatchScore(groupId, matchId, sets);

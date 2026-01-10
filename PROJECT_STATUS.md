@@ -47,10 +47,10 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Dark mode suportado
 - [x] Navegação intuitiva
 
-## 🎉 Status do Projeto: MVP COMPLETO
+## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
-**Data de conclusão:** 10/01/2026  
-**Versão:** v0.1.0  
+**Última atualização:** 10/01/2026  
+**Versão:** v0.2.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -149,6 +149,22 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 
 ## 🔄 Histórico de Versões
 
+### v0.2.0 - Ordenação de Categorias ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Sistema de ordenação de categorias
+- ✅ Botões de ordenação (mover para cima/baixo) na página de configuração
+- ✅ Dashboard reflete a ordem customizada das categorias
+- ✅ Ordem persistida no LocalStorage
+- ✅ Validação de limites (primeira/última categoria)
+- ✅ Ícones SVG para indicadores visuais
+
+**Melhorado:**
+- UI da página de configuração com controles de ordenação intuitivos
+- Experiência do usuário ao organizar torneios com múltiplas categorias
+- Grupos no dashboard agora ordenados por fase dentro de cada categoria
+
 ### v0.1.0 - MVP Completo ✅
 **Data:** 10/01/2026
 
@@ -191,9 +207,9 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - Dark mode suportado
 
 **Próximas Versões (Roadmap):**
-- v0.2.0: Melhorias de UX (animações, feedback)
-- v0.3.0: Navegação entre fases (classificatórios, finais)
-- v0.4.0: Histórico de torneios
+- v0.3.0: Melhorias de UX (animações, feedback visual)
+- v0.4.0: Navegação entre fases (classificatórios, finais)
+- v0.5.0: Histórico de torneios
 - v1.0.0: Release estável com todos os refinamentos
 
 ---
@@ -230,5 +246,5 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.1.0  
-**Status:** ✅ MVP COMPLETO - Pronto para uso!
+**Versão atual:** v0.2.0  
+**Status:** ✅ ATIVO - Sistema operacional com melhorias contínuas!

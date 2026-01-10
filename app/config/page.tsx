@@ -20,6 +20,8 @@ export default function ConfigPage() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    moveCategoryUp,
+    moveCategoryDown,
     updateGameConfig,
     addPlayer,
     removePlayer,
@@ -135,22 +137,49 @@ export default function ConfigPage() {
               </div>
 
               <div className="space-y-2">
-                {tournament.categorias.map((cat) => (
+                {tournament.categorias.map((cat, index) => (
                   <div
                     key={cat}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
                   >
                     <span className="text-gray-900 dark:text-white font-medium">{cat}</span>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Remover categoria "${cat}"?`)) {
-                          removeCategory(cat);
-                        }
-                      }}
-                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      Remover
-                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Botões de ordenação */}
+                      <button
+                        onClick={() => moveCategoryUp(cat)}
+                        disabled={index === 0}
+                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Mover para cima"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      
+                      <button
+                        onClick={() => moveCategoryDown(cat)}
+                        disabled={index === tournament.categorias.length - 1}
+                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Mover para baixo"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {/* Botão de remover */}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remover categoria "${cat}"?`)) {
+                            removeCategory(cat);
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
+                      >
+                        Remover
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
