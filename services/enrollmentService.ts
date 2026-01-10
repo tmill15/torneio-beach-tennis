@@ -1,0 +1,155 @@
+/**
+ * Enrollment Service
+ * Gerencia inscrição de jogadores e lista de espera
+ */
+
+import type { Player, Tournament, Group } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
+import { PLAYERS_PER_GROUP } from '@/types';
+import { createGroups, canFormGroups as checkCanFormGroups } from './groupGenerator';
+
+/**
+ * Adiciona um jogador à lista de espera do torneio
+ */
+export function addPlayer(
+  nome: string,
+  categoria: string,
+  isSeed: boolean,
+  tournament: Tournament
+): Tournament {
+  const newPlayer: Player = {
+    id: uuidv4(),
+    nome,
+    categoria,
+    isSeed,
+    status: 'waiting',
+  };
+
+  return {
+    ...tournament,
+    waitingList: [...tournament.waitingList, newPlayer],
+  };
+}
+
+/**
+ * Remove um jogador da lista de espera
+ */
+export function removePlayer(
+  playerId: string,
+  tournament: Tournament
+): Tournament {
+  return {
+    ...tournament,
+    waitingList: tournament.waitingList.filter(p => p.id !== playerId),
+  };
+}
+
+/**
+ * Forma grupos automaticamente da lista de espera
+ * Retorna torneio atualizado com novos grupos e lista de espera reduzida
+ */
+export function formGroupsFromWaitingList(
+  tournament: Tournament,
+  categoria: string,
+  fase: number
+): Tournament {
+  // Filtra jogadores da categoria
+  const playersInCategory = tournament.waitingList.filter(
+    p => p.categoria === categoria
+  );
+
+  if (!checkCanFormGroups(playersInCategory)) {
+    console.warn(`Não há jogadores suficientes (mínimo ${PLAYERS_PER_GROUP}) na categoria ${categoria}`);
+    return tournament;
+  }
+
+  // Calcula quantos jogadores podem formar grupos
+  const numGroups = Math.floor(playersInCategory.length / PLAYERS_PER_GROUP);
+  const playersToEnroll = playersInCategory.slice(0, numGroups * PLAYERS_PER_GROUP);
+  const remainingPlayers = playersInCategory.slice(numGroups * PLAYERS_PER_GROUP);
+
+  // Cria grupos
+  const newGroups = createGroups(playersToEnroll, fase, categoria);
+
+  // Atualiza lista de espera (remove jogadores que foram para grupos)
+  const updatedWaitingList = [
+    ...tournament.waitingList.filter(p => p.categoria !== categoria),
+    ...remainingPlayers,
+  ];
+
+  return {
+    ...tournament,
+    grupos: [...tournament.grupos, ...newGroups],
+    waitingList: updatedWaitingList,
+  };
+}
+
+/**
+ * Verifica se é possível formar um novo grupo de uma categoria
+ */
+export function canFormNewGroup(
+  tournament: Tournament,
+  categoria: string
+): boolean {
+  const playersInCategory = tournament.waitingList.filter(
+    p => p.categoria === categoria
+  );
+  return playersInCategory.length >= PLAYERS_PER_GROUP;
+}
+
+/**
+ * Retorna estatísticas da lista de espera por categoria
+ */
+export function getWaitingListStats(tournament: Tournament) {
+  const stats: Record<string, {
+    total: number;
+    seeds: number;
+    canFormGroup: boolean;
+    groupsReady: number;
+    remaining: number;
+  }> = {};
+
+  for (const categoria of tournament.categorias) {
+    const players = tournament.waitingList.filter(p => p.categoria === categoria);
+    const total = players.length;
+    const seeds = players.filter(p => p.isSeed).length;
+    const groupsReady = Math.floor(total / PLAYERS_PER_GROUP);
+    const remaining = total % PLAYERS_PER_GROUP;
+
+    stats[categoria] = {
+      total,
+      seeds,
+      canFormGroup: total >= PLAYERS_PER_GROUP,
+      groupsReady,
+      remaining,
+    };
+  }
+
+  return stats;
+}
+
+/**
+ * Atualiza dados de um jogador
+ */
+export function updatePlayer(
+  playerId: string,
+  updates: Partial<Player>,
+  tournament: Tournament
+): Tournament {
+  return {
+    ...tournament,
+    waitingList: tournament.waitingList.map(p =>
+      p.id === playerId ? { ...p, ...updates } : p
+    ),
+  };
+}
+
+/**
+ * Lista jogadores de uma categoria específica
+ */
+export function getPlayersByCategory(
+  tournament: Tournament,
+  categoria: string
+): Player[] {
+  return tournament.waitingList.filter(p => p.categoria === categoria);
+}

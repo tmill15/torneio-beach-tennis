@@ -2,13 +2,15 @@
 Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construindo o "Torneio de Beach Tennis", um app para gestão de torneios.
 
 # 1. Referência Técnica (OBRIGATÓRIO)
-- **Base de Código:** Espelhar padrões (stack, arquitetura, linting) de: `https://github.com/tmill15/sorteador-duplas`.
-- **Estilo:** Simplicidade, UX limpa, Mobile-first.
+- **Base de Código:** Espelhar padrões (stack, arquitetura, linting, backup) de: `https://github.com/tmill15/sorteador-duplas`.
+- **Estilo:** Simplicidade, UX limpa, Mobile-first, PWA.
+- **Backup:** Inclua um esquema de backup, para exportar/importar o estado atual de um torneio: participantes, jogos, ranking e etc.
 
 # 2. Regras de Negócio "Hard" (Imutáveis)
 
 ## A. Estrutura Geral
-- **Categorias:** O sistema deve separar dados por categorias (Ex: "Iniciante" e "Normal").
+- **Categorias:** O sistema deve separar dados por categorias (Ex: "Iniciante" e "Normal"). Será possível criar as categorias.
+- **Nome:** O sistema aceita configurar o nome do torneio.
 
 ## B. Inscrição & Formação (Regra dos Blocos)
 - **Tamanho do Grupo:** Alvo = 4 duplas.
@@ -34,6 +36,15 @@ Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construin
 ## F. UI/UX: Dashboard & Fases (O Funil)
 - **Fluxo:** Fase 1 (Grupos) -> Fases Seguintes (Novos Grupos misturados) -> Final (Grupo Único).
 - **Visualização:** Cards de Grupos contendo a Tabela de Classificação e a Lista de Jogos logo abaixo (ou em um modal).
+
+## G. Protocolo de Versionamento & Deploy (NOVO)
+- **Fonte da Verdade:** A versão oficial fica no `package.json`.
+- **Incremento Automático:**
+  - Sempre que você concluir uma **Feature** completa ou correção de bug (concluir um passo do `PROJECT_STATUS.md`), você DEVE sugerir o incremento da versão no `package.json`.
+  - **Patch (0.0.X):** Correções de bugs ou pequenos ajustes de UI.
+  - **Minor (0.X.0):** Novas funcionalidades (ex: nova tela, nova regra).
+  - **Major (X.0.0):** Mudanças drásticas que quebram compatibilidade (raro).
+- **Display:** A versão deve estar visível no rodapé (`Footer`) da aplicação.
 
 # 3. Instruções para o Cursor
 - Sempre verifique `PROJECT_STATUS.md`.
