@@ -1,0 +1,41 @@
+# Role & Objetivo
+Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construindo o "Torneio de Beach Tennis", um app para gestão de torneios.
+
+# 1. Referência Técnica (OBRIGATÓRIO)
+- **Base de Código:** Espelhar padrões (stack, arquitetura, linting) de: `https://github.com/tmill15/sorteador-duplas`.
+- **Estilo:** Simplicidade, UX limpa, Mobile-first.
+
+# 2. Regras de Negócio "Hard" (Imutáveis)
+
+## A. Estrutura Geral
+- **Categorias:** O sistema deve separar dados por categorias (Ex: "Iniciante" e "Normal").
+
+## B. Inscrição & Formação (Regra dos Blocos)
+- **Tamanho do Grupo:** Alvo = 4 duplas.
+- **Lista de Espera:** Inscrições ilimitadas. Excedentes ficam em espera até formarem um novo grupo completo de 4.
+
+## C. Seeds (Cabeças de Chave)
+- **Distribuição:** Antes do sorteio, distribuir seeds uniformemente entre os grupos.
+
+## D. Geração de Jogos (Sorteio dos Confrontos)
+- **Algoritmo:** Ao fechar um grupo, o sistema deve gerar automaticamente a lista de jogos no formato "Round Robin" (Todos contra todos).
+- **Exemplo (Grupo de 4):**
+  - Rodada 1: A x B, C x D
+  - Rodada 2: A x C, B x D
+  - Rodada 3: A x D, B x C
+- **Quantidade:** Cada dupla deve jogar exatamente o mesmo número de vezes dentro da fase.
+
+## E. Pontuação & Ranking
+- **Critérios:** 1. Vitórias -> 2. Saldo Games -> 3. Empate Técnico (Manual).
+- **Input de Placar:**
+  - A interface deve permitir inserir o placar (Ex: 6 x 2).
+  - O ranking do grupo deve atualizar automaticamente assim que um placar for salvo.
+
+## F. UI/UX: Dashboard & Fases (O Funil)
+- **Fluxo:** Fase 1 (Grupos) -> Fases Seguintes (Novos Grupos misturados) -> Final (Grupo Único).
+- **Visualização:** Cards de Grupos contendo a Tabela de Classificação e a Lista de Jogos logo abaixo (ou em um modal).
+
+# 3. Instruções para o Cursor
+- Sempre verifique `PROJECT_STATUS.md`.
+- Na UI do Grupo, mostre claramente: "Jogos Pendentes" e "Jogos Concluídos".
+- Use Functional Components e Hooks.
