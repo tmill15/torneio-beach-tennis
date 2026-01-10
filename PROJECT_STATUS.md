@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.5.1  
+**Versão:** v0.6.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,57 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.6.0 - Partidas de Desempate Isoladas do Ranking ✅
+**Data:** 10/01/2026
+
+**Mudança Importante:**
+- 🎯 Partidas de desempate (`isTiebreaker: true`) agora são **isoladas** do ranking principal
+- 📊 Vitórias, derrotas e saldos de partidas de desempate **NÃO** contam mais no ranking
+- 🏆 Partidas de desempate servem **EXCLUSIVAMENTE** para resolver empates
+- ✨ Feedback visual ao gerar partida: alerta com nomes dos jogadores e mudança automática para aba "Jogos"
+
+**Problema Identificado:**
+Ao gerar uma partida de desempate de simples (ex: Dayanna × Amanda 6x0), a vitória e o saldo de games eram contabilizados no ranking geral, o que podia fazer um jogador **cair** na classificação ao "vencer" o desempate. Isso violava a lógica de que desempates devem apenas resolver posições iguais, não alterar estatísticas gerais.
+
+**Exemplo do Bug:**
+```
+Antes da partida de desempate:
+2. Dayanna  1V 2D  7-12  1 pt (-5)
+3. Amanda   1V 2D  7-12  1 pt (-5)
+⚠️ Empate
+
+Após Dayanna × Amanda (6-0):
+2. Dayanna  2V 2D  13-12  2 pts (+1)  ← Saldo melhorou!
+3. Amanda   1V 3D  7-18  1 pt (-11) ← Piorou muito!
+4. Carla    1V 2D  6-13  1 pt (-7)  ← Carla subiu!
+
+PROBLEMA: Dayanna deveria ficar em 2º, mas a vitória a fez subir tanto que Carla passou Amanda!
+```
+
+**Solução Implementada:**
+1. **`rankingService.ts`**: `getPlayerStats` agora ignora partidas com `isTiebreaker: true`
+2. **Ranking isolado**: Partidas de desempate não afetam V/D/Sets/Games
+3. **Posição definida apenas por `tiebreakOrder`**: Vencedor = 1, Perdedor = 2
+4. **Feedback UX**: 
+   - Alert: "✅ Partida de desempate gerada! Jogador1 × Jogador2"
+   - Mudança automática para aba "Jogos"
+
+**Resultado Esperado Agora:**
+```
+Antes da partida de desempate:
+2. Dayanna  1V 2D  7-12  1 pt (-5)
+3. Amanda   1V 2D  7-12  1 pt (-5)
+⚠️ Empate
+
+Após Dayanna × Amanda (6-0):
+2. Dayanna [DESEMPATE] 1V 2D  7-12  1 pt (-5)  ← Estatísticas inalteradas!
+3. Amanda [DESEMPATE]  1V 2D  7-12  1 pt (-5)  ← Estatísticas inalteradas!
+
+Partida de desempate serviu APENAS para definir quem fica em 2º e 3º!
+```
+
+**Tipo:** Minor (mudança de comportamento importante - nova regra de cálculo)
 
 ### v0.5.1 - Remoção de Partida de Simples ao Desfazer Desempate ✅
 **Data:** 10/01/2026
@@ -577,5 +628,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.5.1  
-**Status:** ✅ ATIVO - Sistema completo com resolução automática de desempates via partidas de simples, remoção correta de partidas ao desfazer, sorteio funcionando e métodos claramente identificados!
+**Versão atual:** v0.6.0  
+**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), resolução automática, feedback visual ao gerar partidas, e métodos claramente identificados!

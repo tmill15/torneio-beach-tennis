@@ -91,6 +91,10 @@ export function getPlayerStats(player: Player, matches: Match[]) {
   for (const match of matches) {
     if (!match.isFinished) continue;
     
+    // IMPORTANTE: Ignorar partidas de desempate no cálculo do ranking
+    // Partidas de desempate servem APENAS para resolver empates, não para afetar estatísticas
+    if (match.isTiebreaker) continue;
+    
     // Verifica se jogador está na dupla A
     const isInDuplaA = 
       match.jogador1A.id === player.id || 
