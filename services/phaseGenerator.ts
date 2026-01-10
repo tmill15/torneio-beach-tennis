@@ -249,18 +249,21 @@ export function generateNextPhase(
     
     const finalGroup: Group = {
       id: uuidv4(),
-      nome: 'Final',
+      nome: 'A', // Usa letra como os outros grupos
       fase: 3,
       categoria,
-      players: groupPlayers.map(p => ({ 
-        ...p, 
-        status: 'enrolled',
-        qualificationType: allQualified.find(q => q.player.id === p.id)?.type,
-        // Limpar badges da fase anterior
-        tiebreakOrder: undefined,
-        tiebreakMethod: undefined,
-        eliminatedInPhase: undefined
-      })),
+      players: groupPlayers.map(p => {
+        return {
+          ...p,
+          status: 'enrolled' as const, // Todos os jogadores na fase final estão enrolled
+          // Fase 3 é a final - não há próxima fase, então não precisa de qualificationType
+          qualificationType: undefined,
+          // Limpar badges e status da fase anterior
+          tiebreakOrder: undefined,
+          tiebreakMethod: undefined,
+          eliminatedInPhase: undefined
+        };
+      }),
       matches: []
     };
     
@@ -300,15 +303,18 @@ export function generateNextPhase(
         nome: groupName, // Apenas a letra (A, B, C...)
         fase: nextPhase,
         categoria,
-        players: groupPlayers.map(p => ({ 
-          ...p, 
-          status: 'enrolled',
-          qualificationType: allQualified.find(q => q.player.id === p.id)?.type,
-          // Limpar badges da fase anterior
-          tiebreakOrder: undefined,
-          tiebreakMethod: undefined,
-          eliminatedInPhase: undefined
-        })),
+        players: groupPlayers.map(p => {
+          return {
+            ...p,
+            status: 'enrolled' as const, // Todos os jogadores na nova fase estão enrolled
+            // NÃO atribuir qualificationType aqui - isso será feito quando avançar para a próxima fase
+            qualificationType: undefined,
+            // Limpar badges e status da fase anterior
+            tiebreakOrder: undefined,
+            tiebreakMethod: undefined,
+            eliminatedInPhase: undefined
+          };
+        }),
         matches: []
       };
       

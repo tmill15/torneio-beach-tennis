@@ -61,9 +61,11 @@ export function GroupCard({
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-orange-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white">
-          {group.nome && group.nome.startsWith('Grupo ') 
-            ? `${group.nome} - Fase ${group.fase}`
-            : `Grupo ${group.nome || '?'} - Fase ${group.fase}`
+          {group.fase === 3
+            ? `Grupo ${group.nome === 'Final' ? 'A' : (group.nome || 'A')} - Fase Final`
+            : group.nome && group.nome.startsWith('Grupo ')
+              ? `${group.nome} - Fase ${group.fase}`
+              : `Grupo ${group.nome || '?'} - Fase ${group.fase}`
           }
         </h3>
         <p className="text-orange-100 text-sm mt-1">
@@ -139,7 +141,8 @@ export function GroupCard({
                             REPESCAGEM
                           </span>
                         )}
-                        {isReadOnly && entry.player.status === 'eliminated' && (
+                        {/* ELIMINADO só aparece se não foi classificado (sem qualificationType) */}
+                        {isReadOnly && entry.player.status === 'eliminated' && !entry.player.qualificationType && (
                           <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded">
                             ELIMINADO
                           </span>

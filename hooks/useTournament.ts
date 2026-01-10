@@ -131,13 +131,15 @@ export function useTournament() {
     
     // 🔤 MIGRAÇÃO v0.11.2: Garantir que todos os grupos tenham nome (letra)
     const groupsWithoutName = rawTournament.grupos.filter(g => !g.nome || g.nome.trim() === '');
-    if (groupsWithoutName.length > 0) {
-      console.log(`🔤 v0.11.2: Corrigindo ${groupsWithoutName.length} grupo(s) sem nome...`);
+    const groupsWithFinalName = rawTournament.grupos.filter(g => g.nome === 'Final' || g.nome === 'Grupo Final');
+    
+    if (groupsWithoutName.length > 0 || groupsWithFinalName.length > 0) {
+      console.log(`🔤 v0.11.7: Corrigindo ${groupsWithoutName.length + groupsWithFinalName.length} grupo(s) com nome incorreto...`);
       const fixedTournament = {
         ...rawTournament,
         grupos: rawTournament.grupos.map((group, index) => {
-          // Se não tem nome, atribui baseado na ordem na categoria e fase
-          if (!group.nome || group.nome.trim() === '') {
+          // Se não tem nome ou tem nome "Final", atribui baseado na ordem na categoria e fase
+          if (!group.nome || group.nome.trim() === '' || group.nome === 'Final' || group.nome === 'Grupo Final') {
             const groupsInSameCategoryAndPhase = rawTournament.grupos.filter(
               g => g.categoria === group.categoria && g.fase === group.fase
             );
@@ -153,6 +155,109 @@ export function useTournament() {
       setTimeout(() => setRawTournament(fixedTournament), 0);
       console.log('✅ Nomes dos grupos corrigidos!');
       return fixedTournament;
+    }
+    
+    // 🧹 MIGRAÇÃO v0.11.8: Limpar qualificationType incorreto de jogadores na Fase 2
+    // Problema: Todos os jogadores da Fase 2 estavam recebendo qualificationType quando não deveriam
+    // Solução: Limpar qualificationType de jogadores na Fase 2 que não estão na Fase 3
+    const phase2Groups = rawTournament.grupos.filter(g => g.fase === 2);
+    const needsPhase2Cleanup = phase2Groups.some(group => {
+      return group.players.some(p => p.qualificationType !== undefined);
+    });
+    
+    if (needsPhase2Cleanup) {
+      console.log('🧹 v0.11.8: Limpando qualificationType incorreto da Fase 2...');
+      
+      // Para cada categoria, identificar jogadores que realmente foram classificados (estão na Fase 3)
+      const categoriesWithPhase3 = new Set<string>();
+      rawTournament.grupos.forEach(g => {
+        if (g.fase === 3) {
+          categoriesWithPhase3.add(g.categoria);
+        }
+      });
+      
+      const cleanedTournament = {
+        ...rawTournament,
+        grupos: rawTournament.grupos.map(group => {
+          if (group.fase === 2) {
+            // Se há Fase 3, verificar quais jogadores realmente foram classificados
+            if (categoriesWithPhase3.has(group.categoria)) {
+              const phase3Group = rawTournament.grupos.find(g => g.fase === 3 && g.categoria === group.categoria);
+              if (phase3Group) {
+                const qualifiedIds = new Set(phase3Group.players.map(p => p.id));
+                return {
+                  ...group,
+                  players: group.players.map(p => {
+                    // Se o jogador está na Fase 3, manter qualificationType (será recalculado corretamente pelo advanceToNextPhase)
+                    // Se não está, limpar qualificationType
+                    if (qualifiedIds.has(p.id)) {
+                      return p; // Manter - será recalculado corretamente
+                    } else {
+                      const { qualificationType, ...rest } = p;
+                      return rest; // Limpar qualificationType
+                    }
+                  })
+                };
+              }
+            }
+            // Se não há Fase 3, limpar qualificationType de todos
+            return {
+              ...group,
+              players: group.players.map(p => {
+                const { qualificationType, ...rest } = p;
+                return rest;
+              })
+            };
+          }
+          return group;
+        })
+      };
+      
+      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      console.log('✅ qualificationType da Fase 2 corrigido!');
+      return cleanedTournament;
+    }
+    
+    // 🧹 MIGRAÇÃO v0.11.7: Limpar qualificationType de jogadores na fase atual
+    // qualificationType só deve existir em jogadores de fases anteriores (read-only)
+    const maxPhaseByCategory: Record<string, number> = {};
+    rawTournament.grupos.forEach(group => {
+      if (!maxPhaseByCategory[group.categoria] || group.fase > maxPhaseByCategory[group.categoria]) {
+        maxPhaseByCategory[group.categoria] = group.fase;
+      }
+    });
+    
+    const needsQualificationTypeCleanup = rawTournament.grupos.some(group => {
+      const maxPhase = maxPhaseByCategory[group.categoria] || 0;
+      // Se a fase do grupo é a fase máxima (fase atual), não deveria ter qualificationType
+      if (group.fase === maxPhase && maxPhase > 0) {
+        return group.players.some(p => p.qualificationType !== undefined);
+      }
+      return false;
+    });
+    
+    if (needsQualificationTypeCleanup) {
+      console.log('🧹 v0.11.7: Limpando qualificationType de jogadores na fase atual...');
+      const cleanedTournament = {
+        ...rawTournament,
+        grupos: rawTournament.grupos.map(group => {
+          const maxPhase = maxPhaseByCategory[group.categoria] || 0;
+          // Se é a fase atual, limpa qualificationType
+          if (group.fase === maxPhase && maxPhase > 0) {
+            return {
+              ...group,
+              players: group.players.map(p => {
+                const { qualificationType, ...rest } = p;
+                return rest;
+              })
+            };
+          }
+          return group;
+        })
+      };
+      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      console.log('✅ qualificationType limpo da fase atual!');
+      return cleanedTournament;
     }
     
     return rawTournament;

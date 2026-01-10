@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.11.6  
+**Versão:** v0.11.9  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,117 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.11.9 - Correção: Badges Incorretos na Fase 2 ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Todos os jogadores marcados como CLASSIFICADO na Fase 2:** Todos os jogadores da Fase 2 estavam recebendo `qualificationType` quando apenas os classificados deveriam ter
+  - **Problema:** Quando a Fase 2 era criada, todos os jogadores recebiam `qualificationType` da Fase 1
+  - **Solução:** 
+    - Removido `qualificationType` da criação de grupos na Fase 2 e Fase 3
+    - `qualificationType` agora só é atribuído quando a fase avança (na função `advanceToNextPhase`)
+    - Migração v0.11.8 que limpa `qualificationType` incorreto de jogadores na Fase 2 que não foram classificados
+  - **Resultado:** Apenas jogadores realmente classificados têm badges na Fase 2
+
+**Modificado:**
+- 🔄 `services/phaseGenerator.ts`:
+  - Removido `qualificationType` da criação de grupos na Fase 2 e Fase 3
+  - `qualificationType` agora é `undefined` quando grupos são criados
+- 🔄 `hooks/useTournament.ts`:
+  - Nova migração v0.11.8 que limpa `qualificationType` incorreto da Fase 2
+  - Migração verifica quais jogadores realmente foram classificados (estão na Fase 3) e mantém apenas esses
+
+**Nota sobre Badges:**
+- **CLASSIFICADO:** Apenas para jogadores com `qualificationType: 'direct'` (classificação direta)
+- **REPESCAGEM:** Apenas para jogadores com `qualificationType: 'repechage'` (melhor 2º/3º lugar)
+- Jogadores classificados via repescagem têm APENAS o badge REPESCAGEM, não CLASSIFICADO (isso está correto)
+
+---
+
+### v0.11.8 - Correção: Badges na Fase Atual e Nome do Grupo Final ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Badges aparecendo na fase atual:** Badges de CLASSIFICADO/REPESCAGEM/ELIMINADO apareciam na fase atual quando não deveriam
+  - **Problema:** `qualificationType` estava sendo mantido em jogadores da fase atual
+  - **Solução:** 
+    - Migração automática v0.11.7 que limpa `qualificationType` de jogadores na fase atual
+    - `qualificationType` só deve existir em jogadores de fases anteriores (read-only)
+  - **Resultado:** Badges só aparecem em fases anteriores (read-only), não na fase atual
+
+- 🏆 **Nome do Grupo Final:** Corrigido para usar "A" ao invés de "Final"
+  - **Problema:** Grupos antigos ainda tinham `nome: 'Final'` ou `nome: 'Grupo Final'`
+  - **Solução:**
+    - Migração automática que corrige grupos com nome "Final" ou "Grupo Final"
+    - Atribui letra "A" para o grupo final
+    - Componente `GroupCard` trata grupos antigos com nome "Final"
+  - **Resultado:** Grupo final agora mostra "Grupo A - Fase Final" consistentemente
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Nova migração v0.11.7 que limpa `qualificationType` da fase atual
+  - Migração expandida para corrigir grupos com nome "Final" ou "Grupo Final"
+- 🔄 `components/GroupCard.tsx`:
+  - Tratamento para grupos antigos com nome "Final" (converte para "A")
+
+**Lógica de Badges (Atualizada):**
+```
+Fase Anterior (read-only, selectedPhase < maxPhase):
+  - SEED: sempre visível
+  - CLASSIFICADO: se qualificationType === 'direct'
+  - REPESCAGEM: se qualificationType === 'repechage'
+  - ELIMINADO: se status === 'eliminated' E !qualificationType
+  - DESEMPATE: se tiebreakOrder existe
+
+Fase Atual (editável, selectedPhase === maxPhase):
+  - SEED: sempre visível
+  - Nenhum outro badge (qualificationType é limpo automaticamente)
+```
+
+---
+
+### v0.11.7 - Correção: Badges e Título da Fase Final ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Badges conflitantes na Fase 2:** Jogadores apareciam com CLASSIFICADO e ELIMINADO simultaneamente
+  - **Problema:** Jogadores classificados mantinham `status: 'eliminated'` da fase anterior
+  - **Solução:** 
+    - Garantir que todos os jogadores em novas fases tenham `status: 'enrolled'`
+    - Badge ELIMINADO só aparece se não houver `qualificationType` (não foi classificado)
+  - **Resultado:** Badges agora são mutuamente exclusivos (CLASSIFICADO ou ELIMINADO, nunca ambos)
+
+- 🏆 **Título do Grupo Final:** Corrigido para manter nomenclatura consistente
+  - **Problema:** Aparecia "Grupo Final - Fase 3"
+  - **Solução:**
+    - Grupo final agora usa letra "A" como os outros grupos
+    - Título exibe "Grupo A - Fase Final" ao invés de "Grupo Final - Fase 3"
+  - **Resultado:** Nomenclatura consistente e clara
+
+**Modificado:**
+- 🔄 `services/phaseGenerator.ts`:
+  - Grupo final agora usa `nome: 'A'` ao invés de `'Final'`
+  - Garantido que todos os jogadores em novas fases têm `status: 'enrolled'`
+  - Limpeza adequada de status ao criar grupos das fases 2 e 3
+- 🔄 `components/GroupCard.tsx`:
+  - Título da Fase 3 agora mostra "Fase Final" ao invés de "Fase 3"
+  - Badge ELIMINADO só aparece se `!qualificationType` (não foi classificado)
+
+**Lógica de Badges:**
+```
+Fase Anterior (read-only):
+  - SEED: sempre visível
+  - CLASSIFICADO: se qualificationType === 'direct'
+  - REPESCAGEM: se qualificationType === 'repechage'
+  - ELIMINADO: se status === 'eliminated' E !qualificationType
+
+Fase Atual (editável):
+  - SEED: sempre visível
+  - Sem outros badges
+```
 
 ---
 
