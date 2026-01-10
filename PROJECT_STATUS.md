@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.6.0  
+**Versão:** v0.6.1  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,41 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.6.1 - Indicador de Partida de Desempate Gerada (UX) ✅
+**Data:** 10/01/2026
+
+**Melhorado:**
+- 🎯 Removido popup (alert) ao gerar partida de desempate
+- ✨ Adicionado card visual elegante indicando "Partida de Desempate Gerada!"
+- 🔘 Botão "▶️ Ir para a Partida" para navegar manualmente para a aba "Jogos"
+- 📍 Card verde com borda destacada mostra rodada e jogadores da partida gerada
+
+**Experiência do Usuário:**
+
+**Antes (v0.6.0):**
+1. Clicava em "⚔️ Gerar Partida de Simples"
+2. ⚠️ Popup aparecia (intrusivo)
+3. Aba mudava automaticamente para "Jogos" (sem controle do usuário)
+
+**Agora (v0.6.1):**
+1. Clica em "⚔️ Gerar Partida de Simples"
+2. ✅ Card verde elegante aparece na aba "Classificação":
+   ```
+   🎾 Partida de Desempate Gerada!
+   ⚔️ Rodada 4: Dayanna × Amanda
+   [▶️ Ir para a Partida]
+   ```
+3. Usuário clica no botão quando estiver pronto
+4. Aba muda para "Jogos" com a partida visível
+
+**Design do Card:**
+- 🟢 Fundo verde claro com borda verde destacada
+- 🎾 Ícone de tênis para chamar atenção
+- ⚔️ Detalhes da partida (rodada e jogadores)
+- 🔘 Botão de ação claro e direto
+
+**Tipo:** Patch (melhoria de UX/UI)
 
 ### v0.6.0 - Partidas de Desempate Isoladas do Ranking ✅
 **Data:** 10/01/2026
@@ -628,5 +663,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.6.0  
-**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), resolução automática, feedback visual ao gerar partidas, e métodos claramente identificados!
+**Versão atual:** v0.6.1  
+**Status:** ✅ ATIVO - Sistema completo com partidas de desempate isoladas do ranking (não afetam estatísticas), card visual elegante para partidas geradas, navegação controlada pelo usuário, e métodos claramente identificados!

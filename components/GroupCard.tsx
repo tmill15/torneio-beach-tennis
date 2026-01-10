@@ -23,6 +23,7 @@ interface GroupCardProps {
   onResolveTieRandom: (groupId: string, tiedPlayerIds: string[]) => void;
   onGenerateSingles: (groupId: string, player1Id: string, player2Id: string) => void;
   onUndoTiebreak: (groupId: string, playerIds: string[]) => void;
+  onChangeViewMode?: (mode: 'classificacao' | 'jogos') => void;
 }
 
 export function GroupCard({
@@ -37,6 +38,7 @@ export function GroupCard({
   onResolveTieRandom,
   onGenerateSingles,
   onUndoTiebreak,
+  onChangeViewMode,
 }: GroupCardProps) {
   const [showTiebreakerModal, setShowTiebreakerModal] = useState<any>(null);
 
@@ -48,6 +50,9 @@ export function GroupCard({
 
   // Detectar jogadores com desempate resolvido
   const playersWithTiebreak = ranking.filter(entry => entry.player.tiebreakOrder);
+
+  // Detectar partidas de desempate pendentes
+  const pendingTiebreakerMatches = group.matches.filter(m => m.isTiebreaker && !m.isFinished);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -182,6 +187,33 @@ export function GroupCard({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partida de Desempate Pendente */}
+      {viewMode === 'classificacao' && pendingTiebreakerMatches.length > 0 && (
+        <div className="px-6 pb-6">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🎾</span>
+              <p className="text-sm font-bold text-green-800 dark:text-green-200">
+                Partida de Desempate Gerada!
+              </p>
+            </div>
+            <div className="space-y-2 mb-3">
+              {pendingTiebreakerMatches.map((match) => (
+                <div key={match.id} className="text-sm text-green-700 dark:text-green-300 font-medium">
+                  ⚔️ Rodada {match.rodada}: {match.jogador1A.nome} × {match.jogador1B.nome}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => onChangeViewMode?.('jogos')}
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-bold flex items-center justify-center gap-2"
+            >
+              ▶️ Ir para a Partida
+            </button>
           </div>
         </div>
       )}

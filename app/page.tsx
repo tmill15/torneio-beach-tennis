@@ -45,23 +45,8 @@ export default function Home() {
   };
 
   const handleGenerateSingles = (groupId: string, player1Id: string, player2Id: string) => {
-    // Gera a partida
+    // Apenas gera a partida (sem mudar aba ou mostrar alert)
     generateSinglesMatch(groupId, player1Id, player2Id);
-    
-    // Muda para visualização de jogos
-    setViewMode('jogos');
-    
-    // Encontra os nomes dos jogadores
-    const group = tournament.grupos.find(g => g.id === groupId);
-    const player1 = group?.players.find(p => p.id === player1Id);
-    const player2 = group?.players.find(p => p.id === player2Id);
-    
-    // Mostra alerta de sucesso
-    if (player1 && player2) {
-      setTimeout(() => {
-        alert(`✅ Partida de desempate gerada!\n\n${player1.nome} × ${player2.nome}\n\nA partida está disponível na aba "Jogos" abaixo.`);
-      }, 100);
-    }
   };
 
   // Evita erro de hydration - só renderiza após montar no cliente
@@ -181,6 +166,7 @@ export default function Home() {
                   onResolveTieRandom={resolveTieRandom}
                   onGenerateSingles={handleGenerateSingles}
                   onUndoTiebreak={undoTiebreak}
+                  onChangeViewMode={setViewMode}
                 />
               );
             })}
