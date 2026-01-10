@@ -77,6 +77,7 @@ export interface Group {
 // ============================================
 
 export interface Tournament {
+  version?: string;                  // Versão dos dados (para migrações seguras)
   nome: string;
   categorias: string[];
   gameConfig: GameConfig;            // Configurações do jogo
@@ -166,5 +167,8 @@ export function getGroupName(index: number): string {
  * Formata nomes de dupla para exibição
  */
 export function formatDupla(jogador1: Player, jogador2: Player): string {
+  if (!jogador1 || !jogador2) {
+    return 'Dupla incompleta';
+  }
   return `${jogador1.nome} / ${jogador2.nome}`;
 }

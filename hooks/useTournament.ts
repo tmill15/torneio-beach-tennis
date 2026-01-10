@@ -5,13 +5,13 @@
 
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Tournament, Player, Group, Match, SetScore } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer as removePlayerService } from '@/services/enrollmentService';
 import { generatePairsFor4Players } from '@/services/matchGenerator';
 import { updateMatchResult, calculateRanking } from '@/services/rankingService';
-import { createEmptyTournament } from '@/services/backupService';
+import { createEmptyTournament, isValidTournamentStructure, isV030Structure, migrateV030ToV040 } from '@/services/backupService';
 
 const TOURNAMENT_STORAGE_KEY = 'beachtennis-tournament';
 
@@ -19,47 +19,114 @@ const TOURNAMENT_STORAGE_KEY = 'beachtennis-tournament';
  * Hook principal para gerenciar o torneio
  */
 export function useTournament() {
-  const [tournament, setTournament] = useLocalStorage<Tournament>(
+  const [rawTournament, setRawTournament] = useLocalStorage<Tournament>(
     TOURNAMENT_STORAGE_KEY,
     createEmptyTournament()
   );
+
+  // Valida estrutura do torneio ao carregar
+  const [tournament, setTournament] = useState<Tournament>(() => {
+    // Verifica se é da v0.3.0 e precisa migrar
+    if (isV030Structure(rawTournament)) {
+      console.log('🔄 Detectados dados da v0.3.0. Iniciando migração automática...');
+      const migratedTournament = migrateV030ToV040(rawTournament);
+      
+      // Regera matches para grupos existentes
+      const groupsWithMatches = migratedTournament.grupos.map(group => {
+        if (group.players.length === 4) {
+          return {
+            ...group,
+            matches: generatePairsFor4Players(group),
+          };
+        }
+        return group;
+      });
+      
+      const finalTournament = {
+        ...migratedTournament,
+        grupos: groupsWithMatches,
+      };
+      
+      // Salva estrutura migrada
+      setTimeout(() => setRawTournament(finalTournament), 0);
+      return finalTournament;
+    }
+    
+    // ✅ MODO SEGURO: Valida apenas estrutura básica
+    if (!isValidTournamentStructure(rawTournament)) {
+      console.error('❌ Dados corrompidos ou inválidos detectados!');
+      console.error('Estrutura recebida:', rawTournament);
+      
+      // ⚠️ ÚLTIMO RECURSO: Só cria torneio vazio se dados estiverem realmente corrompidos
+      const emptyTournament = createEmptyTournament();
+      console.warn('⚠️ Criando torneio vazio. Verifique backups automáticos no localStorage.');
+      return emptyTournament;
+    }
+    
+    // ✅ Adiciona version se não existir (compatibilidade com v0.4.0)
+    if (!rawTournament.version) {
+      console.log('📌 Adicionando marcador de versão aos dados existentes...');
+      const tournamentWithVersion = {
+        ...rawTournament,
+        version: '0.4.0',
+      };
+      setTimeout(() => setRawTournament(tournamentWithVersion), 0);
+      return tournamentWithVersion;
+    }
+    
+    return rawTournament;
+  });
+
+  // Sincroniza com rawTournament
+  useEffect(() => {
+    if (isValidTournamentStructure(rawTournament)) {
+      setTournament(rawTournament);
+    }
+  }, [rawTournament]);
+
+  // Wrapper para setRawTournament
+  const updateTournament = useCallback((value: Tournament | ((prev: Tournament) => Tournament)) => {
+    const newValue = value instanceof Function ? value(tournament) : value;
+    setTournament(newValue);
+    setRawTournament(newValue);
+  }, [tournament, setRawTournament]);
 
   /**
    * Atualiza nome do torneio
    */
   const updateTournamentName = useCallback((nome: string) => {
-    setTournament(prev => ({ ...prev, nome }));
-  }, [setTournament]);
+    updateTournament(prev => ({ ...prev, nome }));
+  }, [updateTournament]);
 
   /**
    * Adiciona uma categoria
    */
   const addCategory = useCallback((categoria: string) => {
-    setTournament(prev => ({
+    updateTournament(prev => ({
       ...prev,
       categorias: [...prev.categorias, categoria],
     }));
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Remove uma categoria
    */
   const removeCategory = useCallback((categoria: string) => {
-    setTournament(prev => ({
+    updateTournament(prev => ({
       ...prev,
       categorias: prev.categorias.filter(c => c !== categoria),
       waitingList: prev.waitingList.filter(p => p.categoria !== categoria),
       grupos: prev.grupos.filter(g => g.categoria !== categoria),
     }));
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Move uma categoria para cima na ordem
    */
   const moveCategoryUp = useCallback((categoria: string) => {
-    setTournament(prev => {
+    updateTournament(prev => {
       const index = prev.categorias.indexOf(categoria);
-      if (index <= 0) return prev; // Já está no topo ou não existe
+      if (index <= 0) return prev;
       
       const newCategorias = [...prev.categorias];
       [newCategorias[index - 1], newCategorias[index]] = [newCategorias[index], newCategorias[index - 1]];
@@ -69,15 +136,15 @@ export function useTournament() {
         categorias: newCategorias,
       };
     });
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Move uma categoria para baixo na ordem
    */
   const moveCategoryDown = useCallback((categoria: string) => {
-    setTournament(prev => {
+    updateTournament(prev => {
       const index = prev.categorias.indexOf(categoria);
-      if (index < 0 || index >= prev.categorias.length - 1) return prev; // Já está no final ou não existe
+      if (index < 0 || index >= prev.categorias.length - 1) return prev;
       
       const newCategorias = [...prev.categorias];
       [newCategorias[index], newCategorias[index + 1]] = [newCategorias[index + 1], newCategorias[index]];
@@ -87,34 +154,34 @@ export function useTournament() {
         categorias: newCategorias,
       };
     });
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Atualiza configurações de jogo
    */
   const updateGameConfig = useCallback((config: Tournament['gameConfig']) => {
-    setTournament(prev => ({ ...prev, gameConfig: config }));
-  }, [setTournament]);
+    updateTournament(prev => ({ ...prev, gameConfig: config }));
+  }, [updateTournament]);
 
   /**
    * Adiciona um jogador à lista de espera
    */
   const addPlayer = useCallback((nome: string, categoria: string, isSeed: boolean) => {
-    setTournament(prev => addPlayerService(nome, categoria, isSeed, prev));
-  }, [setTournament]);
+    updateTournament(prev => addPlayerService(nome, categoria, isSeed, prev));
+  }, [updateTournament]);
 
   /**
    * Remove um jogador da lista de espera
    */
   const removePlayer = useCallback((playerId: string) => {
-    setTournament(prev => removePlayerService(playerId, prev));
-  }, [setTournament]);
+    updateTournament(prev => removePlayerService(playerId, prev));
+  }, [updateTournament]);
 
   /**
    * Forma grupos a partir da lista de espera
    */
   const formGroups = useCallback((categoria: string, fase: number = 1) => {
-    setTournament(prev => {
+    updateTournament(prev => {
       const updated = formGroupsFromWaitingList(prev, categoria, fase);
       
       // Gera matches para os novos grupos
@@ -134,7 +201,7 @@ export function useTournament() {
         grupos: groupsWithMatches,
       };
     });
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Atualiza o placar de uma partida
@@ -144,7 +211,7 @@ export function useTournament() {
     matchId: string,
     sets: SetScore[]
   ) => {
-    setTournament(prev => ({
+    updateTournament(prev => ({
       ...prev,
       grupos: prev.grupos.map(group => {
         if (group.id !== groupId) return group;
@@ -158,13 +225,13 @@ export function useTournament() {
         };
       }),
     }));
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Finaliza uma partida
    */
   const finalizeMatch = useCallback((groupId: string, matchId: string) => {
-    setTournament(prev => ({
+    updateTournament(prev => ({
       ...prev,
       grupos: prev.grupos.map(group => {
         if (group.id !== groupId) return group;
@@ -178,7 +245,7 @@ export function useTournament() {
         };
       }),
     }));
-  }, [setTournament]);
+  }, [updateTournament]);
 
   /**
    * Obtém o ranking de um grupo
@@ -193,15 +260,15 @@ export function useTournament() {
    * Importa um torneio (substituindo o atual)
    */
   const importTournament = useCallback((newTournament: Tournament) => {
-    setTournament(newTournament);
-  }, [setTournament]);
+    updateTournament(newTournament);
+  }, [updateTournament]);
 
   /**
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
-    setTournament(createEmptyTournament());
-  }, [setTournament]);
+    updateTournament(createEmptyTournament());
+  }, [updateTournament]);
 
   return {
     tournament,

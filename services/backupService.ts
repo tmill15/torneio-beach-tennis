@@ -146,11 +146,15 @@ export function getBackupMetadata(jsonData: string): {
   }
 }
 
+// Versão atual dos dados
+const CURRENT_DATA_VERSION = '0.4.0';
+
 /**
  * Cria um torneio vazio
  */
 export function createEmptyTournament(): Tournament {
   return {
+    version: CURRENT_DATA_VERSION,
     nome: 'Novo Torneio',
     categorias: ['Iniciante', 'Normal'],
     gameConfig: {
@@ -162,4 +166,252 @@ export function createEmptyTournament(): Tournament {
     grupos: [],
     waitingList: [],
   };
+}
+
+/**
+ * Valida estrutura BÁSICA do torneio (modo compatível)
+ * Apenas verifica campos essenciais, aceita variações
+ */
+export function isValidTournamentStructure(tournament: any): boolean {
+  if (!tournament || typeof tournament !== 'object') return false;
+  
+  // Verifica APENAS estrutura básica essencial
+  if (typeof tournament.nome !== 'string') return false;
+  if (!Array.isArray(tournament.categorias)) return false;
+  if (!tournament.gameConfig || typeof tournament.gameConfig !== 'object') return false;
+  if (!Array.isArray(tournament.grupos)) return false;
+  if (!Array.isArray(tournament.waitingList)) return false;
+  
+  // ✅ MODO COMPATÍVEL: Aceita pequenas variações
+  // Não valida estrutura interna profunda para evitar perda de dados
+  
+  return true;
+}
+
+/**
+ * Valida se o torneio está na estrutura EXATA da v0.4.0
+ * Usado apenas para detecção, NÃO para rejeitar dados
+ */
+export function isExactV040Structure(tournament: any): boolean {
+  if (!isValidTournamentStructure(tournament)) return false;
+  
+  // Verifica se waitingList tem estrutura de jogadores individuais (v0.4.0)
+  if (tournament.waitingList.length > 0) {
+    const firstItem = tournament.waitingList[0];
+    // Se tem jogador1/jogador2, NÃO é v0.4.0
+    if (firstItem.jogador1 || firstItem.jogador2) return false;
+    // Deve ter nome direto (jogador individual)
+    if (!firstItem.nome) return false;
+  }
+  
+  // Verifica grupos
+  if (tournament.grupos.length > 0) {
+    const firstGroup = tournament.grupos[0];
+    // Se tem 'duplas', NÃO é v0.4.0
+    if (firstGroup.duplas) return false;
+    // Deve ter 'players' (v0.4.0)
+    if (!firstGroup.players) return false;
+    
+    // Verifica matches se existirem
+    if (firstGroup.matches && firstGroup.matches.length > 0) {
+      const firstMatch = firstGroup.matches[0];
+      // Se tem duplaA/duplaB, NÃO é v0.4.0
+      if (firstMatch.duplaA || firstMatch.duplaB) return false;
+      // Deve ter jogador1A, jogador2A, jogador1B, jogador2B (v0.4.0)
+      if (!firstMatch.jogador1A || !firstMatch.jogador2A || 
+          !firstMatch.jogador1B || !firstMatch.jogador2B) return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Detecta se os dados são da v0.3.0 (estrutura de duplas)
+ */
+export function isV030Structure(tournament: any): boolean {
+  if (!tournament || typeof tournament !== 'object') return false;
+  
+  // Verifica waitingList com duplas
+  if (tournament.waitingList && tournament.waitingList.length > 0) {
+    const firstItem = tournament.waitingList[0];
+    if (firstItem.jogador1 || firstItem.jogador2) return true;
+  }
+  
+  // Verifica grupos com duplas
+  if (tournament.grupos && tournament.grupos.length > 0) {
+    const firstGroup = tournament.grupos[0];
+    if (firstGroup.duplas) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Cria backup automático dos dados antes de qualquer migração
+ */
+export function createAutoBackup(tournament: any): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const timestamp = new Date().toISOString();
+    const backupKey = `beachtennis-backup-${timestamp}`;
+    const backup = {
+      version: tournament.version || '0.3.0',
+      timestamp,
+      data: tournament,
+    };
+    window.localStorage.setItem(backupKey, JSON.stringify(backup));
+    console.log(`💾 Backup automático criado: ${backupKey}`);
+    
+    // Limita quantidade de backups automáticos (mantém últimos 5)
+    cleanOldAutoBackups();
+  } catch (error) {
+    console.error('Erro ao criar backup automático:', error);
+  }
+}
+
+/**
+ * Lista todos os backups automáticos disponíveis
+ */
+export function listAutoBackups(): Array<{ key: string; timestamp: string; version: string }> {
+  if (typeof window === 'undefined') return [];
+  
+  const backups: Array<{ key: string; timestamp: string; version: string }> = [];
+  
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('beachtennis-backup-')) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          const backup = JSON.parse(data);
+          backups.push({
+            key,
+            timestamp: backup.timestamp,
+            version: backup.version,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao listar backups:', error);
+  }
+  
+  return backups.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+/**
+ * Remove backups automáticos antigos (mantém últimos 5)
+ */
+function cleanOldAutoBackups(): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const backups = listAutoBackups();
+    if (backups.length > 5) {
+      // Remove backups mais antigos
+      const toRemove = backups.slice(5);
+      toRemove.forEach(backup => {
+        localStorage.removeItem(backup.key);
+        console.log(`🗑️  Backup antigo removido: ${backup.key}`);
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao limpar backups antigos:', error);
+  }
+}
+
+/**
+ * Migra dados da v0.3.0 (duplas) para v0.4.0 (jogadores individuais)
+ * Converte cada dupla em 2 jogadores individuais
+ */
+export function migrateV030ToV040(oldTournament: any): Tournament {
+  const { v4: uuidv4 } = require('uuid');
+  
+  console.log('🔄 Migrando dados de v0.3.0 para v0.4.0...');
+  
+  // Cria backup antes de migrar
+  createAutoBackup(oldTournament);
+  
+  const newTournament: Tournament = {
+    version: CURRENT_DATA_VERSION,
+    nome: oldTournament.nome || 'Novo Torneio',
+    categorias: oldTournament.categorias || ['Iniciante', 'Normal'],
+    gameConfig: oldTournament.gameConfig || {
+      quantidadeSets: 1,
+      gamesPerSet: 6,
+      tieBreakDecisivo: false,
+      pontosTieBreak: 7,
+    },
+    grupos: [],
+    waitingList: [],
+  };
+
+  // Migra waitingList: cada dupla vira 2 jogadores
+  if (oldTournament.waitingList && Array.isArray(oldTournament.waitingList)) {
+    for (const dupla of oldTournament.waitingList) {
+      if (dupla.jogador1 && dupla.jogador2) {
+        // Jogador 1
+        newTournament.waitingList.push({
+          id: uuidv4(),
+          nome: dupla.jogador1.nome,
+          categoria: dupla.categoria,
+          isSeed: dupla.isSeed || false,
+          status: dupla.status || 'waiting',
+        });
+        // Jogador 2
+        newTournament.waitingList.push({
+          id: uuidv4(),
+          nome: dupla.jogador2.nome,
+          categoria: dupla.categoria,
+          isSeed: dupla.isSeed || false,
+          status: dupla.status || 'waiting',
+        });
+      }
+    }
+  }
+
+  // Migra grupos: cada dupla vira 2 jogadores
+  if (oldTournament.grupos && Array.isArray(oldTournament.grupos)) {
+    for (const oldGroup of oldTournament.grupos) {
+      const newPlayers: any[] = [];
+      
+      // Converte duplas em jogadores individuais
+      if (oldGroup.duplas && Array.isArray(oldGroup.duplas)) {
+        for (const dupla of oldGroup.duplas) {
+          if (dupla.jogador1 && dupla.jogador2) {
+            newPlayers.push({
+              id: uuidv4(),
+              nome: dupla.jogador1.nome,
+              categoria: oldGroup.categoria,
+              isSeed: dupla.isSeed || false,
+              status: dupla.status || 'enrolled',
+            });
+            newPlayers.push({
+              id: uuidv4(),
+              nome: dupla.jogador2.nome,
+              categoria: oldGroup.categoria,
+              isSeed: dupla.isSeed || false,
+              status: dupla.status || 'enrolled',
+            });
+          }
+        }
+      }
+
+      // Cria novo grupo (sem matches - serão regerados)
+      newTournament.grupos.push({
+        id: oldGroup.id || uuidv4(),
+        nome: oldGroup.nome || 'A',
+        fase: oldGroup.fase || 1,
+        categoria: oldGroup.categoria,
+        players: newPlayers,
+        matches: [], // Matches serão regerados automaticamente
+      });
+    }
+  }
+
+  console.log(`✅ Migração concluída: ${newTournament.waitingList.length} jogadores na lista de espera, ${newTournament.grupos.length} grupos`);
+  
+  return newTournament;
 }
