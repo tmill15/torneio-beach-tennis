@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.5  
+**Versão:** v0.4.6  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,22 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.6 - Correção do Sorteio de Desempate ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 Algoritmo de sorteio substituído por Fisher-Yates shuffle
+- 🐛 Sorteio agora é verdadeiramente aleatório e uniformemente distribuído
+- 🐛 Eliminado viés que favorecia sempre o mesmo jogador
+
+**Problema Identificado:**
+O método anterior (`sort(() => Math.random() - 0.5)`) não garantia distribuição uniforme, causando viés no sorteio. Em testes, o mesmo jogador era sempre selecionado.
+
+**Solução Implementada:**
+Algoritmo Fisher-Yates (embaralhamento de Knuth) que garante que cada permutação tem exatamente a mesma probabilidade de ocorrer.
+
+**Tipo:** Patch (correção de bug crítico no sorteio)
 
 ### v0.4.5 - Melhorias no Sistema de Desempate ✅
 **Data:** 10/01/2026
@@ -443,5 +459,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.5  
-**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente: detecção automática, indicadores claros e opção de desfazer!
+**Versão atual:** v0.4.6  
+**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente e sorteio verdadeiramente aleatório!

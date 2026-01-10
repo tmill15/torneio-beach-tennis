@@ -342,8 +342,13 @@ export function useTournament() {
    * Resolver desempate por sorteio
    */
   const resolveTieRandom = useCallback((groupId: string, tiedPlayerIds: string[]) => {
-    // Embaralhar jogadores
-    const shuffled = [...tiedPlayerIds].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle para embaralhamento verdadeiramente aleatório
+    const shuffled = [...tiedPlayerIds];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
     const winnerId = shuffled[0];
     
     resolveTieManual(groupId, winnerId, tiedPlayerIds);
