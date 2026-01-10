@@ -25,6 +25,7 @@ export default function ConfigPage() {
     moveCategoryDown,
     updateGameConfig,
     addPlayer,
+    addMultiplePlayers,
     removePlayer,
     formGroups,
     resetAndRedrawGroups,
@@ -46,6 +47,7 @@ export default function ConfigPage() {
   const [importCategory, setImportCategory] = useState<string>('');
   const [importOverwrite, setImportOverwrite] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importFileInfo, setImportFileInfo] = useState<{ totalPlayers: number; categoria?: string } | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -270,37 +272,90 @@ export default function ConfigPage() {
     }
   };
 
-  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    try {
+      // Lê o arquivo para verificar a categoria
+      const json = await file.text();
+      const data = JSON.parse(json);
+      
+      // Valida estrutura básica
+      if (!data.players || !Array.isArray(data.players)) {
+        alert('Arquivo inválido: campo "players" não encontrado ou não é um array.');
+        e.target.value = '';
+        return;
+      }
+      
+      // Tenta usar a categoria do arquivo, se existir e for válida
+      let defaultCategory = selectedCategory;
+      if (data.categoria && tournament.categorias.includes(data.categoria)) {
+        defaultCategory = data.categoria;
+      } else if (data.categoria) {
+        console.warn(`Categoria "${data.categoria}" do arquivo não existe. Usando "${selectedCategory}"`);
+      }
+      
       setImportFile(file);
+      setImportCategory(defaultCategory);
+      setImportFileInfo({
+        totalPlayers: data.players.length,
+        categoria: data.categoria
+      });
       setShowImportModal(true);
-      setImportCategory(selectedCategory); // Define categoria padrão
+    } catch (err) {
+      console.error('Erro ao ler arquivo:', err);
+      alert(`Erro ao ler o arquivo:\n\n${err instanceof Error ? err.message : 'Erro desconhecido'}\n\nVerifique se é um JSON válido.`);
     }
+    
     // Limpa input
     e.target.value = '';
   };
 
   const handleImportPlayers = async () => {
-    if (!importFile) return;
+    if (!importFile) {
+      alert('Nenhum arquivo selecionado');
+      return;
+    }
 
     try {
+      console.log('📤 Iniciando importação...', importFile.name);
+      
       const json = await importFile.text();
+      console.log('📄 Arquivo lido, tamanho:', json.length);
+      
       const data = JSON.parse(json);
+      console.log('✅ JSON parseado:', data);
 
       // Validação básica
       if (!data.players || !Array.isArray(data.players)) {
-        alert('Arquivo de jogadores inválido');
+        alert(`Arquivo de jogadores inválido.\n\nEsperado: campo "players" (array)\nRecebido: ${JSON.stringify(Object.keys(data))}`);
+        console.error('Estrutura inválida:', data);
+        return;
+      }
+
+      if (data.players.length === 0) {
+        alert('O arquivo não contém jogadores para importar.');
         return;
       }
 
       const targetCategory = importCategory || selectedCategory;
+      
+      if (!targetCategory) {
+        alert('Por favor, selecione uma categoria de destino.');
+        return;
+      }
+
+      console.log(`🎯 Importando ${data.players.length} jogador(es) para categoria "${targetCategory}"`);
 
       // Se sobrescrever, remover jogadores existentes
       if (importOverwrite) {
+        console.log('🗑️ Modo sobrescrever ativo, removendo jogadores existentes...');
+        
         // Remover da lista de espera
         const playersToRemove = tournament.waitingList
           .filter(p => p.categoria === targetCategory);
+        console.log(`Removendo ${playersToRemove.length} jogador(es) da lista de espera`);
         playersToRemove.forEach(p => removePlayer(p.id));
 
         // Remover grupos da categoria (resortear Fase 1)
@@ -308,23 +363,51 @@ export default function ConfigPage() {
           g => g.categoria === targetCategory && g.fase === 1
         );
         if (phase1Groups.length > 0) {
+          console.log(`Removendo ${phase1Groups.length} grupo(s) da Fase 1`);
           resetAndRedrawGroups(targetCategory, 1);
         }
       }
 
-      // Adicionar jogadores
-      data.players.forEach((p: any) => {
-        addPlayer(p.nome || '', targetCategory, p.isSeed || false);
-      });
+      // Adicionar jogadores de uma vez (evita problemas de estado)
+      let skippedCount = 0;
+      
+      const playersToAdd = data.players
+        .filter((p: any) => {
+          if (!p.nome || p.nome.trim() === '') {
+            console.warn('Jogador sem nome ignorado:', p);
+            skippedCount++;
+            return false;
+          }
+          return true;
+        })
+        .map((p: any) => ({
+          nome: p.nome.trim(),
+          categoria: targetCategory,
+          isSeed: p.isSeed || false,
+        }));
+
+      // Adiciona todos os jogadores de uma vez
+      if (playersToAdd.length > 0) {
+        console.log(`Adicionando ${playersToAdd.length} jogador(es) de uma vez...`);
+        addMultiplePlayers(playersToAdd);
+      }
+
+      const addedCount = playersToAdd.length;
+      console.log(`✅ Importação concluída: ${addedCount} adicionado(s), ${skippedCount} ignorado(s)`);
 
       setShowImportModal(false);
       setImportFile(null);
+      setImportFileInfo(null);
       setImportOverwrite(false);
       
-      alert(`✅ ${data.players.length} jogador(es) importado(s) com sucesso para "${targetCategory}"!`);
+      const message = addedCount > 0
+        ? `✅ ${addedCount} jogador(es) importado(s) com sucesso para "${targetCategory}"!${skippedCount > 0 ? `\n\n⚠️ ${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`
+        : `⚠️ Nenhum jogador foi importado.${skippedCount > 0 ? `\n\n${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`;
+      
+      alert(message);
     } catch (err) {
-      alert('Erro ao importar jogadores');
-      console.error(err);
+      console.error('❌ Erro ao importar jogadores:', err);
+      alert(`Erro ao importar jogadores:\n\n${err instanceof Error ? err.message : 'Erro desconhecido'}\n\nVerifique o console para mais detalhes.`);
     }
   };
 
@@ -888,11 +971,27 @@ export default function ConfigPage() {
               )}
             </div>
 
+            {importFileInfo && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-200">
+                  📄 <strong>Arquivo:</strong> {importFile?.name}<br />
+                  👥 <strong>Jogadores:</strong> {importFileInfo.totalPlayers}
+                  {importFileInfo.categoria && (
+                    <>
+                      <br />
+                      📋 <strong>Categoria no arquivo:</strong> {importFileInfo.categoria}
+                    </>
+                  )}
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
                   setShowImportModal(false);
                   setImportFile(null);
+                  setImportFileInfo(null);
                   setImportOverwrite(false);
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"

@@ -252,6 +252,19 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Adiciona múltiplos jogadores de uma vez (otimizado para importação)
+   */
+  const addMultiplePlayers = useCallback((players: Array<{ nome: string; categoria: string; isSeed: boolean }>) => {
+    updateTournament(prev => {
+      let updated = prev;
+      players.forEach(player => {
+        updated = addPlayerService(player.nome, player.categoria, player.isSeed, updated);
+      });
+      return updated;
+    });
+  }, [updateTournament]);
+
+  /**
    * Remove um jogador da lista de espera
    */
   const removePlayer = useCallback((playerId: string) => {
@@ -750,6 +763,7 @@ export function useTournament() {
     moveCategoryDown,
     updateGameConfig,
     addPlayer,
+    addMultiplePlayers,
     removePlayer,
     formGroups,
     updateMatchScore,
