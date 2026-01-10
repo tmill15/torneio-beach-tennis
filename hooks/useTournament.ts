@@ -780,16 +780,29 @@ export function useTournament() {
   const clearCategory = useCallback((categoria: string) => {
     updateTournament(prev => {
       // 1. Coletar todos os jogadores de todos os grupos da categoria
-      const allPlayers = prev.grupos
+      // Usar um Map para garantir que cada jogador (por ID) seja coletado apenas uma vez
+      // Isso evita duplicatas quando o mesmo jogador está em múltiplas fases
+      const playersMap = new Map<string, Player>();
+      
+      prev.grupos
         .filter(g => g.categoria === categoria)
-        .flatMap(g => g.players.map(p => ({
-          ...p,
-          status: 'waiting' as const,
-          tiebreakOrder: undefined,
-          tiebreakMethod: undefined,
-          eliminatedInPhase: undefined,
-          qualificationType: undefined
-        })));
+        .forEach(g => {
+          g.players.forEach(p => {
+            // Se o jogador ainda não foi adicionado, adiciona com status limpo
+            if (!playersMap.has(p.id)) {
+              playersMap.set(p.id, {
+                ...p,
+                status: 'waiting' as const,
+                tiebreakOrder: undefined,
+                tiebreakMethod: undefined,
+                eliminatedInPhase: undefined,
+                qualificationType: undefined
+              });
+            }
+          });
+        });
+
+      const allPlayers = Array.from(playersMap.values());
 
       // 2. Remover todos os grupos da categoria
       const remainingGroups = prev.grupos.filter(g => g.categoria !== categoria);
