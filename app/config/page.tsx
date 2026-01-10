@@ -27,11 +27,14 @@ export default function ConfigPage() {
     addPlayer,
     addMultiplePlayers,
     removePlayer,
+    clearWaitingList,
     formGroups,
     resetAndRedrawGroups,
     redrawGroupsInPlace,
+    clearCategory,
     importTournament,
     getMaxPhase,
+    isPhaseComplete,
   } = useTournament();
 
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -168,7 +171,8 @@ export default function ConfigPage() {
       `Esta ação não pode ser desfeita!`;
     
     if (window.confirm(message)) {
-      playersInCategory.forEach(p => removePlayer(p.id));
+      // Limpar toda a lista de espera da categoria em uma única operação
+      clearWaitingList(categoria);
     }
   };
 
@@ -185,7 +189,12 @@ export default function ConfigPage() {
       g.matches?.some(m => m.isFinished)
     );
 
-    if (hasFinishedMatches) {
+    // Verificar se o torneio está completo (Fase 3 finalizada)
+    const maxPhase = getMaxPhase(categoria);
+    const isTournamentComplete = maxPhase === 3 && isPhaseComplete(categoria, 3);
+
+    // Permitir limpar se o torneio estiver completo, mesmo com jogos finalizados
+    if (hasFinishedMatches && !isTournamentComplete) {
       alert(
         `⚠️ Não é possível limpar a categoria!\n\n` +
         `Existem jogos com placares já registrados.\n\n` +
@@ -206,10 +215,8 @@ export default function ConfigPage() {
       `Esta ação não pode ser desfeita!`;
     
     if (window.confirm(message)) {
-      // Remove todos os grupos de todas as fases da categoria
-      groupsInCategory.forEach(group => {
-        resetAndRedrawGroups(categoria, group.fase);
-      });
+      // Limpar completamente a categoria (remove todos os grupos e retorna jogadores para lista de espera)
+      clearCategory(categoria);
     }
   };
 
@@ -770,7 +777,13 @@ export default function ConfigPage() {
                     const hasFinishedMatches = groupsInCategory.some(g => 
                       g.matches?.some(m => m.isFinished)
                     );
-                    const canClearCategory = !hasFinishedMatches;
+                    
+                    // Verificar se o torneio está completo (Fase 3 finalizada)
+                    const maxPhase = getMaxPhase(categoria);
+                    const isTournamentComplete = maxPhase === 3 && isPhaseComplete(categoria, 3);
+                    
+                    // Permitir limpar se não houver jogos finalizados OU se o torneio estiver completo
+                    const canClearCategory = !hasFinishedMatches || isTournamentComplete;
 
                     return (
                       <div key={categoria} className="mb-6 last:mb-0">
@@ -808,8 +821,10 @@ export default function ConfigPage() {
                               }`}
                               title={
                                 canClearCategory
-                                  ? 'Remove todos os grupos e retorna jogadores para a lista de espera'
-                                  : 'Não é possível limpar: existem jogos com placares registrados'
+                                  ? isTournamentComplete
+                                    ? 'Torneio completo - Remove todos os grupos e retorna jogadores para a lista de espera'
+                                    : 'Remove todos os grupos e retorna jogadores para a lista de espera'
+                                  : 'Não é possível limpar: existem jogos com placares registrados (torneio ainda não finalizado)'
                               }
                             >
                               Limpar Categoria

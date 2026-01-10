@@ -379,6 +379,16 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Limpa toda a lista de espera de uma categoria
+   */
+  const clearWaitingList = useCallback((categoria: string) => {
+    updateTournament(prev => ({
+      ...prev,
+      waitingList: prev.waitingList.filter(p => p.categoria !== categoria)
+    }));
+  }, [updateTournament]);
+
+  /**
    * Forma grupos a partir da lista de espera
    */
   const formGroups = useCallback((categoria: string, fase: number = 1) => {
@@ -715,6 +725,37 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Limpa completamente uma categoria (remove todos os grupos e retorna jogadores para lista de espera)
+   */
+  const clearCategory = useCallback((categoria: string) => {
+    updateTournament(prev => {
+      // 1. Coletar todos os jogadores de todos os grupos da categoria
+      const allPlayers = prev.grupos
+        .filter(g => g.categoria === categoria)
+        .flatMap(g => g.players.map(p => ({
+          ...p,
+          status: 'waiting' as const,
+          tiebreakOrder: undefined,
+          tiebreakMethod: undefined,
+          eliminatedInPhase: undefined,
+          qualificationType: undefined
+        })));
+
+      // 2. Remover todos os grupos da categoria
+      const remainingGroups = prev.grupos.filter(g => g.categoria !== categoria);
+
+      // 3. Adicionar jogadores de volta à lista de espera
+      const newWaitingList = [...prev.waitingList, ...allPlayers];
+
+      return {
+        ...prev,
+        grupos: remainingGroups,
+        waitingList: newWaitingList,
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Desfazer desempate manual (remove tiebreakOrder, tiebreakMethod e partidas de simples)
    */
   const undoTiebreak = useCallback((groupId: string, playerIds: string[]) => {
@@ -872,6 +913,7 @@ export function useTournament() {
     addPlayer,
     addMultiplePlayers,
     removePlayer,
+    clearWaitingList,
     formGroups,
     updateMatchScore,
     finalizeMatch,
@@ -880,6 +922,7 @@ export function useTournament() {
     importTournament,
     resetAndRedrawGroups,
     redrawGroupsInPlace,
+    clearCategory,
     resolveTieManual,
     resolveTieRandom,
     generateSinglesMatch,

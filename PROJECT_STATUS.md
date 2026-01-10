@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.12.0  
+**Versão:** v0.12.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,90 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.12.3 - Correção: Limpar Tudo na Lista de Espera ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Botão "Limpar Tudo" removia apenas o primeiro participante:** A função estava chamando `removePlayer` múltiplas vezes em um loop, causando problemas de estado
+  - **Problema:** `handleClearWaitingList` chamava `removePlayer` para cada jogador em um `forEach`, mas cada chamada atualizava o estado, causando inconsistências
+  - **Solução:** Criada função `clearWaitingList` no hook que remove todos os jogadores da categoria da lista de espera em uma única operação de estado
+  - **Resultado:** Agora remove todos os jogadores da lista de espera da categoria corretamente
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Nova função `clearWaitingList(categoria: string)` que remove todos os jogadores da categoria da lista de espera em uma única atualização de estado
+- 🔄 `app/config/page.tsx`:
+  - `handleClearWaitingList()` agora usa `clearWaitingList()` ao invés de chamar `removePlayer` múltiplas vezes
+  - Importação de `clearWaitingList` do hook
+
+**Comportamento:**
+```
+Antes: Limpar Tudo → removePlayer() múltiplas vezes → Remove apenas o primeiro ❌
+Agora: Limpar Tudo → clearWaitingList() → Remove todos de uma vez ✅
+```
+
+---
+
+### v0.12.2 - Correção: Limpar Categoria Remove Todos os Grupos ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Limpar Categoria não estava removendo todos os grupos:** A função estava chamando `resetAndRedrawGroups` múltiplas vezes, causando problemas de estado
+  - **Problema:** `handleClearTournamentPlayers` chamava `resetAndRedrawGroups` para cada fase individualmente, o que não garantia remoção completa
+  - **Solução:** Criada função `clearCategory` no hook que remove todos os grupos da categoria e retorna todos os jogadores para a lista de espera em uma única operação de estado
+  - **Resultado:** Agora limpa completamente o torneio da categoria, removendo todos os grupos de todas as fases e retornando todos os jogadores para a lista de espera
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Nova função `clearCategory(categoria: string)` que:
+    - Coleta todos os jogadores de todos os grupos da categoria
+    - Remove todos os grupos da categoria
+    - Adiciona todos os jogadores de volta à lista de espera
+    - Limpa campos relacionados a fases (tiebreakOrder, tiebreakMethod, eliminatedInPhase, qualificationType)
+    - Tudo em uma única atualização de estado
+- 🔄 `app/config/page.tsx`:
+  - `handleClearTournamentPlayers()` agora usa `clearCategory()` ao invés de chamar `resetAndRedrawGroups` múltiplas vezes
+  - Importação de `clearCategory` do hook
+
+**Comportamento:**
+```
+Antes: Limpar Categoria → Chamava resetAndRedrawGroups para cada fase → Problemas de estado ❌
+Agora: Limpar Categoria → clearCategory() → Remove tudo de uma vez ✅
+```
+
+---
+
+### v0.12.1 - Reabilitação: Limpar Categoria Após Término do Torneio ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🔓 **Reabilitado botão "Limpar Categoria" após término do torneio:** Agora é possível limpar a categoria mesmo com jogos finalizados, desde que o torneio esteja completo
+  - **Problema:** Botão estava desabilitado sempre que havia jogos finalizados, mesmo após o término completo do torneio
+  - **Solução:** Verificação se o torneio está completo (Fase 3 finalizada) antes de bloquear
+  - **Lógica:**
+    - Se não há jogos finalizados: permite limpar (como antes)
+    - Se há jogos finalizados MAS o torneio está completo (Fase 3 finalizada): permite limpar
+    - Se há jogos finalizados E o torneio NÃO está completo: bloqueia (como antes)
+  - **Resultado:** Usuários podem limpar a categoria após finalizar o torneio para começar um novo
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `handleClearTournamentPlayers()` - verifica se torneio está completo antes de bloquear
+  - Adicionada verificação `isPhaseComplete(categoria, 3)` para detectar torneio completo
+  - Tooltip atualizado para indicar quando o torneio está completo
+  - Variável `isTournamentComplete` para controle de estado
+
+**Comportamento:**
+```
+Torneio em andamento (com jogos finalizados):
+  [Limpar Categoria] ← Cinza, desabilitado 🔒
+
+Torneio completo (Fase 3 finalizada):
+  [Limpar Categoria] ← Vermelho, ativo ✅
+```
 
 ---
 
