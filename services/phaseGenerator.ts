@@ -249,7 +249,7 @@ export function generateNextPhase(
     
     const finalGroup: Group = {
       id: uuidv4(),
-      nome: 'Grupo Final',
+      nome: 'Final',
       fase: 3,
       categoria,
       players: groupPlayers.map(p => ({ 
@@ -297,7 +297,7 @@ export function generateNextPhase(
       const groupName = String.fromCharCode(65 + i); // A, B, C...
       const group: Group = {
         id: uuidv4(),
-        nome: `Grupo ${groupName}`,
+        nome: groupName, // Apenas a letra (A, B, C...)
         fase: nextPhase,
         categoria,
         players: groupPlayers.map(p => ({ 

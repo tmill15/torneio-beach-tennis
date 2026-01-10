@@ -61,7 +61,10 @@ export function GroupCard({
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-orange-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white">
-          Grupo {group.nome || '?'} - Fase {group.fase}
+          {group.nome && group.nome.startsWith('Grupo ') 
+            ? `${group.nome} - Fase ${group.fase}`
+            : `Grupo ${group.nome || '?'} - Fase ${group.fase}`
+          }
         </h3>
         <p className="text-orange-100 text-sm mt-1">
           {group.categoria}
@@ -120,22 +123,23 @@ export function GroupCard({
                             SEED
                           </span>
                         )}
-                        {entry.player.tiebreakOrder && (
+                        {/* Badges de desempate e classificação - APENAS em fases anteriores (read-only) */}
+                        {isReadOnly && entry.player.tiebreakOrder && (
                           <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded" title="Classificado por desempate manual">
                             DESEMPATE
                           </span>
                         )}
-                        {entry.player.qualificationType === 'direct' && (
+                        {isReadOnly && entry.player.qualificationType === 'direct' && (
                           <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">
                             CLASSIFICADO
                           </span>
                         )}
-                        {entry.player.qualificationType === 'repechage' && (
+                        {isReadOnly && entry.player.qualificationType === 'repechage' && (
                           <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded">
                             REPESCAGEM
                           </span>
                         )}
-                        {entry.player.status === 'eliminated' && (
+                        {isReadOnly && entry.player.status === 'eliminated' && (
                           <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded">
                             ELIMINADO
                           </span>

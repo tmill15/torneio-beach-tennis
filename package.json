@@ -1,6 +1,6 @@
 {
   "name": "torneio-beach-tennis",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "description": "App PWA para gestão de torneios de Beach Tennis",
   "private": true,
   "scripts": {

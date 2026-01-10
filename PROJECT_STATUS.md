@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.11.3  
+**Versão:** v0.11.6  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,28 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.11.6 - Correção: Duplicação "Grupo" no Título ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Bug no título dos cards:** Títulos apareciam como "Grupo Grupo A - Fase 2"
+  - **Problema:** `phaseGenerator.ts` estava salvando `nome: "Grupo A"` ao invés de apenas `"A"`
+  - **Causa:** Inconsistência entre como grupos são nomeados (alguns lugares usam apenas letra, outros usam "Grupo " + letra)
+  - **Solução:** 
+    - Corrigido `phaseGenerator.ts` para salvar apenas a letra (A, B, C...)
+    - Fase 3 agora salva apenas "Final" ao invés de "Grupo Final"
+    - Adicionada verificação no `GroupCard.tsx` para não duplicar "Grupo " se o nome já começar com isso
+  - **Resultado:** Títulos agora aparecem corretamente como "Grupo A - Fase 2"
+
+**Modificado:**
+- 🔄 `services/phaseGenerator.ts`:
+  - Linha 300: `nome: groupName` (removido "Grupo " antes)
+  - Linha 252: `nome: 'Final'` (removido "Grupo " antes)
+- 🔄 `components/GroupCard.tsx`:
+  - Verificação para não duplicar "Grupo " se o nome já contiver
 
 ---
 

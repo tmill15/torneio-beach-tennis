@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GroupCard } from '@/components/GroupCard';
@@ -41,23 +41,57 @@ export default function Home() {
 
   const [viewMode, setViewMode] = useState<'classificacao' | 'jogos'>('classificacao');
   const [selectedPhase, setSelectedPhase] = useState<number>(1); // Estado para a fase selecionada
-
-  // Atualizar selectedPhase quando mudar de categoria ou quando a fase máxima muda
-  useEffect(() => {
-    if (selectedCategory) {
-      const maxPhase = getMaxPhase(selectedCategory);
-      if (maxPhase > 0) {
-        setSelectedPhase(maxPhase); // Sempre mostrar a fase mais recente
-      } else {
-        setSelectedPhase(1); // Se não há grupos, volta para Fase 1
-      }
-    }
-  }, [selectedCategory, tournament.grupos, getMaxPhase]); // Depende de tournament.grupos para reagir a mudanças de fase
+  
+  // Refs para rastrear mudanças e evitar atualizações desnecessárias
+  const lastCategoryRef = useRef<string>('');
+  const lastMaxPhaseRef = useRef<number>(0);
 
   // Filtra e ordena grupos pela fase
   const groupsInCategory = tournament.grupos
     .filter((g) => g.categoria === selectedCategory)
     .sort((a, b) => a.fase - b.fase);
+
+  // Atualizar selectedPhase apenas quando necessário (mudança de categoria ou nova fase criada)
+  useEffect(() => {
+    if (selectedCategory) {
+      const maxPhase = getMaxPhase(selectedCategory);
+      const categoryChanged = lastCategoryRef.current !== selectedCategory;
+      const newPhaseCreated = maxPhase > lastMaxPhaseRef.current && lastMaxPhaseRef.current > 0;
+      
+      // Atualiza refs
+      lastCategoryRef.current = selectedCategory;
+      lastMaxPhaseRef.current = maxPhase;
+      
+      // Só atualiza selectedPhase se:
+      // 1. Categoria mudou (sempre mostra fase máxima da nova categoria)
+      // 2. Nova fase foi criada (avança automaticamente)
+      // 3. Fase selecionada não existe mais ou é futura
+      if (categoryChanged) {
+        // Mudou de categoria: mostra fase máxima da nova categoria
+        if (maxPhase > 0) {
+          setSelectedPhase(maxPhase);
+        } else {
+          setSelectedPhase(1);
+        }
+      } else if (newPhaseCreated) {
+        // Nova fase criada: avança automaticamente
+        setSelectedPhase(maxPhase);
+      } else {
+        // Verifica se a fase selecionada ainda é válida
+        const currentPhaseHasGroups = groupsInCategory.some(g => g.fase === selectedPhase);
+        if (!currentPhaseHasGroups && maxPhase > 0) {
+          // Fase selecionada não tem mais grupos, vai para a máxima disponível
+          setSelectedPhase(maxPhase);
+        } else if (selectedPhase > maxPhase && maxPhase > 0) {
+          // Fase selecionada é futura, vai para a máxima disponível
+          setSelectedPhase(maxPhase);
+        } else if (maxPhase === 0 && selectedPhase !== 1) {
+          // Não há grupos, volta para Fase 1
+          setSelectedPhase(1);
+        }
+      }
+    }
+  }, [selectedCategory, tournament.grupos, groupsInCategory, selectedPhase, getMaxPhase]);
 
   const groupsInSelectedPhase = groupsInCategory.filter(g => g.fase === selectedPhase);
 
