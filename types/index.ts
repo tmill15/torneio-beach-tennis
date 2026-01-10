@@ -15,6 +15,7 @@ export interface Player {
   categoria: string;
   isSeed: boolean;
   status: PlayerStatus;
+  tiebreakOrder?: number; // Ordem de desempate manual (1 = vencedor, 2+ = outros)
 }
 
 // ============================================
@@ -57,6 +58,7 @@ export interface Match {
   setsWonB: number;                  // Sets ganhos por B
   isFinished: boolean;
   rodada: number;                    // Número da rodada (1, 2, 3...)
+  isTiebreaker?: boolean;            // Indica partida de desempate (simples)
 }
 
 // ============================================

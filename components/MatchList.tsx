@@ -53,13 +53,17 @@ export function MatchList({
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       <span className="text-gray-500 dark:text-gray-400">R{match.rodada}:</span>{' '}
-                      {formatDupla(match.jogador1A, match.jogador2A)} <span className="font-bold text-primary">{match.setsWonA}</span> × <span className="font-bold text-primary">{match.setsWonB}</span> {formatDupla(match.jogador1B, match.jogador2B)}
+                      {formatDupla(match.jogador1A, match.jogador2A)}{' '}
+                      <span className="font-bold text-primary">
+                        {match.sets.length > 0 ? match.sets.map(formatSetScore).join(', ') : '0-0'}
+                      </span>{' '}
+                      {formatDupla(match.jogador1B, match.jogador2B)}
+                      {match.isTiebreaker && (
+                        <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium">
+                          DESEMPATE
+                        </span>
+                      )}
                     </p>
-                    {match.sets.length > 0 && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        ({match.sets.map(formatSetScore).join(', ')})
-                      </p>
-                    )}
                   </div>
                   <button
                     onClick={() => onReopenMatch(match.id)}
@@ -92,6 +96,11 @@ export function MatchList({
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     <span className="text-gray-500 dark:text-gray-400">Rodada {match.rodada}:</span>{' '}
                     {formatDupla(match.jogador1A, match.jogador2A)} × {formatDupla(match.jogador1B, match.jogador2B)}
+                    {match.isTiebreaker && (
+                      <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium">
+                        DESEMPATE
+                      </span>
+                    )}
                   </p>
                 </div>
                 

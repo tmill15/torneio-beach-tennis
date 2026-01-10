@@ -6,6 +6,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import type { Tournament, Player, Group, Match, SetScore } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer as removePlayerService } from '@/services/enrollmentService';
@@ -311,6 +312,105 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Resolver desempate por seleção manual
+   */
+  const resolveTieManual = useCallback((groupId: string, winnerId: string, tiedPlayerIds: string[]) => {
+    updateTournament(prev => ({
+      ...prev,
+      grupos: prev.grupos.map(group => {
+        if (group.id !== groupId) return group;
+        
+        return {
+          ...group,
+          players: group.players.map(player => {
+            if (!tiedPlayerIds.includes(player.id)) return player;
+            
+            // Atribuir ordem de desempate
+            if (player.id === winnerId) {
+              return { ...player, tiebreakOrder: 1 };
+            } else {
+              const otherIndex = tiedPlayerIds.indexOf(player.id);
+              return { ...player, tiebreakOrder: otherIndex + 1 };
+            }
+          }),
+        };
+      }),
+    }));
+  }, [updateTournament]);
+
+  /**
+   * Resolver desempate por sorteio
+   */
+  const resolveTieRandom = useCallback((groupId: string, tiedPlayerIds: string[]) => {
+    // Embaralhar jogadores
+    const shuffled = [...tiedPlayerIds].sort(() => Math.random() - 0.5);
+    const winnerId = shuffled[0];
+    
+    resolveTieManual(groupId, winnerId, tiedPlayerIds);
+  }, [resolveTieManual]);
+
+  /**
+   * Gerar partida de simples para desempate
+   */
+  const generateSinglesMatch = useCallback((groupId: string, player1Id: string, player2Id: string) => {
+    updateTournament(prev => ({
+      ...prev,
+      grupos: prev.grupos.map(group => {
+        if (group.id !== groupId) return group;
+        
+        const p1 = group.players.find(p => p.id === player1Id);
+        const p2 = group.players.find(p => p.id === player2Id);
+        
+        if (!p1 || !p2) return group;
+        
+        // Criar partida de simples (jogador duplicado como dupla)
+        const singlesMatch: Match = {
+          id: uuidv4(),
+          groupId: group.id,
+          jogador1A: p1,
+          jogador2A: p1, // Mesmo jogador (simples)
+          jogador1B: p2,
+          jogador2B: p2, // Mesmo jogador (simples)
+          sets: [],
+          setsWonA: 0,
+          setsWonB: 0,
+          isFinished: false,
+          rodada: group.matches.length + 1,
+          isTiebreaker: true, // Flag especial
+        };
+        
+        return {
+          ...group,
+          matches: [...group.matches, singlesMatch],
+        };
+      }),
+    }));
+  }, [updateTournament]);
+
+  /**
+   * Desfazer desempate manual (remove tiebreakOrder)
+   */
+  const undoTiebreak = useCallback((groupId: string, playerIds: string[]) => {
+    updateTournament(prev => ({
+      ...prev,
+      grupos: prev.grupos.map(group => {
+        if (group.id !== groupId) return group;
+        
+        return {
+          ...group,
+          players: group.players.map(player => {
+            if (!playerIds.includes(player.id)) return player;
+            
+            // Remover tiebreakOrder
+            const { tiebreakOrder, ...playerWithoutTiebreak } = player;
+            return playerWithoutTiebreak;
+          }),
+        };
+      }),
+    }));
+  }, [updateTournament]);
+
+  /**
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
@@ -334,6 +434,10 @@ export function useTournament() {
     getGroupRanking,
     importTournament,
     resetAndRedrawGroups,
+    resolveTieManual,
+    resolveTieRandom,
+    generateSinglesMatch,
+    undoTiebreak,
     resetTournament,
   };
 }

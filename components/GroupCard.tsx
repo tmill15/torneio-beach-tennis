@@ -5,8 +5,11 @@
 
 'use client';
 
+import { useState } from 'react';
 import type { Group, RankingEntry, SetScore, GameConfig } from '@/types';
 import { MatchList } from './MatchList';
+import { TiebreakerModal } from './TiebreakerModal';
+import { detectTies } from '@/services/rankingService';
 
 interface GroupCardProps {
   group: Group;
@@ -16,6 +19,10 @@ interface GroupCardProps {
   onUpdateScore: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (groupId: string, matchId: string) => void;
+  onResolveTieManual: (groupId: string, winnerId: string, tiedPlayerIds: string[]) => void;
+  onResolveTieRandom: (groupId: string, tiedPlayerIds: string[]) => void;
+  onGenerateSingles: (groupId: string, player1Id: string, player2Id: string) => void;
+  onUndoTiebreak: (groupId: string, playerIds: string[]) => void;
 }
 
 export function GroupCard({
@@ -26,7 +33,22 @@ export function GroupCard({
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
+  onResolveTieManual,
+  onResolveTieRandom,
+  onGenerateSingles,
+  onUndoTiebreak,
 }: GroupCardProps) {
+  const [showTiebreakerModal, setShowTiebreakerModal] = useState<any>(null);
+
+  // Detectar empates
+  const ties = detectTies(ranking);
+  const getTieInfo = (index: number) => {
+    return ties.find(tie => tie.positions.includes(index + 1));
+  };
+
+  // Detectar jogadores com desempate resolvido
+  const playersWithTiebreak = ranking.filter(entry => entry.player.tiebreakOrder);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Header */}
@@ -55,31 +77,45 @@ export function GroupCard({
                     <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Jogador</th>
                     <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">V</th>
                     <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">D</th>
-                    <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Sets</th>
                     <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Games</th>
-                    <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Pts</th>
+                    <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Pts (saldo)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ranking.map((entry, index) => (
-                    <tr
-                      key={entry.player.id}
-                      className={`border-b border-gray-100 dark:border-gray-800 ${
-                        index === 0
-                          ? 'bg-yellow-50 dark:bg-yellow-900/10'
-                          : index === 1
-                          ? 'bg-gray-50 dark:bg-gray-900/30'
-                          : ''
-                      }`}
-                    >
-                      <td className="py-3 px-2 text-gray-900 dark:text-white font-medium">
-                        {index + 1}
-                      </td>
+                  {ranking.map((entry, index) => {
+                    const tieInfo = getTieInfo(index);
+                    
+                    return (
+                      <tr
+                        key={entry.player.id}
+                        className={`border-b border-gray-100 dark:border-gray-800 ${
+                          index === 0
+                            ? 'bg-yellow-50 dark:bg-yellow-900/10'
+                            : index === 1
+                            ? 'bg-gray-50 dark:bg-gray-900/30'
+                            : ''
+                        }`}
+                      >
+                        <td className="py-3 px-2 text-gray-900 dark:text-white font-medium">
+                          <div className="flex items-center gap-1">
+                            {index + 1}
+                            {tieInfo && (
+                              <span className="text-yellow-600 dark:text-yellow-400" title="Empate técnico">
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       <td className="py-3 px-2 text-gray-900 dark:text-white">
                         {entry.player.nome}
                         {entry.player.isSeed && (
                           <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
                             SEED
+                          </span>
+                        )}
+                        {entry.player.tiebreakOrder && (
+                          <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded" title="Classificado por desempate manual">
+                            DESEMPATE
                           </span>
                         )}
                       </td>
@@ -90,18 +126,21 @@ export function GroupCard({
                         {entry.derrotas}
                       </td>
                       <td className="py-3 px-2 text-center text-gray-700 dark:text-gray-300 text-xs">
-                        {entry.setsGanhos}-{entry.setsPerdidos}
-                      </td>
-                      <td className="py-3 px-2 text-center text-gray-700 dark:text-gray-300 text-xs">
                         {entry.gamesGanhos}-{entry.gamesPerdidos}
                       </td>
                       <td className="py-3 px-2 text-center">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">
-                          {entry.vitorias}
-                        </span>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">
+                            {entry.vitorias}
+                          </span>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            ({entry.saldoGames > 0 ? '+' : ''}{entry.saldoGames})
+                          </span>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -123,6 +162,81 @@ export function GroupCard({
             onReopenMatch={(matchId) => onReopenMatch(group.id, matchId)}
           />
         </div>
+      )}
+
+      {/* Alertas de Empate */}
+      {viewMode === 'classificacao' && ties.length > 0 && (
+        <div className="px-6 pb-6">
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
+              ⚠️ {ties.length} empate{ties.length > 1 ? 's' : ''} detectado{ties.length > 1 ? 's' : ''}
+            </p>
+            <div className="space-y-2">
+              {ties.map((tie, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setShowTiebreakerModal(tie)}
+                  className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                >
+                  Resolver empate nas posições {tie.positions.join(', ')}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desempates Resolvidos */}
+      {viewMode === 'classificacao' && playersWithTiebreak.length > 0 && (
+        <div className="px-6 pb-6">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
+              ℹ️ Desempates Resolvidos Manualmente
+            </p>
+            <div className="space-y-2 mb-3">
+              {playersWithTiebreak.map((entry) => (
+                <div key={entry.player.id} className="text-sm text-blue-700 dark:text-blue-300">
+                  • {entry.player.nome} (posição {ranking.indexOf(entry) + 1})
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const playerIds = playersWithTiebreak.map(e => e.player.id);
+                if (window.confirm(`Desfazer desempate para ${playersWithTiebreak.length} jogador${playersWithTiebreak.length !== 1 ? 'es' : ''}?\n\nIsso removerá a ordem de desempate manual e eles voltarão a estar empatados.`)) {
+                  onUndoTiebreak(group.id, playerIds);
+                }
+              }}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              ↩️ Desfazer Desempate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Resolução */}
+      {showTiebreakerModal && (
+        <TiebreakerModal
+          tieGroup={showTiebreakerModal}
+          onManualSelect={(winnerId) => {
+            onResolveTieManual(group.id, winnerId, showTiebreakerModal.players.map((p: any) => p.id));
+            setShowTiebreakerModal(null);
+          }}
+          onRandomSelect={() => {
+            onResolveTieRandom(group.id, showTiebreakerModal.players.map((p: any) => p.id));
+            setShowTiebreakerModal(null);
+          }}
+          onGenerateSingles={
+            showTiebreakerModal.players.length === 2
+              ? () => {
+                  onGenerateSingles(group.id, showTiebreakerModal.players[0].id, showTiebreakerModal.players[1].id);
+                  setShowTiebreakerModal(null);
+                }
+              : undefined
+          }
+          onClose={() => setShowTiebreakerModal(null)}
+        />
       )}
     </div>
   );

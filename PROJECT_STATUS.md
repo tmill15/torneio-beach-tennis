@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.3  
+**Versão:** v0.4.5  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,62 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.5 - Melhorias no Sistema de Desempate ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Badge "DESEMPATE" na tabela de classificação para jogadores classificados por desempate manual
+- ✅ Card informativo mostrando todos os jogadores com desempate resolvido
+- ✅ Função `undoTiebreak` para desfazer resolução de desempate
+- ✅ Botão "Desfazer Desempate" no card de desempates resolvidos
+- ✅ Confirmação antes de desfazer desempate
+
+**Modificado:**
+- 🔄 Interface mais clara sobre status de desempate dos jogadores
+- 🔄 Jogadores com `tiebreakOrder` exibem badge azul "DESEMPATE"
+- 🔄 Possibilidade de reverter decisão de desempate para escolher outro método
+
+**Benefícios:**
+- Transparência Total: Fica explícito quem foi classificado por desempate manual
+- Flexibilidade: Permite reverter e escolher outro método de desempate
+- UX Melhorada: Informação clara e opção de correção sempre disponível
+- Auditoria: Fácil identificar quais classificações foram definidas manualmente
+
+**Impacto nos dados:** Nenhum (apenas apresentação e funcionalidade de desfazer)
+
+### v0.4.4 - Sistema de Resolução de Desempate ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Detecção automática de empates no ranking (mesmas vitórias e saldo de games)
+- ✅ Indicador visual (⚠️) nas posições empatadas da tabela de classificação
+- ✅ Componente `TiebreakerModal` para resolução de empates
+- ✅ Três métodos de resolução de empate:
+  - Seleção manual do vencedor
+  - Sorteio aleatório
+  - Geração de partida de simples (apenas para 2 jogadores)
+- ✅ Campo `tiebreakOrder` no Player para persistir resolução manual
+- ✅ Campo `isTiebreaker` no Match para identificar partidas de desempate
+- ✅ Badge "DESEMPATE" em partidas de simples
+- ✅ Função `detectTies` no rankingService
+- ✅ Funções de resolução no useTournament: `resolveTieManual`, `resolveTieRandom`, `generateSinglesMatch`
+
+**Modificado:**
+- 🔄 Função `compareRanking` agora considera `tiebreakOrder` antes do empate técnico
+- 🔄 GroupCard detecta e exibe alertas de empate na aba de Classificação
+- 🔄 MatchList exibe badge especial para partidas de desempate
+- 🔄 Tabela de classificação atualizada com "Pts (saldo)" para maior clareza
+- 🔄 Coluna "Sets" removida da tabela (simplificação)
+- 🔄 Saldo de games exibido ao lado dos pontos: "3 (+9)"
+
+**Benefícios:**
+- Transparência: Empates são claramente identificados e sinalizados
+- Flexibilidade: Múltiplas opções para resolver empates conforme a situação
+- Fairness: Partidas de simples permitem desempate justo entre 2 jogadores
+- Persistência: Resoluções manuais são salvas e respeitadas no ranking
+
+**Impacto nos dados:** Adiciona campos opcionais sem quebrar compatibilidade
 
 ### v0.4.3 - Melhorias de Gestão de Torneio ✅
 **Data:** 10/01/2026
@@ -387,5 +443,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.3  
-**Status:** ✅ ATIVO - Sistema completo com gestão avançada: abas de participantes, resortear grupos e reabrir jogos!
+**Versão atual:** v0.4.5  
+**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente: detecção automática, indicadores claros e opção de desfazer!

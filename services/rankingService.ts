@@ -64,7 +64,14 @@ function compareRanking(a: RankingEntry, b: RankingEntry): number {
     return b.saldoGames - a.saldoGames;
   }
 
-  // 4. Empate técnico
+  // 4. Desempate manual (se definido)
+  const tieA = a.player.tiebreakOrder || 999;
+  const tieB = b.player.tiebreakOrder || 999;
+  if (tieA !== tieB) {
+    return tieA - tieB;
+  }
+
+  // 5. Empate técnico
   return 0;
 }
 
@@ -278,4 +285,54 @@ export function canFinalizeMatch(
     canFinalize: errors.length === 0,
     errors,
   };
+}
+
+/**
+ * Interface para grupo de jogadores empatados
+ */
+export interface TieGroup {
+  positions: number[];      // Posições empatadas (ex: [1, 2] ou [2, 3, 4])
+  players: Player[];        // Jogadores empatados
+  stats: RankingEntry;      // Estatísticas comuns (mesmos valores)
+}
+
+/**
+ * Detecta empates no ranking
+ * Retorna grupos de jogadores que estão empatados tecnicamente
+ */
+export function detectTies(ranking: RankingEntry[]): TieGroup[] {
+  const ties: TieGroup[] = [];
+  
+  for (let i = 0; i < ranking.length - 1; i++) {
+    // Verificar se há empate com próximo jogador
+    if (
+      ranking[i].vitorias === ranking[i + 1].vitorias &&
+      ranking[i].saldoGames === ranking[i + 1].saldoGames &&
+      !ranking[i].player.tiebreakOrder // Só detectar se não tem desempate manual
+    ) {
+      // Coletar todos os jogadores empatados em sequência
+      const tiedPlayers = [ranking[i]];
+      let j = i + 1;
+      
+      while (
+        j < ranking.length &&
+        ranking[j].vitorias === ranking[i].vitorias &&
+        ranking[j].saldoGames === ranking[i].saldoGames &&
+        !ranking[j].player.tiebreakOrder
+      ) {
+        tiedPlayers.push(ranking[j]);
+        j++;
+      }
+      
+      ties.push({
+        positions: tiedPlayers.map((_, idx) => i + idx + 1),
+        players: tiedPlayers.map(entry => entry.player),
+        stats: ranking[i],
+      });
+      
+      i = j - 1; // Pular jogadores já processados
+    }
+  }
+  
+  return ties;
 }

@@ -19,6 +19,10 @@ export default function Home() {
     finalizeMatch,
     reopenMatch,
     getGroupRanking,
+    resolveTieManual,
+    resolveTieRandom,
+    generateSinglesMatch,
+    undoTiebreak,
   } = useTournament();
 
   useEffect(() => {
@@ -153,6 +157,10 @@ export default function Home() {
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                   onReopenMatch={reopenMatch}
+                  onResolveTieManual={resolveTieManual}
+                  onResolveTieRandom={resolveTieRandom}
+                  onGenerateSingles={generateSinglesMatch}
+                  onUndoTiebreak={undoTiebreak}
                 />
               );
             })}
