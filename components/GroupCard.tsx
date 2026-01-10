@@ -28,7 +28,7 @@ export function GroupCard({
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-orange-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white">
-          Grupo {group.id.slice(-4).toUpperCase()} - Fase {group.fase}
+          Grupo {group.nome} - Fase {group.fase}
         </h3>
         <p className="text-orange-100 text-sm mt-1">
           {group.categoria}
@@ -47,7 +47,7 @@ export function GroupCard({
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Pos</th>
-                  <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Dupla</th>
+                  <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Jogador</th>
                   <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">V</th>
                   <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">D</th>
                   <th className="text-center py-2 px-2 text-gray-600 dark:text-gray-400 font-medium">Sets</th>
@@ -101,8 +101,8 @@ export function GroupCard({
             </table>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-            Aguardando resultados...
+          <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+            Nenhum jogo finalizado ainda
           </p>
         )}
       </div>

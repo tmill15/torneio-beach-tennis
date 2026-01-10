@@ -1,6 +1,6 @@
 /**
  * Ranking Service
- * Calcula estatísticas e classifica jogadores dentro de um grupo
+ * Calcula estatísticas e classifica jogadores individuais dentro de um grupo
  */
 
 import type { 
@@ -69,7 +69,8 @@ function compareRanking(a: RankingEntry, b: RankingEntry): number {
 }
 
 /**
- * Calcula estatísticas de um jogador
+ * Calcula estatísticas de um jogador individual
+ * O jogador acumula estatísticas de todos os jogos que participou
  */
 export function getPlayerStats(player: Player, matches: Match[]) {
   let vitorias = 0;
@@ -81,42 +82,51 @@ export function getPlayerStats(player: Player, matches: Match[]) {
   let jogos = 0;
 
   for (const match of matches) {
-    // Verifica se o jogador está nesta partida
-    const isPlayerA = match.playerA.id === player.id;
-    const isPlayerB = match.playerB.id === player.id;
-
-    if (!isPlayerA && !isPlayerB) continue;
     if (!match.isFinished) continue;
-
+    
+    // Verifica se jogador está na dupla A
+    const isInDuplaA = 
+      match.jogador1A.id === player.id || 
+      match.jogador2A.id === player.id;
+    
+    // Verifica se jogador está na dupla B
+    const isInDuplaB = 
+      match.jogador1B.id === player.id || 
+      match.jogador2B.id === player.id;
+    
+    if (!isInDuplaA && !isInDuplaB) continue;
+    
     jogos++;
-
-    // Calcula estatísticas baseado em sets
-    if (isPlayerA) {
+    
+    if (isInDuplaA) {
+      // Jogador estava na dupla A
       setsGanhos += match.setsWonA;
       setsPerdidos += match.setsWonB;
-
+      
       if (match.setsWonA > match.setsWonB) {
         vitorias++;
       } else {
         derrotas++;
       }
+      
+      // Calcular games
+      for (const set of match.sets) {
+        gamesGanhos += set.gamesA;
+        gamesPerdidos += set.gamesB;
+      }
     } else {
+      // Jogador estava na dupla B
       setsGanhos += match.setsWonB;
       setsPerdidos += match.setsWonA;
-
+      
       if (match.setsWonB > match.setsWonA) {
         vitorias++;
       } else {
         derrotas++;
       }
-    }
-
-    // Calcula games
-    for (const set of match.sets) {
-      if (isPlayerA) {
-        gamesGanhos += set.gamesA;
-        gamesPerdidos += set.gamesB;
-      } else {
+      
+      // Calcular games
+      for (const set of match.sets) {
         gamesGanhos += set.gamesB;
         gamesPerdidos += set.gamesA;
       }
@@ -141,7 +151,7 @@ export function updateMatchResult(
   match: Match,
   sets: SetScore[]
 ): Match {
-  // Conta sets ganhos por cada jogador
+  // Conta sets ganhos por cada dupla
   let setsA = 0;
   let setsB = 0;
 
@@ -261,7 +271,7 @@ export function canFinalizeMatch(
   // Verifica se há vencedor
   const winner = determineMatchWinner(match, gameConfig);
   if (winner === null) {
-    errors.push('Nenhum jogador atingiu o número de sets necessário para vencer');
+    errors.push('Nenhuma dupla atingiu o número de sets necessário para vencer');
   }
 
   return {

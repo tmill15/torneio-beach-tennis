@@ -6,6 +6,7 @@
 'use client';
 
 import type { Match, SetScore, GameConfig } from '@/types';
+import { formatDupla } from '@/types';
 import { ScoreInput } from './ScoreInput';
 
 interface MatchListProps {
@@ -50,7 +51,7 @@ export function MatchList({
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       <span className="text-gray-500 dark:text-gray-400">R{match.rodada}:</span>{' '}
-                      {match.playerA.nome} <span className="font-bold text-primary">{match.setsWonA}</span> × <span className="font-bold text-primary">{match.setsWonB}</span> {match.playerB.nome}
+                      {formatDupla(match.jogador1A, match.jogador2A)} <span className="font-bold text-primary">{match.setsWonA}</span> × <span className="font-bold text-primary">{match.setsWonB}</span> {formatDupla(match.jogador1B, match.jogador2B)}
                     </p>
                     {match.sets.length > 0 && (
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -81,7 +82,7 @@ export function MatchList({
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     <span className="text-gray-500 dark:text-gray-400">Rodada {match.rodada}:</span>{' '}
-                    {match.playerA.nome} × {match.playerB.nome}
+                    {formatDupla(match.jogador1A, match.jogador2A)} × {formatDupla(match.jogador1B, match.jogador2B)}
                   </p>
                 </div>
                 

@@ -3,9 +3,9 @@
 ## 📋 Objetivo do Projeto
 
 Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tennis com:
-- Sistema de inscrição e formação de grupos (4 duplas por grupo)
-- Geração automática de partidas no formato Round Robin
-- Ranking em tempo real com critérios de desempate
+- Sistema de inscrição individual e formação de grupos (4 jogadores por grupo)
+- Geração automática de partidas em duplas no formato Round Robin de pareamentos
+- Ranking individual em tempo real com critérios de desempate
 - Configurações flexíveis de jogo (sets, games, tie-break)
 - Sistema de backup/restore (export/import JSON)
 - Funciona offline e é instalável
@@ -20,18 +20,21 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Footer com versão visível
 
 ### ✅ Inscrição e Grupos - COMPLETO
-- [x] Sistema de inscrição com lista de espera
-- [x] Formação automática de grupos (4 duplas)
+- [x] Sistema de inscrição individual com lista de espera
+- [x] Formação automática de grupos (4 jogadores)
 - [x] Distribuição de seeds
-- [x] Algoritmo Round Robin para geração de jogos
+- [x] Algoritmo Round Robin de pareamentos para geração de jogos
 - [x] Validação de grupos completos
+- [x] Cada jogador joga COM e CONTRA todos os outros
 
 ### ✅ Partidas e Ranking - COMPLETO
-- [x] Cálculo de ranking (Vitórias > Saldo Sets > Saldo Games)
+- [x] Cálculo de ranking INDIVIDUAL (Vitórias > Saldo Sets > Saldo Games)
+- [x] Jogos em formato de duplas (4 jogadores por jogo)
+- [x] Estatísticas individuais acumuladas de todos os jogos
 - [x] Configurações de jogo (sets, games, tie-break)
 - [x] Input de placares com validação em tempo real
 - [x] Diferenciação visual jogos pendentes/concluídos
-- [x] Atualização automática de ranking
+- [x] Atualização automática de ranking individual
 
 ### ✅ Backup e PWA - COMPLETO
 - [x] Sistema de backup/restore (export/import JSON)
@@ -50,7 +53,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.2.0  
+**Versão:** v0.4.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -149,6 +152,76 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 
 ## 🔄 Histórico de Versões
 
+### v0.4.0 - Sistema Individual com Duplas nos Jogos ✅
+**Data:** 10/01/2026
+
+**REESTRUTURAÇÃO COMPLETA:**
+Esta versão corrige fundamentalmente a estrutura do sistema para refletir corretamente as regras do Beach Tennis:
+- Cadastro e ranking são INDIVIDUAIS
+- Duplas são formadas apenas nos JOGOS
+- Cada jogador acumula suas próprias estatísticas
+
+**Adicionado:**
+- Sistema de cadastro individual de jogadores
+- Ranking individual (cada jogador tem suas próprias estatísticas)
+- Algoritmo Round Robin de pareamentos: cada jogador joga COM e CONTRA todos os outros
+- Match com 4 jogadores (jogador1A, jogador2A, jogador1B, jogador2B)
+- Função helper `formatDupla()` para exibição de duplas nos jogos
+- Estatísticas individuais aplicadas aos jogadores de cada dupla após o jogo
+
+**Modificado:**
+- Player agora é individual (id, nome, categoria, isSeed, status)
+- Group contém `players[]` (4 jogadores individuais)
+- Tournament.waitingList contém jogadores individuais
+- RankingEntry calcula estatísticas por jogador
+- UI de cadastro voltou para 1 campo de input
+- Lista de espera mostra jogadores individuais
+- Componentes atualizados para exibir jogadores e duplas corretamente
+
+**Removido:**
+- Tipo `Dupla` e `DuplaStatus`
+- Função `getDuplaName()`
+- Sistema de cadastro de duplas fixas
+
+**Exemplo Prático:**
+```
+Grupo A: Thiago, Dayanna, Silva, Flavio
+
+Jogos Gerados:
+- Jogo 1: (Thiago + Dayanna) vs (Silva + Flavio)
+- Jogo 2: (Thiago + Silva) vs (Dayanna + Flavio)
+- Jogo 3: (Thiago + Flavio) vs (Dayanna + Silva)
+
+Se Jogo 1 terminar 6x2:
+- Thiago: +1V, +6GF, +2GC
+- Dayanna: +1V, +6GF, +2GC
+- Silva: +1D, +2GF, +6GC
+- Flavio: +1D, +2GF, +6GC
+```
+
+**Nota de Compatibilidade:**
+Esta versão quebra compatibilidade com backups da v0.3.0 devido à mudança estrutural de duplas para jogadores individuais.
+
+### v0.3.0 - Sistema de Duplas e Nomenclatura de Grupos (OBSOLETO)
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ Sistema completo de DUPLAS (2 jogadores por dupla)
+- ✅ Nomenclatura alfabética dos grupos (A, B, C, D...)
+- ✅ UI atualizada para cadastro de duplas (2 campos de input)
+- ✅ Exibição de duplas formatada ("Jogador 1 / Jogador 2")
+- ✅ Tipos atualizados: `Dupla`, `Player`, helper `getDuplaName()`
+
+**Modificado:**
+- 🔄 Estrutura de dados migrada de Players individuais para Duplas
+- 🔄 Todos os serviços adaptados (enrollment, group, match, ranking)
+- 🔄 Hooks atualizados (`useTournament` agora usa `addDupla`/`removeDupla`)
+- 🔄 Componentes UI atualizados (GroupCard, MatchList, BackupPanel)
+- 🔄 Nomenclatura dos grupos agora usa letras (A, B, C...) em vez de IDs aleatórios
+
+**Contexto:**
+Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrutura fundamental do sistema para refletir a natureza real do esporte. Jogos de simples só serão criados para desempate ao final de cada fase (funcionalidade futura).
+
 ### v0.2.0 - Ordenação de Categorias ✅
 **Data:** 10/01/2026
 
@@ -207,9 +280,10 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - Dark mode suportado
 
 **Próximas Versões (Roadmap):**
-- v0.3.0: Melhorias de UX (animações, feedback visual)
-- v0.4.0: Navegação entre fases (classificatórios, finais)
-- v0.5.0: Histórico de torneios
+- v0.5.0: Jogos de simples para desempate (ao final das fases)
+- v0.6.0: Melhorias de UX (animações, feedback visual)
+- v0.7.0: Navegação entre fases (classificatórios, finais)
+- v0.8.0: Histórico de torneios
 - v1.0.0: Release estável com todos os refinamentos
 
 ---
@@ -246,5 +320,5 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.2.0  
-**Status:** ✅ ATIVO - Sistema operacional com melhorias contínuas!
+**Versão atual:** v0.4.0  
+**Status:** ✅ ATIVO - Sistema individual com Round Robin de pareamentos implementado!

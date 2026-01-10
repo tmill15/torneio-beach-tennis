@@ -1,6 +1,6 @@
 /**
  * Enrollment Service
- * Gerencia inscrição de jogadores e lista de espera
+ * Gerencia inscrição de jogadores individuais e lista de espera
  */
 
 import type { Player, Tournament, Group } from '@/types';
@@ -68,8 +68,13 @@ export function formGroupsFromWaitingList(
   const playersToEnroll = playersInCategory.slice(0, numGroups * PLAYERS_PER_GROUP);
   const remainingPlayers = playersInCategory.slice(numGroups * PLAYERS_PER_GROUP);
 
+  // Calcula índice inicial para nomeação (A, B, C...)
+  const existingGroupsInCategory = tournament.grupos.filter(
+    g => g.categoria === categoria && g.fase === fase
+  ).length;
+
   // Cria grupos
-  const newGroups = createGroups(playersToEnroll, fase, categoria);
+  const newGroups = createGroups(playersToEnroll, fase, categoria, existingGroupsInCategory);
 
   // Atualiza lista de espera (remove jogadores que foram para grupos)
   const updatedWaitingList = [

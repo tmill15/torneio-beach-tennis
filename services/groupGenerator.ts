@@ -5,16 +5,18 @@
 
 import type { Player, Group } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { PLAYERS_PER_GROUP } from '@/types';
+import { PLAYERS_PER_GROUP, getGroupName } from '@/types';
 
 /**
  * Cria grupos a partir de uma lista de jogadores
  * Distribui seeds uniformemente e sorteia os demais
+ * @param startIndex - Índice inicial para nomear grupos (0 = A, 1 = B, etc.)
  */
 export function createGroups(
   players: Player[],
   fase: number,
-  categoria: string
+  categoria: string,
+  startIndex: number = 0
 ): Group[] {
   if (players.length < PLAYERS_PER_GROUP) {
     console.warn(`Mínimo de ${PLAYERS_PER_GROUP} jogadores necessário para criar grupos`);
@@ -42,9 +44,10 @@ export function createGroups(
     }
   }
 
-  // Cria objetos de grupo
+  // Cria objetos de grupo com nomes alfabéticos (A, B, C...)
   return seededGroups.map((groupPlayers, index) => ({
     id: uuidv4(),
+    nome: getGroupName(startIndex + index),  // A, B, C, D...
     fase,
     categoria,
     players: groupPlayers.map(p => ({ ...p, status: 'enrolled' as const })),

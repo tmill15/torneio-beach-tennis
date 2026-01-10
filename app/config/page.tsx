@@ -196,7 +196,7 @@ export default function ConfigPage() {
 
           {/* Coluna Direita */}
           <div className="space-y-8">
-            {/* Adicionar Jogadores */}
+            {/* Adicionar Jogador */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Adicionar Jogador

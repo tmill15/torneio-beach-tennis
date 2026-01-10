@@ -131,7 +131,7 @@ export function getBackupMetadata(jsonData: string): {
 
     const totalPlayers = 
       backup.tournament.waitingList.length +
-      backup.tournament.grupos.reduce((sum, group) => sum + group.players.length, 0);
+      backup.tournament.grupos.reduce((sum, group) => sum + (group.players?.length || 0), 0);
 
     return {
       version: backup.version,

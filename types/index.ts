@@ -1,10 +1,10 @@
 /**
  * Types e Interfaces do BeachTennis Manager
- * Versão: 0.1.0
+ * Versão: 0.4.0
  */
 
 // ============================================
-// PLAYER (Jogador/Dupla)
+// PLAYER (Jogador Individual)
 // ============================================
 
 export type PlayerStatus = 'waiting' | 'enrolled' | 'eliminated';
@@ -40,14 +40,18 @@ export interface SetScore {
 }
 
 // ============================================
-// MATCH (Partida)
+// MATCH (Partida de Duplas - 4 jogadores)
 // ============================================
 
 export interface Match {
   id: string;
   groupId: string;
-  playerA: Player;
-  playerB: Player;
+  // Dupla A (2 jogadores)
+  jogador1A: Player;
+  jogador2A: Player;
+  // Dupla B (2 jogadores)
+  jogador1B: Player;
+  jogador2B: Player;
   sets: SetScore[];                  // Array de sets jogados
   setsWonA: number;                  // Sets ganhos por A
   setsWonB: number;                  // Sets ganhos por B
@@ -61,9 +65,10 @@ export interface Match {
 
 export interface Group {
   id: string;
+  nome: string;                      // Nome do grupo (A, B, C...)
   fase: number;                      // Número da fase (1, 2, 3...)
   categoria: string;
-  players: Player[];
+  players: Player[];                 // 4 jogadores individuais
   matches: Match[];
 }
 
@@ -76,15 +81,15 @@ export interface Tournament {
   categorias: string[];
   gameConfig: GameConfig;            // Configurações do jogo
   grupos: Group[];
-  waitingList: Player[];
+  waitingList: Player[];             // Lista de espera de jogadores individuais
 }
 
 // ============================================
-// RANKING (Classificação)
+// RANKING (Classificação Individual)
 // ============================================
 
 export interface RankingEntry {
-  player: Player;
+  player: Player;                    // Jogador individual
   vitorias: number;                  // Vitórias (matches ganhos)
   derrotas: number;                  // Derrotas (matches perdidos)
   setsGanhos: number;                // Total de sets ganhos
@@ -143,5 +148,23 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
 export const MIN_GAMES_PER_SET = 4;
 export const MAX_GAMES_PER_SET = 10;
 export const MIN_TIE_BREAK_POINTS = 7;
-export const PLAYERS_PER_GROUP = 4;
+export const PLAYERS_PER_GROUP = 4;         // 4 jogadores por grupo
 export const MIN_GAME_DIFFERENCE = 2;
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Gera nome do grupo baseado no índice (A, B, C...)
+ */
+export function getGroupName(index: number): string {
+  return String.fromCharCode(65 + index); // 65 = 'A' em ASCII
+}
+
+/**
+ * Formata nomes de dupla para exibição
+ */
+export function formatDupla(jogador1: Player, jogador2: Player): string {
+  return `${jogador1.nome} / ${jogador2.nome}`;
+}
