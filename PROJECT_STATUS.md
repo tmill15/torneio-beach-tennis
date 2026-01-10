@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.14.3  
+**Versão:** v0.14.4  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,42 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.14.4 - Correção: Lista de Jogadores Duplicados ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Lista de jogadores duplicada:** Jogadores que apareciam em múltiplas fases estavam sendo exibidos múltiplas vezes na lista
+  - **Problema:** Um jogador que participa da Fase 1, 2 e 3 aparecia 3 vezes na lista visual
+  - **Causa:** `playersInCategory` usava `flatMap` que incluía o mesmo jogador de todos os grupos (múltiplas fases)
+  - **Solução:** Usar `Map` com `player.id` para garantir que cada jogador apareça apenas uma vez na lista
+  - **Resultado:** Lista mostra apenas jogadores únicos, mesmo que participem de múltiplas fases
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `playersInCategory` agora remove duplicatas usando `Map` antes de renderizar
+  - Comentário explicativo adicionado
+
+**Antes:**
+```typescript
+const playersInCategory = groupsInCategory.flatMap(g => g.players);
+// Resultado: Jogador aparece 3x se estiver em 3 fases
+```
+
+**Agora:**
+```typescript
+const playersInCategoryRaw = groupsInCategory.flatMap(g => g.players);
+const playersInCategoryMap = new Map<string, typeof playersInCategoryRaw[0]>();
+playersInCategoryRaw.forEach(player => {
+  if (!playersInCategoryMap.has(player.id)) {
+    playersInCategoryMap.set(player.id, player);
+  }
+});
+const playersInCategory = Array.from(playersInCategoryMap.values());
+// Resultado: Cada jogador aparece apenas uma vez ✅
+```
 
 ---
 

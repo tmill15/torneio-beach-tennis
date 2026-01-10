@@ -779,8 +779,16 @@ export default function ConfigPage() {
                     const groupsInCategory = tournament.grupos.filter(g => g.categoria === categoria);
                     if (groupsInCategory.length === 0) return null;
 
-                    // Coletar todos os jogadores da categoria (de todos os grupos)
-                    const playersInCategory = groupsInCategory.flatMap(g => g.players);
+                    // Coletar todos os jogadores únicos da categoria (de todos os grupos)
+                    // IMPORTANTE: Remover duplicatas quando um jogador aparece em múltiplas fases
+                    const playersInCategoryRaw = groupsInCategory.flatMap(g => g.players);
+                    const playersInCategoryMap = new Map<string, typeof playersInCategoryRaw[0]>();
+                    playersInCategoryRaw.forEach(player => {
+                      if (!playersInCategoryMap.has(player.id)) {
+                        playersInCategoryMap.set(player.id, player);
+                      }
+                    });
+                    const playersInCategory = Array.from(playersInCategoryMap.values());
                     
                     // Verificar se há grupos em Fase 2 ou superior
                     const hasAdvancedPhases = groupsInCategory.some(g => g.fase >= 2);
