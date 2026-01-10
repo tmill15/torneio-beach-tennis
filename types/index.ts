@@ -81,6 +81,19 @@ export interface Group {
 // TOURNAMENT (Torneio)
 // ============================================
 
+// ============================================
+// CROSS GROUP TIEBREAK (Desempate entre Grupos)
+// ============================================
+
+export interface CrossGroupTiebreak {
+  phase: number;                     // Fase onde ocorre o empate
+  position: number;                  // Posição (1 = 2º colocado, 2 = 3º colocado, etc.)
+  winnerId: string;                   // ID do jogador vencedor
+  method: 'manual' | 'random' | 'singles'; // Método usado para resolver
+  tiedPlayerIds: string[];            // IDs dos jogadores empatados
+  matchId?: string;                   // ID da partida de simples (se method = 'singles')
+}
+
 export interface Tournament {
   version?: string;                  // Versão dos dados (para migrações seguras)
   nome: string;
@@ -89,6 +102,7 @@ export interface Tournament {
   grupos: Group[];
   waitingList: Player[];             // Lista de espera de jogadores individuais
   completedCategories?: string[];    // Categorias que foram concluídas (torneio finalizado)
+  crossGroupTiebreaks?: CrossGroupTiebreak[]; // Desempates entre grupos diferentes
 }
 
 // ============================================

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
+import { detectCrossGroupTies } from '@/services/phaseGenerator';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
@@ -24,6 +25,9 @@ export default function Home() {
     resolveTieRandom,
     generateSinglesMatch,
     undoTiebreak,
+    resolveCrossGroupTieManual,
+    resolveCrossGroupTieRandom,
+    generateCrossGroupSinglesMatch,
     advanceToNextPhase,
     getPhaseAdvancePreview,
     isPhaseComplete,
@@ -250,6 +254,10 @@ export default function Home() {
               preview={getPhaseAdvancePreview(selectedCategory, selectedPhase)}
               hasPendingTies={hasPendingTies(selectedCategory, selectedPhase)}
               onAdvance={() => advanceToNextPhase(selectedCategory, selectedPhase)}
+              resolveCrossGroupTieManual={resolveCrossGroupTieManual}
+              resolveCrossGroupTieRandom={resolveCrossGroupTieRandom}
+              generateCrossGroupSinglesMatch={generateCrossGroupSinglesMatch}
+              tournament={tournament}
             />
           </div>
         )}

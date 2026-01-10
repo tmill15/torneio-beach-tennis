@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Tournament, Player, Group, Match, SetScore } from '@/types';
+import type { Tournament, Player, Group, Match, SetScore, CrossGroupTiebreak } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer as removePlayerService } from '@/services/enrollmentService';
 import { generatePairsFor4Players } from '@/services/matchGenerator';
@@ -447,9 +447,28 @@ export function useTournament() {
       // Primeiro, encontrar a partida para verificar se é desempate
       const group = prev.grupos.find(g => g.id === groupId);
       const match = group?.matches.find(m => m.id === matchId);
+      const updatedMatch = match ? updateMatchResult(match, sets) : null;
+      
+      // Verificar se é partida de desempate entre grupos
+      const crossGroupTiebreak = prev.crossGroupTiebreaks?.find(t => t.matchId === matchId);
+      
+      let updatedCrossGroupTiebreaks = prev.crossGroupTiebreaks || [];
+      if (crossGroupTiebreak && updatedMatch) {
+        // Atualizar desempate entre grupos com o vencedor
+        const winnerId = updatedMatch.setsWonA > updatedMatch.setsWonB 
+          ? match!.jogador1A.id 
+          : match!.jogador1B.id;
+        
+        updatedCrossGroupTiebreaks = updatedCrossGroupTiebreaks.map(t => 
+          t.matchId === matchId 
+            ? { ...t, winnerId }
+            : t
+        );
+      }
       
       return {
         ...prev,
+        crossGroupTiebreaks: updatedCrossGroupTiebreaks,
         grupos: prev.grupos.map(grp => {
           if (grp.id !== groupId) return grp;
 
@@ -458,13 +477,11 @@ export function useTournament() {
             matches: grp.matches.map(m => {
               if (m.id !== matchId) return m;
               // Atualiza o placar E finaliza em uma única operação
-              const updatedMatch = updateMatchResult(m, sets);
-              return { ...updatedMatch, isFinished: true };
+              return { ...updatedMatch!, isFinished: true };
             }),
             // Se for partida de desempate de simples, aplicar tiebreakOrder automaticamente
-            players: match?.isTiebreaker && match.jogador1A.id === match.jogador2A.id
+            players: match?.isTiebreaker && match.jogador1A.id === match.jogador2A.id && updatedMatch
               ? grp.players.map(player => {
-                  const updatedMatch = updateMatchResult(match, sets);
                   const winnerId = updatedMatch.setsWonA > updatedMatch.setsWonB 
                     ? match.jogador1A.id 
                     : match.jogador1B.id;
@@ -804,6 +821,134 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Resolve desempate entre grupos por seleção manual
+   */
+  const resolveCrossGroupTieManual = useCallback((
+    categoria: string,
+    phase: number,
+    position: number,
+    winnerId: string,
+    tiedPlayerIds: string[]
+  ) => {
+    updateTournament(prev => {
+      const existingTiebreaks = prev.crossGroupTiebreaks || [];
+      
+      // Remover desempate existente para esta combinação (se houver)
+      const filteredTiebreaks = existingTiebreaks.filter(
+        t => !(t.phase === phase && t.position === position && t.tiedPlayerIds.some(id => tiedPlayerIds.includes(id)))
+      );
+      
+      // Adicionar novo desempate
+      const newTiebreak: CrossGroupTiebreak = {
+        phase,
+        position,
+        winnerId,
+        method: 'manual',
+        tiedPlayerIds
+      };
+      
+      return {
+        ...prev,
+        crossGroupTiebreaks: [...filteredTiebreaks, newTiebreak]
+      };
+    });
+  }, [updateTournament]);
+
+  /**
+   * Resolve desempate entre grupos por sorteio
+   */
+  const resolveCrossGroupTieRandom = useCallback((
+    categoria: string,
+    phase: number,
+    position: number,
+    tiedPlayerIds: string[]
+  ) => {
+    const randomIndex = Math.floor(Math.random() * tiedPlayerIds.length);
+    const winnerId = tiedPlayerIds[randomIndex];
+    resolveCrossGroupTieManual(categoria, phase, position, winnerId, tiedPlayerIds);
+  }, [resolveCrossGroupTieManual]);
+
+  /**
+   * Gera partida de simples para desempate entre grupos
+   */
+  const generateCrossGroupSinglesMatch = useCallback((
+    categoria: string,
+    phase: number,
+    position: number,
+    player1Id: string,
+    player2Id: string
+  ) => {
+    updateTournament(prev => {
+      // Encontrar os jogadores
+      const categoryGroups = prev.grupos.filter(g => g.categoria === categoria && g.fase === phase);
+      let player1: Player | undefined;
+      let player2: Player | undefined;
+      
+      for (const group of categoryGroups) {
+        const p1 = group.players.find(p => p.id === player1Id);
+        const p2 = group.players.find(p => p.id === player2Id);
+        if (p1) player1 = p1;
+        if (p2) player2 = p2;
+      }
+      
+      if (!player1 || !player2) return prev;
+      
+      // Criar grupo "virtual" para a partida de desempate
+      // Usar o primeiro grupo da fase como base
+      const baseGroup = categoryGroups[0];
+      if (!baseGroup) return prev;
+      
+      const matchId = uuidv4();
+      const singlesMatch: Match = {
+        id: matchId,
+        groupId: baseGroup.id, // Usar ID do grupo base (será tratado como partida especial)
+        jogador1A: player1,
+        jogador2A: player1, // Duplicar para indicar que é simples
+        jogador1B: player2,
+        jogador2B: player2, // Duplicar para indicar que é simples
+        sets: [],
+        setsWonA: 0,
+        setsWonB: 0,
+        isFinished: false,
+        rodada: 999, // Rodada especial para desempate
+        isTiebreaker: true
+      };
+      
+      // Adicionar partida ao grupo base
+      const updatedGroups = prev.grupos.map(group => {
+        if (group.id === baseGroup.id) {
+          return {
+            ...group,
+            matches: [...group.matches, singlesMatch]
+          };
+        }
+        return group;
+      });
+      
+      // Registrar desempate (será atualizado quando partida for finalizada)
+      const existingTiebreaks = prev.crossGroupTiebreaks || [];
+      const filteredTiebreaks = existingTiebreaks.filter(
+        t => !(t.phase === phase && t.position === position && t.tiedPlayerIds.some(id => [player1Id, player2Id].includes(id)))
+      );
+      
+      const newTiebreak: CrossGroupTiebreak = {
+        phase,
+        position,
+        winnerId: '', // Será preenchido quando partida for finalizada
+        method: 'singles',
+        tiedPlayerIds: [player1Id, player2Id],
+        matchId
+      };
+      
+      return {
+        ...prev,
+        grupos: updatedGroups,
+        crossGroupTiebreaks: [...filteredTiebreaks, newTiebreak]
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Avança para a próxima fase (com lógica específica por fase)
    */
   const advanceToNextPhase = useCallback((categoria: string, currentPhase: number) => {
@@ -817,7 +962,7 @@ export function useTournament() {
       if (currentPhase === 1) {
         ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, currentPhase));
       } else if (currentPhase === 2) {
-        ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase));
+        ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase, prev));
       } else if (currentPhase === 3) {
         // Fase 3 (Final) - Marcar categoria como concluída
         return {
@@ -874,7 +1019,7 @@ export function useTournament() {
     if (phase === 1) {
       ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, phase));
     } else if (phase === 2) {
-      ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, phase));
+      ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, phase, tournament));
     } else {
       return { direct: [], repechage: [], total: 0, rule: '' };
     }
@@ -937,6 +1082,9 @@ export function useTournament() {
     resolveTieRandom,
     generateSinglesMatch,
     undoTiebreak,
+    resolveCrossGroupTieManual,
+    resolveCrossGroupTieRandom,
+    generateCrossGroupSinglesMatch,
     resetTournament,
     // Funções do sistema de fases
     advanceToNextPhase,
@@ -947,7 +1095,8 @@ export function useTournament() {
       hasPendingTiesService(
         tournament.grupos.filter(g => g.categoria === categoria), 
         phase,
-        (group) => getGroupRanking(group.id)
+        (group) => getGroupRanking(group.id),
+        tournament
       ),
     getMaxPhase: (categoria: string) => 
       getMaxPhaseService(tournament.grupos, categoria),

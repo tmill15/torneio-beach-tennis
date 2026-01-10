@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import type { QualifiedPlayer } from '@/services/phaseGenerator';
+import type { Tournament } from '@/types';
+import { detectCrossGroupTies } from '@/services/phaseGenerator';
+import { CrossGroupTiebreakerModal } from './CrossGroupTiebreakerModal';
 
 interface PhaseAdvanceCardProps {
   categoria: string;
@@ -14,6 +17,10 @@ interface PhaseAdvanceCardProps {
   };
   hasPendingTies: boolean;
   onAdvance: () => void;
+  resolveCrossGroupTieManual?: (categoria: string, phase: number, position: number, winnerId: string, tiedPlayerIds: string[]) => void;
+  resolveCrossGroupTieRandom?: (categoria: string, phase: number, position: number, tiedPlayerIds: string[]) => void;
+  generateCrossGroupSinglesMatch?: (categoria: string, phase: number, position: number, player1Id: string, player2Id: string) => void;
+  tournament?: Tournament;
 }
 
 export function PhaseAdvanceCard({
@@ -22,11 +29,40 @@ export function PhaseAdvanceCard({
   preview,
   hasPendingTies,
   onAdvance,
+  resolveCrossGroupTieManual,
+  resolveCrossGroupTieRandom,
+  generateCrossGroupSinglesMatch,
+  tournament,
 }: PhaseAdvanceCardProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showCrossGroupTieModal, setShowCrossGroupTieModal] = useState(false);
+  const [crossGroupTieData, setCrossGroupTieData] = useState<{
+    tiedPlayers: { player: any; stats: any; groupOrigin: string }[];
+    phase: number;
+    position: number;
+  } | null>(null);
+  
   const nextPhase = currentPhase + 1;
   const isFinal = currentPhase === 3; // Fase 3 é a fase final
-  const canComplete = !hasPendingTies;
+  
+  // Detectar empates entre grupos
+  let crossGroupTies: { player: any; stats: any; groupOrigin: string }[] = [];
+  if (tournament) {
+    const categoryGroups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === currentPhase);
+    if (currentPhase === 1) {
+      // Verificar empate em 3º lugar (repescagem)
+      crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 2, tournament.crossGroupTiebreaks);
+    } else if (currentPhase === 2) {
+      const numGroups = categoryGroups.length;
+      if (numGroups === 3) {
+        // Verificar empate em 2º lugar (melhor 2º colocado)
+        crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 1, tournament.crossGroupTiebreaks);
+      }
+    }
+  }
+  
+  const hasCrossGroupTies = crossGroupTies.length > 1;
+  const canComplete = !hasPendingTies && !hasCrossGroupTies;
 
   return (
     <div className={`border-2 rounded-lg p-6 ${
@@ -73,6 +109,22 @@ export function PhaseAdvanceCard({
           {!canComplete && (
             <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
               ⚠️ Resolva todos os desempates antes de concluir a fase
+              {hasCrossGroupTies && (
+                <button
+                  onClick={() => {
+                    const position = currentPhase === 1 ? 2 : 1;
+                    setCrossGroupTieData({
+                      tiedPlayers: crossGroupTies,
+                      phase: currentPhase,
+                      position
+                    });
+                    setShowCrossGroupTieModal(true);
+                  }}
+                  className="ml-2 underline font-medium"
+                >
+                  Resolver empate entre grupos
+                </button>
+              )}
             </p>
           )}
         </div>
@@ -154,6 +206,55 @@ export function PhaseAdvanceCard({
           : (isFinal ? '⚠️ Resolva os desempates para concluir' : `⚠️ Resolva os desempates para concluir`)
         }
       </button>
+      
+      {/* Modal de desempate entre grupos */}
+      {showCrossGroupTieModal && crossGroupTieData && (
+        <CrossGroupTiebreakerModal
+          tiedPlayers={crossGroupTieData.tiedPlayers}
+          phase={crossGroupTieData.phase}
+          position={crossGroupTieData.position}
+          onManualSelect={(winnerId) => {
+            if (resolveCrossGroupTieManual) {
+              resolveCrossGroupTieManual(
+                categoria,
+                crossGroupTieData.phase,
+                crossGroupTieData.position,
+                winnerId,
+                crossGroupTieData.tiedPlayers.map(t => t.player.id)
+              );
+            }
+            setShowCrossGroupTieModal(false);
+            setCrossGroupTieData(null);
+          }}
+          onRandomSelect={() => {
+            if (resolveCrossGroupTieRandom) {
+              resolveCrossGroupTieRandom(
+                categoria,
+                crossGroupTieData.phase,
+                crossGroupTieData.position,
+                crossGroupTieData.tiedPlayers.map(t => t.player.id)
+              );
+            }
+            setShowCrossGroupTieModal(false);
+            setCrossGroupTieData(null);
+          }}
+          onGenerateSingles={crossGroupTieData.tiedPlayers.length === 2 && generateCrossGroupSinglesMatch ? () => {
+            generateCrossGroupSinglesMatch(
+              categoria,
+              crossGroupTieData.phase,
+              crossGroupTieData.position,
+              crossGroupTieData.tiedPlayers[0].player.id,
+              crossGroupTieData.tiedPlayers[1].player.id
+            );
+            setShowCrossGroupTieModal(false);
+            setCrossGroupTieData(null);
+          } : undefined}
+          onClose={() => {
+            setShowCrossGroupTieModal(false);
+            setCrossGroupTieData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

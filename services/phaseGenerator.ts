@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Group, Player, Tournament, RankingEntry } from '@/types';
+import type { Group, Player, Tournament, RankingEntry, CrossGroupTiebreak } from '@/types';
 import { calculateRanking } from './rankingService';
 import { generatePairsFor4Players } from './matchGenerator';
 
@@ -28,7 +28,12 @@ export function isPhaseComplete(groups: Group[], phase: number): boolean {
  * Verifica se há desempates pendentes em uma fase
  * Retorna true se há desempates não resolvidos
  */
-export function hasPendingTies(groups: Group[], phase: number, calculateRanking: (group: Group) => any[]): boolean {
+export function hasPendingTies(
+  groups: Group[], 
+  phase: number, 
+  calculateRanking: (group: Group) => any[],
+  tournament?: Tournament
+): boolean {
   const phaseGroups = groups.filter(g => g.fase === phase);
   if (phaseGroups.length === 0) return false;
   
@@ -36,6 +41,7 @@ export function hasPendingTies(groups: Group[], phase: number, calculateRanking:
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { detectTies } = require('@/services/rankingService');
   
+  // Verificar empates dentro de grupos
   for (const group of phaseGroups) {
     const ranking = calculateRanking(group);
     const ties = detectTies(ranking);
@@ -46,28 +52,126 @@ export function hasPendingTies(groups: Group[], phase: number, calculateRanking:
     }
   }
   
+  // Verificar empates entre grupos (para repescagem)
+  // Fase 1 → Fase 2: verificar empates em 3º lugar
+  // Fase 2 → Fase 3: verificar empates em 2º lugar (quando há 3 grupos)
+  if (phase === 1) {
+    const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 2, tournament?.crossGroupTiebreaks);
+    if (crossGroupTies.length > 1) return true;
+  } else if (phase === 2) {
+    const numGroups = phaseGroups.length;
+    if (numGroups === 3) {
+      // Verificar empate em 2º lugar (melhor 2º colocado)
+      const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 1, tournament?.crossGroupTiebreaks);
+      if (crossGroupTies.length > 1) return true;
+    }
+  }
+  
   return false;
 }
 
 /**
  * Compara dois candidatos à repescagem/segundo lugar
  */
-function compareByRanking(a: RankingEntry, b: RankingEntry): number {
+function compareByRanking(a: RankingEntry, b: RankingEntry, crossGroupTiebreaks?: CrossGroupTiebreak[], phase?: number, position?: number): number {
   if (a.vitorias !== b.vitorias) return b.vitorias - a.vitorias;
   if (a.saldoGames !== b.saldoGames) return b.saldoGames - a.saldoGames;
   if (a.gamesGanhos !== b.gamesGanhos) return b.gamesGanhos - a.gamesGanhos;
+  
+  // Se há empate técnico, verificar se há desempate entre grupos resolvido
+  if (crossGroupTiebreaks && phase !== undefined && position !== undefined) {
+    const tiebreak = crossGroupTiebreaks.find(
+      t => t.phase === phase && 
+           t.position === position && 
+           t.tiedPlayerIds.includes(a.player.id) && 
+           t.tiedPlayerIds.includes(b.player.id)
+    );
+    
+    if (tiebreak) {
+      // Se um dos jogadores é o vencedor do desempate, ele vem primeiro
+      if (tiebreak.winnerId === a.player.id) return -1;
+      if (tiebreak.winnerId === b.player.id) return 1;
+    }
+  }
+  
   return 0;
 }
 
 /**
+ * Detecta empates entre jogadores de grupos diferentes em uma posição específica
+ */
+export function detectCrossGroupTies(
+  groups: Group[],
+  phase: number,
+  position: number,
+  crossGroupTiebreaks?: CrossGroupTiebreak[]
+): { player: Player; stats: RankingEntry; groupOrigin: string }[] {
+  const candidates: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
+  
+  for (const group of groups.filter(g => g.fase === phase)) {
+    const ranking = calculateRanking(group);
+    if (ranking.length > position) {
+      const entry = ranking[position];
+      candidates.push({
+        player: entry.player,
+        stats: entry,
+        groupOrigin: group.nome
+      });
+    }
+  }
+  
+  if (candidates.length === 0) return [];
+  
+  // Ordenar candidatos
+  candidates.sort((a, b) => compareByRanking(a.stats, b.stats, crossGroupTiebreaks, phase, position));
+  
+  if (candidates.length === 0) return [];
+  
+  // Ordenar candidatos
+  candidates.sort((a, b) => compareByRanking(a.stats, b.stats, crossGroupTiebreaks, phase, position));
+  
+  // Verificar se há empate técnico (mesmas estatísticas) entre os primeiros candidatos
+  const ties: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
+  const firstStats = candidates[0].stats;
+  
+  // Verificar se o primeiro candidato tem empate técnico com outros
+  for (const candidate of candidates) {
+    // Comparar sem considerar desempates para detectar empate técnico
+    if (candidate.stats.vitorias === firstStats.vitorias &&
+        candidate.stats.saldoGames === firstStats.saldoGames &&
+        candidate.stats.gamesGanhos === firstStats.gamesGanhos) {
+      // Verificar se não há desempate já resolvido
+      const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+        t => t.phase === phase && 
+             t.position === position && 
+             t.tiedPlayerIds.includes(candidate.player.id) &&
+             t.winnerId // Deve ter um vencedor definido
+      );
+      
+      if (!hasResolvedTiebreak) {
+        ties.push(candidate);
+      }
+    } else {
+      // Se encontrou alguém melhor, parar de procurar empates
+      break;
+    }
+  }
+  
+  // Se há mais de um jogador empatado e não há desempate resolvido, retornar empate
+  return ties.length > 1 ? ties : [];
+}
+
+/**
  * Obtém os melhores de uma posição específica (ex: melhores 2º ou 3º lugares)
+ * Considera desempates entre grupos já resolvidos
  */
 function getBestAtPosition(
   groups: Group[],
   phase: number,
   position: number,
   count: number,
-  type: QualificationType
+  type: QualificationType,
+  tournament?: Tournament
 ): QualifiedPlayer[] {
   const candidates: { qualified: QualifiedPlayer, stats: RankingEntry }[] = [];
   
@@ -87,7 +191,15 @@ function getBestAtPosition(
     }
   }
   
-  candidates.sort((a, b) => compareByRanking(a.stats, b.stats));
+  // Ordenar considerando desempates entre grupos resolvidos
+  candidates.sort((a, b) => compareByRanking(
+    a.stats, 
+    b.stats, 
+    tournament?.crossGroupTiebreaks, 
+    phase, 
+    position
+  ));
+  
   return candidates.slice(0, count).map(c => c.qualified);
 }
 
@@ -131,6 +243,7 @@ export function getPhase1ToPhase2Classification(
   }
   
   // Obter melhores 3º lugares (pode ser 0, 1, 2, 3... dependendo do necessário)
+  // Nota: tournament não está disponível aqui, será passado quando necessário
   const repechage = getBestAtPosition(phaseGroups, phase, 2, repechageCount, 'repechage');
   
   return { direct, repechage };
@@ -142,7 +255,8 @@ export function getPhase1ToPhase2Classification(
  */
 export function getPhase2ToPhase3Classification(
   groups: Group[],
-  phase: number
+  phase: number,
+  tournament?: Tournament
 ): { direct: QualifiedPlayer[], repechage: QualifiedPlayer[] } {
   const phaseGroups = groups.filter(g => g.fase === phase);
   const numGroups = phaseGroups.length;
@@ -175,7 +289,8 @@ export function getPhase2ToPhase3Classification(
         });
       }
     }
-    repechage = getBestAtPosition(phaseGroups, phase, 1, 1, 'repechage');
+    // Nota: tournament será passado quando necessário via função wrapper
+    repechage = getBestAtPosition(phaseGroups, phase, 1, 1, 'repechage', tournament);
   } else {
     // Top 1 de cada grupo (4+ grupos)
     for (const group of phaseGroups) {
@@ -249,7 +364,7 @@ export function generateNextPhase(
     ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, currentPhase));
   } else if (currentPhase === 2) {
     // Fase 2 → Fase 3 (Final)
-    ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase));
+    ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase, tournament));
   } else {
     // Não há fase após a 3
     return tournament;
