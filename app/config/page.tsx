@@ -37,6 +37,14 @@ export default function ConfigPage() {
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
   const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('torneio');
+  
+  // Estados para modais de export/import
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exportCategory, setExportCategory] = useState<string>('all');
+  const [importCategory, setImportCategory] = useState<string>('');
+  const [importOverwrite, setImportOverwrite] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -175,10 +183,121 @@ export default function ConfigPage() {
     }
   };
 
-  const handleImportPlayers = (players: typeof tournament.waitingList) => {
-    players.forEach(player => {
-      addPlayer(player.nome, player.categoria, player.isSeed || false);
-    });
+  // Export de jogadores com opções
+  const handleExportPlayers = () => {
+    try {
+      let allPlayers: typeof tournament.waitingList = [];
+      let categoryLabel = '';
+
+      if (exportCategory === 'all') {
+        // Todas as categorias
+        const enrolledAll = tournament.grupos.flatMap(g => g.players);
+        const waitingAll = tournament.waitingList;
+        allPlayers = [...enrolledAll, ...waitingAll];
+        categoryLabel = 'Todas';
+      } else {
+        // Categoria específica
+        const enrolledInCategory = tournament.grupos
+          .filter(g => g.categoria === exportCategory)
+          .flatMap(g => g.players);
+        const waitingInCategory = tournament.waitingList
+          .filter(p => p.categoria === exportCategory);
+        allPlayers = [...enrolledInCategory, ...waitingInCategory];
+        categoryLabel = exportCategory;
+      }
+
+      if (allPlayers.length === 0) {
+        alert(`Não há jogadores para exportar.`);
+        return;
+      }
+
+      const playersData = {
+        exportDate: new Date().toISOString(),
+        categoria: exportCategory === 'all' ? 'Todas' : exportCategory,
+        totalPlayers: allPlayers.length,
+        players: allPlayers.map(p => ({
+          nome: p.nome,
+          categoria: p.categoria,
+          isSeed: p.isSeed || false,
+        })),
+      };
+
+      const dataStr = JSON.stringify(playersData, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      const filename = `jogadores-${categoryLabel.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setShowExportModal(false);
+    } catch (err) {
+      alert('Erro ao exportar jogadores');
+      console.error(err);
+    }
+  };
+
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImportFile(file);
+      setShowImportModal(true);
+      setImportCategory(selectedCategory); // Define categoria padrão
+    }
+    // Limpa input
+    e.target.value = '';
+  };
+
+  const handleImportPlayers = async () => {
+    if (!importFile) return;
+
+    try {
+      const json = await importFile.text();
+      const data = JSON.parse(json);
+
+      // Validação básica
+      if (!data.players || !Array.isArray(data.players)) {
+        alert('Arquivo de jogadores inválido');
+        return;
+      }
+
+      const targetCategory = importCategory || selectedCategory;
+
+      // Se sobrescrever, remover jogadores existentes
+      if (importOverwrite) {
+        // Remover da lista de espera
+        const playersToRemove = tournament.waitingList
+          .filter(p => p.categoria === targetCategory);
+        playersToRemove.forEach(p => removePlayer(p.id));
+
+        // Remover grupos da categoria (resortear Fase 1)
+        const phase1Groups = tournament.grupos.filter(
+          g => g.categoria === targetCategory && g.fase === 1
+        );
+        if (phase1Groups.length > 0) {
+          resetAndRedrawGroups(targetCategory, 1);
+        }
+      }
+
+      // Adicionar jogadores
+      data.players.forEach((p: any) => {
+        addPlayer(p.nome || '', targetCategory, p.isSeed || false);
+      });
+
+      setShowImportModal(false);
+      setImportFile(null);
+      setImportOverwrite(false);
+      
+      alert(`✅ ${data.players.length} jogador(es) importado(s) com sucesso para "${targetCategory}"!`);
+    } catch (err) {
+      alert('Erro ao importar jogadores');
+      console.error(err);
+    }
   };
 
   // Jogadores na lista de espera da categoria selecionada (para o formulário)
@@ -384,9 +503,42 @@ export default function ConfigPage() {
 
             {/* Participantes (com Abas) */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Participantes
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Participantes
+                </h2>
+                
+                {/* Botões Export/Import */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setExportCategory(selectedCategory);
+                      setShowExportModal(true);
+                    }}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded font-medium transition-colors flex items-center gap-1"
+                    title="Exportar jogadores"
+                  >
+                    <span>📥</span>
+                    Exportar
+                  </button>
+                  
+                  <label
+                    htmlFor="import-players-inline"
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded font-medium transition-colors cursor-pointer flex items-center gap-1"
+                    title="Importar jogadores"
+                  >
+                    <span>📤</span>
+                    Importar
+                  </label>
+                  <input
+                    id="import-players-inline"
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              </div>
 
               {/* Tabs */}
               <div className="mb-6">
@@ -558,12 +710,146 @@ export default function ConfigPage() {
               <BackupPanel 
                 tournament={tournament} 
                 onImport={importTournament}
-                onImportPlayers={handleImportPlayers}
               />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal de Exportação */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              📥 Exportar Jogadores
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Selecionar Categoria
+                </label>
+                <select
+                  value={exportCategory}
+                  onChange={(e) => setExportCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                >
+                  <option value="all">Todas as Categorias</option>
+                  {tournament.categorias.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                <p className="text-sm text-purple-900 dark:text-purple-200">
+                  ℹ️ Serão exportados jogadores <strong>no torneio + lista de espera</strong> da{exportCategory === 'all' ? 's' : ''} categoria{exportCategory === 'all' ? 's' : ''} selecionada{exportCategory === 'all' ? 's' : ''}.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleExportPlayers}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Exportar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Importação */}
+      {showImportModal && importFile && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              📤 Importar Jogadores
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Categoria de Destino
+                </label>
+                <select
+                  value={importCategory}
+                  onChange={(e) => setImportCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                >
+                  {tournament.categorias.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Jogadores serão adicionados à lista de espera desta categoria
+                </p>
+              </div>
+
+              <div className="flex items-start">
+                <input
+                  type="checkbox"
+                  id="overwrite-checkbox"
+                  checked={importOverwrite}
+                  onChange={(e) => setImportOverwrite(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                />
+                <label
+                  htmlFor="overwrite-checkbox"
+                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
+                  <strong>Sobrescrever jogadores existentes</strong>
+                  <br />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Remove todos os jogadores da categoria antes de importar
+                  </span>
+                </label>
+              </div>
+
+              {importOverwrite && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                  <p className="text-sm text-yellow-900 dark:text-yellow-200 flex items-start gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <span>
+                      <strong>Atenção:</strong> Todos os jogadores da categoria "{importCategory}" serão removidos (torneio + espera) antes da importação!
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportOverwrite(false);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleImportPlayers}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Importar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

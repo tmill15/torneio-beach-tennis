@@ -38,7 +38,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 
 ### ✅ Backup e PWA - COMPLETO
 - [x] Sistema de backup/restore completo (export/import JSON)
-- [x] Export/Import de lista de jogadores (simplificado)
+- [x] Export/Import contextual de jogadores por categoria
 - [x] Validação de backups
 - [x] Metadata de backup
 - [x] PWA instalável (Android, iOS, Desktop)
@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.8.4  
+**Versão:** v0.10.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,134 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.10.0 - Modais Avançados de Export/Import ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- 🎨 **Modais interativos para Export/Import:** Interface completa com opções avançadas
+  - **Modal de Exportação:**
+    - Dropdown para selecionar categoria específica ou "Todas as Categorias"
+    - Preview de quantos jogadores serão exportados
+    - Exporta jogadores no torneio + lista de espera
+  - **Modal de Importação:**
+    - Dropdown para selecionar categoria de destino
+    - Checkbox "Sobrescrever jogadores existentes"
+    - Aviso visual quando sobrescrever está ativo
+    - Validação e confirmação antes de importar
+
+**Funcionalidades da Importação:**
+- ✅ **Modo Normal:** Adiciona jogadores à lista de espera (mantém existentes)
+- ✅ **Modo Sobrescrever:** 
+  - Remove todos os jogadores da categoria (torneio + espera)
+  - Resorteia Fase 1 se houver grupos
+  - Importa novos jogadores limpos
+- ✅ **Feedback:** Mensagem de sucesso com quantidade importada
+
+**Interface:**
+```
+Modal de Exportação:
+┌─────────────────────────────────┐
+│ 📥 Exportar Jogadores          │
+│                                 │
+│ Selecionar Categoria            │
+│ [Todas as Categorias ▼]        │
+│                                 │
+│ ℹ️ Serão exportados jogadores  │
+│    no torneio + lista de espera│
+│                                 │
+│ [Cancelar] [Exportar]           │
+└─────────────────────────────────┘
+
+Modal de Importação:
+┌─────────────────────────────────┐
+│ 📤 Importar Jogadores          │
+│                                 │
+│ Categoria de Destino            │
+│ [Normal ▼]                      │
+│                                 │
+│ ☐ Sobrescrever jogadores       │
+│   existentes                    │
+│                                 │
+│ ⚠️ Atenção: Todos os jogadores │
+│    serão removidos...           │
+│                                 │
+│ [Cancelar] [Importar]           │
+└─────────────────────────────────┘
+```
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - Estados para controle dos modais
+  - `handleExportPlayers()` - exporta categoria específica ou todas
+  - `handleImportPlayers()` - importa com opção de sobrescrever
+  - Modais com backdrop escuro e design moderno
+  - Validações e feedback aprimorados
+
+**Benefícios:**
+- ✅ **Flexibilidade total:** Exporta 1 categoria ou todas
+- ✅ **Controle preciso:** Escolhe categoria de destino na importação
+- ✅ **Sobrescrita segura:** Opção para limpar e recomeçar
+- ✅ **UX profissional:** Modais claros e avisos visuais
+
+---
+
+### v0.9.0 - Melhoria: Export/Import de Jogadores por Categoria ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🎯 **Export/Import contextual por categoria:** Funcionalidade movida e melhorada
+  - **Localização:** Botões agora aparecem na seção "Participantes", ao lado do título
+  - **Escopo:** Exporta/importa jogadores da **categoria selecionada** apenas
+  - **Abrangência:** Inclui jogadores **no torneio + lista de espera** (não apenas espera)
+  - **UX aprimorada:** Botões próximos à lista de participantes (mais intuitivo)
+  - **Desabilitação inteligente:** Botão "Exportar" desabilitado se não há jogadores na categoria
+
+**Antes:**
+```
+Seção: Backup & Restauração (parte inferior)
+Exportava: Apenas lista de espera (todas categorias)
+Problema: Desabilitado se jogadores já estavam no torneio
+```
+
+**Depois:**
+```
+Seção: Participantes (topo da seção)
+Exporta: Torneio + Espera (categoria selecionada)
+Sempre habilitado: Se há jogadores na categoria
+```
+
+**Formato do JSON atualizado:**
+```json
+{
+  "exportDate": "2026-01-10T...",
+  "categoria": "Normal",
+  "totalPlayers": 22,
+  "players": [
+    { "nome": "Thiago", "categoria": "Normal", "isSeed": true },
+    { "nome": "Dayanna", "categoria": "Normal", "isSeed": false }
+  ]
+}
+```
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - Novos botões Export/Import ao lado do título "Participantes"
+  - `handleExportCategoryPlayers()` - exporta jogadores da categoria (torneio + espera)
+  - `handleImportCategoryPlayers()` - importa para a categoria selecionada
+  - Botões compactos com ícones (📥 Exportar, 📤 Importar)
+- 🔄 `components/BackupPanel.tsx`:
+  - Removida seção de export/import de jogadores
+  - Mantido apenas backup completo do torneio
+  - Interface simplificada
+
+**Benefícios:**
+- ✅ **Contexto claro:** Exporta apenas a categoria que você está vendo
+- ✅ **Sempre funcional:** Pega jogadores do torneio + espera
+- ✅ **UX melhorada:** Botões onde fazem sentido (junto aos participantes)
+- ✅ **Mais útil:** Facilita gerenciar categorias individualmente
 
 ---
 
@@ -1001,5 +1129,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.8.4  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import de lista de jogadores, adição incremental de grupos, UX simplificada, proteção de resorteio, e todas as funcionalidades anteriores mantidas!
+**Versão atual:** v0.10.0  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, UX profissional, proteção de resorteio, e todas as funcionalidades anteriores mantidas!
