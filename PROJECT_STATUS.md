@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.13.0  
+**Versão:** v0.13.1  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,54 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.13.1 - Correção: Campeão e Card na Fase Final ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Campeão aparecendo automaticamente após resolver desempate:** O campeão estava aparecendo assim que não havia desempates pendentes, sem precisar clicar em "Concluir Torneio"
+  - **Problema:** O banner do campeão aparecia automaticamente quando não havia desempates pendentes
+  - **Solução:** Adicionado campo `completedCategories` no Tournament para marcar categorias concluídas. O campeão só aparece quando a categoria está marcada como concluída (após clicar em "Concluir Torneio")
+  - **Resultado:** O campeão só aparece após clicar em "Concluir Torneio" na fase final
+
+- 🐛 **Card verde mostrando informações sem sentido na fase final:** O card mostrava "Total: 0 jogadores para o GRUPO FINAL" e lista vazia de classificados
+  - **Problema:** O card mostrava preview de classificação para a próxima fase, mas na fase final não há próxima fase
+  - **Solução:** 
+    - Card não mostra preview de classificação na fase final
+    - Mostra mensagem: "Todos os jogos foram finalizados. Clique em 'Concluir Torneio' para finalizar."
+    - Card é escondido após clicar em "Concluir Torneio"
+  - **Resultado:** Card mostra informações relevantes apenas na fase final
+
+**Modificado:**
+- 🔄 `types/index.ts`:
+  - Adicionado campo `completedCategories?: string[]` no Tournament para marcar categorias concluídas
+- 🔄 `hooks/useTournament.ts`:
+  - `advanceToNextPhase` agora marca a categoria como concluída quando `currentPhase === 3`
+  - Quando fase 3 é concluída, adiciona a categoria em `completedCategories`
+- 🔄 `services/backupService.ts`:
+  - `createEmptyTournament` agora inclui `completedCategories: []`
+- 🔄 `components/PhaseAdvanceCard.tsx`:
+  - Não mostra preview de classificação na fase final (`isFinal`)
+  - Mostra mensagem específica para fase final
+  - Botão "Ver quem classificou" não aparece na fase final
+- 🔄 `app/page.tsx`:
+  - Card não aparece quando a categoria foi concluída (fase 3)
+  - Campeão só aparece quando `completedCategories` inclui a categoria
+
+**Comportamento:**
+```
+Fase Final (antes de concluir):
+  🏆 Torneio Pronto para Conclusão!
+  Todos os jogos foram finalizados. Clique em "Concluir Torneio" para finalizar.
+  [🏆 Concluir Torneio] ← Ativo
+
+Fase Final (após concluir):
+  (Card verde desaparece)
+  🏆 CAMPEÃO DA CATEGORIA NORMAL
+  [Nome do Campeão]
+```
 
 ---
 

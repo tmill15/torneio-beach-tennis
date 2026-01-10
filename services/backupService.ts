@@ -165,6 +165,7 @@ export function createEmptyTournament(): Tournament {
     },
     grupos: [],
     waitingList: [],
+    completedCategories: [],
   };
 }
 

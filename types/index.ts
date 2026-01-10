@@ -88,6 +88,7 @@ export interface Tournament {
   gameConfig: GameConfig;            // Configurações do jogo
   grupos: Group[];
   waitingList: Player[];             // Lista de espera de jogadores individuais
+  completedCategories?: string[];    // Categorias que foram concluídas (torneio finalizado)
 }
 
 // ============================================

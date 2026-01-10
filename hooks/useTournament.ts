@@ -818,6 +818,15 @@ export function useTournament() {
         ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, currentPhase));
       } else if (currentPhase === 2) {
         ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, currentPhase));
+      } else if (currentPhase === 3) {
+        // Fase 3 (Final) - Marcar categoria como concluída
+        return {
+          ...prev,
+          completedCategories: [
+            ...(prev.completedCategories || []),
+            categoria
+          ].filter((c, index, arr) => arr.indexOf(c) === index) // Remove duplicatas
+        };
       } else {
         return prev; // Não avançar além da Fase 3
       }

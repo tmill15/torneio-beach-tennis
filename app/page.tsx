@@ -241,7 +241,8 @@ export default function Home() {
 
         {/* Botão de Concluir Fase / Torneio */}
         {selectedPhase === getMaxPhase(selectedCategory) && 
-         isPhaseComplete(selectedCategory, selectedPhase) && (
+         isPhaseComplete(selectedCategory, selectedPhase) && 
+         !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory)) && (
           <div className="mb-6">
             <PhaseAdvanceCard
               categoria={selectedCategory}
@@ -253,8 +254,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* Mostrar campeão se fase 3 está completa */}
-        {selectedPhase === 3 && isPhaseComplete(selectedCategory, 3) && groupsInSelectedPhase.length === 1 && (
+        {/* Mostrar campeão se fase 3 está completa, sem desempates pendentes E categoria foi concluída */}
+        {selectedPhase === 3 && 
+         isPhaseComplete(selectedCategory, 3) && 
+         !hasPendingTies(selectedCategory, 3) &&
+         tournament.completedCategories?.includes(selectedCategory) &&
+         groupsInSelectedPhase.length === 1 && (
           <div className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 border-4 border-yellow-600 rounded-lg p-8 text-center">
             <div className="text-6xl mb-4">🏆</div>
             <h2 className="text-3xl font-bold text-white mb-2">

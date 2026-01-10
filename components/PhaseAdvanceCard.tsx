@@ -25,7 +25,7 @@ export function PhaseAdvanceCard({
 }: PhaseAdvanceCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const nextPhase = currentPhase + 1;
-  const isFinal = nextPhase === 3;
+  const isFinal = currentPhase === 3; // Fase 3 é a fase final
   const canComplete = !hasPendingTies;
 
   return (
@@ -47,20 +47,27 @@ export function PhaseAdvanceCard({
               : (isFinal ? 'Torneio com Desempates Pendentes' : `Fase ${currentPhase} com Desempates Pendentes`)
             }
           </h3>
-          <p className={`text-sm font-medium ${
-            canComplete 
-              ? 'text-green-700 dark:text-green-300' 
-              : 'text-yellow-700 dark:text-yellow-300'
-          }`}>
-            {preview.rule}
-          </p>
-          {canComplete && (
+          {!isFinal && (
+            <p className={`text-sm font-medium ${
+              canComplete 
+                ? 'text-green-700 dark:text-green-300' 
+                : 'text-yellow-700 dark:text-yellow-300'
+            }`}>
+              {preview.rule}
+            </p>
+          )}
+          {canComplete && !isFinal && (
             <p className={`text-xs mt-1 ${
               canComplete 
                 ? 'text-green-600 dark:text-green-400' 
                 : 'text-yellow-600 dark:text-yellow-400'
             }`}>
-              Total: {preview.total} jogadores para {isFinal ? 'o GRUPO FINAL' : `a Fase ${nextPhase}`}
+              Total: {preview.total} jogadores para a Fase {nextPhase}
+            </p>
+          )}
+          {isFinal && canComplete && (
+            <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+              Todos os jogos foram finalizados. Clique em "Concluir Torneio" para finalizar.
             </p>
           )}
           {!canComplete && (
@@ -71,8 +78,8 @@ export function PhaseAdvanceCard({
         </div>
       </div>
       
-      {/* Detalhes */}
-      {canComplete && (
+      {/* Detalhes - Só mostrar se não for fase final */}
+      {canComplete && !isFinal && (
         <button
           onClick={() => setShowDetails(!showDetails)}
           className={`text-sm underline mb-3 ${
@@ -85,7 +92,7 @@ export function PhaseAdvanceCard({
         </button>
       )}
       
-      {showDetails && (
+      {showDetails && !isFinal && (
         <div className="mb-4 space-y-3">
           {/* Classificados Diretos */}
           <div>
