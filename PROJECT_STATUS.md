@@ -37,7 +37,8 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Atualização automática de ranking individual
 
 ### ✅ Backup e PWA - COMPLETO
-- [x] Sistema de backup/restore (export/import JSON)
+- [x] Sistema de backup/restore completo (export/import JSON)
+- [x] Export/Import de lista de jogadores (simplificado)
 - [x] Validação de backups
 - [x] Metadata de backup
 - [x] PWA instalável (Android, iOS, Desktop)
@@ -54,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.7.0  
+**Versão:** v0.8.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -256,6 +257,56 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.8.0 - Export/Import de Lista de Jogadores ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ **Exportação de lista de jogadores** (`BackupPanel.tsx`)
+  - Botão "Exportar Jogadores" para baixar JSON com lista de jogadores
+  - Formato simplificado: nome, categoria e seed
+  - Facilita reutilização de listas entre torneios
+- ✅ **Importação de lista de jogadores**
+  - Botão "Importar Jogadores" para carregar JSON de jogadores
+  - Jogadores importados são adicionados à lista de espera
+  - Validação de formato do arquivo
+  - Confirmação antes de importar
+- ✅ **Nova seção no BackupPanel:**
+  - Design com gradiente roxo/índigo para destacar a funcionalidade
+  - Separada visualmente do backup completo do torneio
+  - Dica informativa sobre o uso
+
+**Modificado:**
+- 🔄 `BackupPanel` component:
+  - Nova prop `onImportPlayers` para callback de importação
+  - Funções `handleExportPlayers` e `handleImportPlayers`
+  - Novo input file independente para importação de jogadores
+  - Layout reorganizado com seções claras
+- 🔄 Config Page (`app/config/page.tsx`):
+  - Nova função `handleImportPlayers` integrada
+  - Passa callback para `BackupPanel`
+
+**Benefícios:**
+- 🔄 Facilita recomeçar torneios mantendo os mesmos jogadores
+- 📤 Permite compartilhar listas entre diferentes dispositivos
+- ⚡ Agiliza configuração de torneios recorrentes
+- 🎯 Formato leve e focado (apenas jogadores, sem dados de partidas)
+
+**Formato do JSON:**
+```json
+{
+  "exportDate": "2026-01-10T...",
+  "totalPlayers": 20,
+  "players": [
+    { "nome": "Thiago", "categoria": "Normal", "isSeed": true },
+    { "nome": "Dayanna", "categoria": "Normal", "isSeed": false }
+  ]
+}
+```
+
+---
 
 ### v0.6.3 - Estatísticas por Categoria ✅
 **Data:** 10/01/2026
@@ -845,5 +896,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.7.0  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, e todas as funcionalidades anteriores mantidas!
+**Versão atual:** v0.8.0  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import de lista de jogadores, e todas as funcionalidades anteriores mantidas!

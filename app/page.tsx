@@ -139,39 +139,36 @@ export default function Home() {
           {/* Navegação de Fases (Sempre visível) */}
           {groupsInCategory.length > 0 && (
             <div className="mt-4">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Fase:
-                </span>
-                <div className="flex gap-1 overflow-x-auto pb-2">
-                  {[1, 2, 3].map((phase) => {
-                    const phaseGroupsExist = groupsInCategory.some(g => g.fase === phase);
-                    const maxPhase = getMaxPhase(selectedCategory);
-                    const isLocked = phase > maxPhase; // Só bloqueia fases futuras
-                    const isCurrent = phase === selectedPhase;
-                    const isCompleted = phase < maxPhase; // Fase já passou
+              <div className="flex gap-1 overflow-x-auto pb-2">
+                {[1, 2, 3].map((phase) => {
+                  const phaseGroupsExist = groupsInCategory.some(g => g.fase === phase);
+                  const maxPhase = getMaxPhase(selectedCategory);
+                  const isLocked = phase > maxPhase; // Só bloqueia fases futuras
+                  const isCurrent = phase === selectedPhase;
+                  const isCompleted = phase < maxPhase; // Fase já passou
+                  // Desabilita se for fase futura OU se não existir grupos nessa fase
+                  const isDisabled = isLocked || !phaseGroupsExist;
 
-                    return (
-                      <button
-                        key={phase}
-                        onClick={() => setSelectedPhase(phase)}
-                        disabled={isLocked} // Só desabilita fases futuras
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                          isCurrent
-                            ? 'bg-primary text-white'
-                            : isLocked
-                              ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
-                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {phase === 3 ? 'FINAL' : `Fase ${phase}`}
-                        {isLocked && <span className="ml-1">🔒</span>}
-                        {isCompleted && <span className="ml-1 text-xs">✓</span>}
-                        {isCurrent && phase === maxPhase && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
-                      </button>
-                    );
-                  })}
-                </div>
+                  return (
+                    <button
+                      key={phase}
+                      onClick={() => setSelectedPhase(phase)}
+                      disabled={isDisabled}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                        isCurrent
+                          ? 'bg-primary text-white'
+                          : isDisabled
+                            ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {phase === 3 ? 'FINAL' : `Fase ${phase}`}
+                      {isLocked && <span className="ml-1">🔒</span>}
+                      {isCompleted && phaseGroupsExist && <span className="ml-1 text-xs">✓</span>}
+                      {isCurrent && phase === maxPhase && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -120,6 +120,12 @@ export default function ConfigPage() {
     }
   };
 
+  const handleImportPlayers = (players: typeof tournament.waitingList) => {
+    players.forEach(player => {
+      addPlayer(player.nome, player.categoria, player.isSeed || false);
+    });
+  };
+
   // Jogadores na lista de espera
   const waitingPlayers = tournament.waitingList.filter(
     p => p.categoria === selectedCategory
@@ -486,7 +492,11 @@ export default function ConfigPage() {
 
             {/* Backup & Restauração */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <BackupPanel tournament={tournament} onImport={importTournament} />
+              <BackupPanel 
+                tournament={tournament} 
+                onImport={importTournament}
+                onImportPlayers={handleImportPlayers}
+              />
             </div>
           </div>
         </div>

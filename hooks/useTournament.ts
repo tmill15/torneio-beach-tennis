@@ -86,32 +86,46 @@ export function useTournament() {
     
     // 🧹 MIGRAÇÃO v0.7.0: Limpar badges de desempate em fases 2+
     // Ao avançar de fase, tiebreakOrder e tiebreakMethod devem ser limpos
-    const needsBadgeCleanup = rawTournament.grupos.some(group => 
-      group.fase > 1 && group.players.some(p => p.tiebreakOrder || p.tiebreakMethod)
-    );
+    // Esta migração sempre roda para garantir limpeza
+    const hasPhase2Plus = rawTournament.grupos.some(group => group.fase > 1);
     
-    if (needsBadgeCleanup) {
-      console.log('🧹 Limpando badges de desempate em fases 2+...');
-      const cleanedTournament = {
-        ...rawTournament,
-        grupos: rawTournament.grupos.map(group => {
-          // Só limpa se for fase 2 ou 3
-          if (group.fase > 1) {
-            return {
-              ...group,
-              players: group.players.map(p => {
-                // Remove tiebreakOrder e tiebreakMethod de fases novas
-                const { tiebreakOrder, tiebreakMethod, ...cleanPlayer } = p;
-                return cleanPlayer;
-              })
-            };
-          }
-          return group;
-        }),
-        version: '0.7.0'
-      };
-      setTimeout(() => setRawTournament(cleanedTournament), 0);
-      return cleanedTournament;
+    if (hasPhase2Plus) {
+      const needsBadgeCleanup = rawTournament.grupos.some(group => 
+        group.fase > 1 && group.players.some(p => 
+          p.tiebreakOrder !== undefined || p.tiebreakMethod !== undefined
+        )
+      );
+      
+      if (needsBadgeCleanup) {
+        console.log('🧹 v0.7.0: Limpando badges de desempate em fases 2+...');
+        const cleanedTournament = {
+          ...rawTournament,
+          grupos: rawTournament.grupos.map(group => {
+            // Só limpa se for fase 2 ou 3
+            if (group.fase > 1) {
+              return {
+                ...group,
+                players: group.players.map(p => {
+                  // Remove tiebreakOrder e tiebreakMethod de fases novas
+                  const { tiebreakOrder, tiebreakMethod, ...cleanPlayer } = p;
+                  return {
+                    ...cleanPlayer,
+                    // Mantém os outros campos
+                    status: p.status,
+                    qualificationType: p.qualificationType,
+                    eliminatedInPhase: p.eliminatedInPhase
+                  };
+                })
+              };
+            }
+            return group;
+          }),
+          version: '0.7.0'
+        };
+        setTimeout(() => setRawTournament(cleanedTournament), 0);
+        console.log('✅ Badges limpos com sucesso!');
+        return cleanedTournament;
+      }
     }
     
     return rawTournament;
