@@ -13,6 +13,7 @@ import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer 
 import { generatePairsFor4Players } from '@/services/matchGenerator';
 import { updateMatchResult, calculateRanking } from '@/services/rankingService';
 import { createEmptyTournament, isValidTournamentStructure, isV030Structure, migrateV030ToV040 } from '@/services/backupService';
+import { getGroupName } from '@/types';
 import {
   isPhaseComplete as isPhaseCompleteService,
   generateNextPhase,
@@ -126,6 +127,32 @@ export function useTournament() {
         console.log('✅ Badges limpos com sucesso!');
         return cleanedTournament;
       }
+    }
+    
+    // 🔤 MIGRAÇÃO v0.11.2: Garantir que todos os grupos tenham nome (letra)
+    const groupsWithoutName = rawTournament.grupos.filter(g => !g.nome || g.nome.trim() === '');
+    if (groupsWithoutName.length > 0) {
+      console.log(`🔤 v0.11.2: Corrigindo ${groupsWithoutName.length} grupo(s) sem nome...`);
+      const fixedTournament = {
+        ...rawTournament,
+        grupos: rawTournament.grupos.map((group, index) => {
+          // Se não tem nome, atribui baseado na ordem na categoria e fase
+          if (!group.nome || group.nome.trim() === '') {
+            const groupsInSameCategoryAndPhase = rawTournament.grupos.filter(
+              g => g.categoria === group.categoria && g.fase === group.fase
+            );
+            const groupIndex = groupsInSameCategoryAndPhase.findIndex(g => g.id === group.id);
+            return {
+              ...group,
+              nome: getGroupName(groupIndex >= 0 ? groupIndex : index % 26)
+            };
+          }
+          return group;
+        })
+      };
+      setTimeout(() => setRawTournament(fixedTournament), 0);
+      console.log('✅ Nomes dos grupos corrigidos!');
+      return fixedTournament;
     }
     
     return rawTournament;
@@ -402,6 +429,85 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Resorteia grupos mantendo os mesmos jogadores (sem voltar para lista de espera)
+   */
+  const redrawGroupsInPlace = useCallback((categoria: string, fase: number) => {
+    updateTournament(prev => {
+      // 1. Coletar jogadores dos grupos da fase específica
+      const groupsToRedraw = prev.grupos.filter(g => g.categoria === categoria && g.fase === fase);
+      const playersToRedraw = groupsToRedraw.flatMap(g => g.players.map(p => ({ 
+        ...p, 
+        status: 'enrolled' as const,
+        tiebreakOrder: undefined,
+        tiebreakMethod: undefined,
+        eliminatedInPhase: undefined,
+        qualificationType: undefined
+      })));
+      
+      if (playersToRedraw.length === 0) return prev;
+      
+      // 2. Remover grupos antigos da fase
+      const remainingGroups = prev.grupos.filter(
+        g => !(g.categoria === categoria && g.fase === fase)
+      );
+      
+      // 3. Separar seeds e não-seeds
+      const seeds = playersToRedraw.filter(p => p.isSeed);
+      const nonSeeds = playersToRedraw.filter(p => !p.isSeed);
+      
+      // 4. Embaralhar
+      const shuffledSeeds = [...seeds].sort(() => Math.random() - 0.5);
+      const shuffledNonSeeds = [...nonSeeds].sort(() => Math.random() - 0.5);
+      
+      // 5. Criar novos grupos
+      const numGroups = Math.floor(playersToRedraw.length / 4);
+      const newGroups: Group[] = [];
+      
+      for (let i = 0; i < numGroups; i++) {
+        const groupPlayers: Player[] = [];
+        
+        // Distribuir seeds uniformemente
+        if (shuffledSeeds.length > 0) {
+          groupPlayers.push(shuffledSeeds.shift()!);
+        }
+        
+        // Completar com não-seeds
+        while (groupPlayers.length < 4 && shuffledNonSeeds.length > 0) {
+          groupPlayers.push(shuffledNonSeeds.shift()!);
+        }
+        
+        // Se ainda falta seed e há disponível, adicionar
+        while (groupPlayers.length < 4 && shuffledSeeds.length > 0) {
+          groupPlayers.push(shuffledSeeds.shift()!);
+        }
+        
+        // Criar grupo com ID único
+        const groupId = uuidv4();
+        const tempGroup: Group = {
+          id: groupId,
+          nome: getGroupName(i), // A, B, C, D...
+          categoria,
+          fase,
+          players: groupPlayers,
+          matches: [],
+        };
+        
+        const matches = generatePairsFor4Players(tempGroup);
+        
+        newGroups.push({
+          ...tempGroup,
+          matches,
+        });
+      }
+      
+      return {
+        ...prev,
+        grupos: [...remainingGroups, ...newGroups],
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Resolver desempate por seleção manual
    */
   const resolveTieManual = useCallback((groupId: string, winnerId: string, tiedPlayerIds: string[], method: 'manual' | 'random' = 'manual') => {
@@ -652,6 +758,7 @@ export function useTournament() {
     getGroupRanking,
     importTournament,
     resetAndRedrawGroups,
+    redrawGroupsInPlace,
     resolveTieManual,
     resolveTieRandom,
     generateSinglesMatch,

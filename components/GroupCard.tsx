@@ -61,7 +61,7 @@ export function GroupCard({
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-orange-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white">
-          Grupo {group.nome} - Fase {group.fase}
+          Grupo {group.nome || '?'} - Fase {group.fase}
         </h3>
         <p className="text-orange-100 text-sm mt-1">
           {group.categoria}

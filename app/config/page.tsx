@@ -28,6 +28,7 @@ export default function ConfigPage() {
     removePlayer,
     formGroups,
     resetAndRedrawGroups,
+    redrawGroupsInPlace,
     importTournament,
     getMaxPhase,
   } = useTournament();
@@ -106,22 +107,8 @@ export default function ConfigPage() {
         return;
       }
       
-      const groupsToAdd = Math.floor(waitingCount / 4);
-      const remaining = waitingCount % 4;
-      
-      const confirmMessage = 
-        `Adicionar ${groupsToAdd} novo(s) grupo(s) à Fase 1?\n\n` +
-        `Jogadores na lista de espera: ${waitingCount}\n` +
-        `Novos grupos: ${groupsToAdd} grupo(s) de 4\n` +
-        (remaining > 0 
-          ? `Lista de espera: ${remaining} jogador(es)\n\n`
-          : `Todos os jogadores entrarão nos grupos\n\n`) +
-        `Os jogadores serão distribuídos nos novos grupos.\n\n` +
-        `Continuar?`;
-      
-      if (window.confirm(confirmMessage)) {
-        formGroups(categoria, 1);
-      }
+      // Adiciona grupos sem confirmação
+      formGroups(categoria, 1);
       return;
     }
     
@@ -137,30 +124,8 @@ export default function ConfigPage() {
       return;
     }
     
-    // Preview do caminho
-    const pathPreview = validation.path.map(p => 
-      `Fase ${p.phase}: ${p.groups} grupo${p.groups > 1 ? 's' : ''} de ${p.playersPerGroup}\n` +
-      `   → ${p.qualificationRule}`
-    ).join('\n\n');
-    
-    // Calcular jogadores que ficarão na lista de espera
-    const groupsPlayers = validation.path[0].groups * 4;
-    const waitingListPlayers = waitingCount - groupsPlayers;
-    
-    const confirmMessage = 
-      `Formar torneio de 3 fases para "${categoria}"?\n\n` +
-      `Total de inscritos: ${waitingCount} jogadores\n` +
-      (waitingListPlayers > 0 
-        ? `Jogarão: ${groupsPlayers} jogadores\n` +
-          `Lista de espera: ${waitingListPlayers} jogadores\n\n` +
-          `(Jogadores na lista de espera aguardarão próximo torneio)\n\n`
-        : `Todos os ${waitingCount} jogadores jogarão\n\n`) +
-      `${pathPreview}\n\n` +
-      `Continuar?`;
-    
-    if (window.confirm(confirmMessage)) {
-      formGroups(categoria, 1);
-    }
+    // Forma grupos sem confirmação
+    formGroups(categoria, 1);
   };
 
   const handleRedrawGroups = (categoria: string) => {
@@ -171,15 +136,78 @@ export default function ConfigPage() {
       return;
     }
     
+    const playersCount = phase1Groups.flatMap(g => g.players).length;
+    
     const message = `Tem certeza que deseja resortear a Fase 1?\n\n` +
       `Isso irá:\n` +
       `- Apagar ${phase1Groups.length} grupo(s) da Fase 1\n` +
       `- Apagar todos os jogos e placares desta fase\n` +
-      `- Retornar jogadores para lista de espera\n\n` +
+      `- Resortear os ${playersCount} jogadores em novos grupos\n\n` +
+      `⚠️ Os mesmos jogadores permanecerão no torneio (não voltam para lista de espera)\n\n` +
       `Esta ação não pode ser desfeita!`;
     
     if (window.confirm(message)) {
-      resetAndRedrawGroups(categoria, 1);
+      redrawGroupsInPlace(categoria, 1);
+    }
+  };
+
+  // Limpar toda a lista de espera de uma categoria
+  const handleClearWaitingList = (categoria: string) => {
+    const playersInCategory = tournament.waitingList.filter(p => p.categoria === categoria);
+    
+    if (playersInCategory.length === 0) {
+      alert(`Não há jogadores na lista de espera da categoria "${categoria}".`);
+      return;
+    }
+
+    const message = `⚠️ ATENÇÃO: Remover TODOS os jogadores da lista de espera?\n\n` +
+      `Categoria: ${categoria}\n` +
+      `Jogadores: ${playersInCategory.length}\n\n` +
+      `Esta ação não pode ser desfeita!`;
+    
+    if (window.confirm(message)) {
+      playersInCategory.forEach(p => removePlayer(p.id));
+    }
+  };
+
+  // Limpar todos os jogadores do torneio de uma categoria
+  const handleClearTournamentPlayers = (categoria: string) => {
+    const groupsInCategory = tournament.grupos.filter(g => g.categoria === categoria);
+    
+    if (groupsInCategory.length === 0) {
+      alert(`Não há grupos na categoria "${categoria}".`);
+      return;
+    }
+
+    const hasFinishedMatches = groupsInCategory.some(g => 
+      g.matches?.some(m => m.isFinished)
+    );
+
+    if (hasFinishedMatches) {
+      alert(
+        `⚠️ Não é possível limpar a categoria!\n\n` +
+        `Existem jogos com placares já registrados.\n\n` +
+        `Para limpar esta categoria:\n` +
+        `1. Use "Resortear Grupos" para resetar apenas a Fase 1, OU\n` +
+        `2. Finalize o torneio antes de limpar`
+      );
+      return;
+    }
+
+    const playersCount = groupsInCategory.flatMap(g => g.players).length;
+
+    const message = `⚠️ ATENÇÃO: Remover TODOS os grupos e jogadores do torneio?\n\n` +
+      `Categoria: ${categoria}\n` +
+      `Grupos: ${groupsInCategory.length}\n` +
+      `Jogadores: ${playersCount}\n\n` +
+      `Os jogadores retornarão para a lista de espera.\n\n` +
+      `Esta ação não pode ser desfeita!`;
+    
+    if (window.confirm(message)) {
+      // Remove todos os grupos de todas as fases da categoria
+      groupsInCategory.forEach(group => {
+        resetAndRedrawGroups(categoria, group.fase);
+      });
     }
   };
 
@@ -575,7 +603,7 @@ export default function ConfigPage() {
                         <h3 className="font-medium text-gray-900 dark:text-white">
                           {categoria}
                         </h3>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-600 dark:text-gray-400">
                             {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
                           </span>
@@ -585,6 +613,15 @@ export default function ConfigPage() {
                               className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors"
                             >
                               Formar {stats.groupsReady} Grupo{stats.groupsReady !== 1 ? 's' : ''}
+                            </button>
+                          )}
+                          {stats.total > 0 && (
+                            <button
+                              onClick={() => handleClearWaitingList(categoria)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium transition-colors"
+                              title="Remover todos os jogadores da lista de espera"
+                            >
+                              Limpar Tudo
                             </button>
                           )}
                         </div>
@@ -645,6 +682,12 @@ export default function ConfigPage() {
                     // Verificar se há grupos em Fase 2 ou superior
                     const hasAdvancedPhases = groupsInCategory.some(g => g.fase >= 2);
                     const canRedraw = !hasAdvancedPhases;
+                    
+                    // Verificar se há jogos com placares registrados
+                    const hasFinishedMatches = groupsInCategory.some(g => 
+                      g.matches?.some(m => m.isFinished)
+                    );
+                    const canClearCategory = !hasFinishedMatches;
 
                     return (
                       <div key={categoria} className="mb-6 last:mb-0">
@@ -652,7 +695,7 @@ export default function ConfigPage() {
                           <h3 className="font-medium text-gray-900 dark:text-white">
                             {categoria}
                           </h3>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600 dark:text-gray-400">
                               {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                             </span>
@@ -671,6 +714,22 @@ export default function ConfigPage() {
                               }
                             >
                               Resortear Fase 1
+                            </button>
+                            <button
+                              onClick={() => handleClearTournamentPlayers(categoria)}
+                              disabled={!canClearCategory}
+                              className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                                canClearCategory
+                                  ? 'bg-red-600 hover:bg-red-700 cursor-pointer'
+                                  : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
+                              }`}
+                              title={
+                                canClearCategory
+                                  ? 'Remove todos os grupos e retorna jogadores para a lista de espera'
+                                  : 'Não é possível limpar: existem jogos com placares registrados'
+                              }
+                            >
+                              Limpar Categoria
                             </button>
                           </div>
                         </div>

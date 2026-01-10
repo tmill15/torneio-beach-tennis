@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.10.0  
+**Versão:** v0.11.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,286 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.11.3 - Correção Definitiva: Letras dos Grupos ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🔤 **Migração automática para grupos sem nome:** Sistema agora corrige grupos existentes
+  - **Problema:** Grupos criados antes da correção não tinham o campo `nome` definido
+  - **Solução:** 
+    - Migração automática v0.11.2 que detecta e corrige grupos sem nome
+    - Atribui letras (A, B, C...) baseado na ordem na categoria e fase
+    - Usa função `getGroupName()` para garantir consistência
+  - **Resultado:** Todos os grupos agora têm letras identificadoras
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Nova migração v0.11.2 que corrige grupos sem nome
+  - `redrawGroupsInPlace()` agora usa `getGroupName()` ao invés de `String.fromCharCode()`
+  - Importação de `getGroupName` do módulo de tipos
+- 🔄 `components/GroupCard.tsx`:
+  - Fallback simples para grupos sem nome (mostra "?" temporariamente)
+
+**Como funciona a migração:**
+1. Sistema detecta grupos sem `nome` ou com `nome` vazio
+2. Calcula índice baseado na ordem na mesma categoria e fase
+3. Atribui letra usando `getGroupName(index)`
+4. Salva automaticamente no localStorage
+
+**Exemplo:**
+```
+Antes: Grupo - Fase 1 ❌
+Depois: Grupo A - Fase 1 ✅
+        Grupo B - Fase 1 ✅
+```
+
+---
+
+### v0.11.2 - Correção: Letras dos Grupos no Resorteio ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Bug nas letras dos grupos:** Grupos resorteados perdiam as letras identificadoras (A, B, C...)
+  - **Problema:** Grupos apareciam como "Grupo - Fase 1" sem a letra
+  - **Causa Raiz 1:** Propriedade `name` usada ao invés de `nome` (interface `Group` usa `nome`)
+  - **Causa Raiz 2:** IDs dos grupos usando `Date.now() + i` podiam gerar duplicatas
+  - **Solução:** 
+    - Corrigido para usar `nome` (não `name`)
+    - Mudado para UUID garantindo IDs únicos
+    - Atribuir apenas a letra (A, B, C...) pois componente adiciona "Grupo" automaticamente
+  - **Resultado:** Grupos agora aparecem corretamente como "Grupo A - Fase 1", "Grupo B - Fase 1", etc.
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - `redrawGroupsInPlace()` agora usa `nome` ao invés de `name`
+  - UUID para IDs únicos ao invés de `Date.now()`
+  - Simplificado para apenas a letra (componente adiciona "Grupo")
+
+**Exemplo:**
+```typescript
+// ANTES (❌):
+name: `Grupo ${String.fromCharCode(65 + i)}`  // Propriedade errada
+id: (Date.now() + i).toString()                // Pode duplicar
+
+// DEPOIS (✅):
+nome: String.fromCharCode(65 + i)              // Apenas letra
+id: uuidv4()                                   // UUID único
+```
+
+---
+
+### v0.11.1 - Correção: Erro ao Resortear Grupos ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Bug crítico no resorteio:** Erro "Can't find variable: generateRoundRobinMatches"
+  - **Problema:** Função `generateRoundRobinMatches` chamada incorretamente
+  - **Causa:** A função precisa receber um objeto `Group` completo, não `players` e `groupId` separados
+  - **Solução:** 
+    - Criar objeto `Group` temporário antes de gerar partidas
+    - Usar `generatePairsFor4Players()` que já estava importado
+  - **Resultado:** Resorteio agora funciona corretamente
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Ajustada chamada de geração de partidas em `redrawGroupsInPlace()`
+  - Criação de objeto `Group` temporário
+  - Uso correto de `generatePairsFor4Players()`
+
+---
+
+### v0.11.0 - Resorteio Inteligente: Mantém Jogadores no Torneio ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🎯 **Resorteio sem perda de vagas:** Jogadores que já estão no torneio permanecem nele
+  - **Problema anterior:** Ao resortear, todos voltavam para lista de espera → risco de ficarem de fora no novo sorteio
+  - **Solução:** Nova função `redrawGroupsInPlace()` que resorteia apenas os jogadores dos grupos existentes
+  - **Benefício:** Garante que quem estava jogando continua jogando, apenas em grupos diferentes
+
+**Como funciona:**
+1. Sistema coleta jogadores dos grupos da Fase 1
+2. Remove os grupos antigos
+3. Distribui seeds uniformemente nos novos grupos
+4. Cria novos grupos com os **mesmos jogadores** (resorteados)
+5. Gera novos jogos (Round Robin)
+
+**Antes:**
+```
+Fase 1: 16 jogadores em 4 grupos
+↓ Resortear
+Lista de Espera: 16 jogadores
+↓ Formar novos grupos (se houver 20 na espera)
+Fase 1: 16 jogadores (podem ser outros!) + 4 na espera ❌
+```
+
+**Depois:**
+```
+Fase 1: 16 jogadores em 4 grupos
+↓ Resortear
+Fase 1: Os mesmos 16 jogadores em 4 novos grupos ✅
+```
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - Nova função `redrawGroupsInPlace(categoria, fase)` 
+  - Mantém `resetAndRedrawGroups()` para outros casos (limpar categoria)
+  - Lógica de distribuição de seeds preservada
+  - Geração de partidas Round Robin
+- 🔄 `app/config/page.tsx`:
+  - `handleRedrawGroups()` agora usa `redrawGroupsInPlace()`
+  - Mensagem de confirmação atualizada
+  - Aviso claro: "Os mesmos jogadores permanecerão no torneio"
+
+**Benefícios:**
+- ✅ **Justiça:** Ninguém perde a vaga por azar do sorteio
+- ✅ **Previsibilidade:** Mesmo número de grupos e jogadores
+- ✅ **Seeds preservados:** Distribuição uniforme mantida
+- ✅ **Segurança:** Confirmação antes de executar
+
+---
+
+### v0.10.3 - UX: Remoção de Pop-ups ao Formar Grupos ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🚀 **Formação de grupos mais ágil:** Removidos pop-ups de confirmação
+  - **Antes:** Ao clicar "Formar Grupos", aparecia pop-up com preview e "Continuar?"
+  - **Depois:** Clicou, formou! Ação direta e rápida
+  - **Mantido:** Alertas de erro (jogadores insuficientes, validação de 3 fases)
+  - **Benefício:** Fluxo mais rápido e menos cliques
+
+**Cenários afetados:**
+1. **Primeira formação de grupos:**
+   - ❌ Removido: Pop-up com preview das 3 fases
+   - ✅ Mantido: Alerta se não for possível formar torneio de 3 fases
+
+2. **Adicionar grupos incrementalmente:**
+   - ❌ Removido: Pop-up "Adicionar X novo(s) grupo(s)..."
+   - ✅ Mantido: Alerta se menos de 4 jogadores
+   - ✅ Mantido: Alerta se já há placares registrados
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `handleFormGroups()` - executa `formGroups()` diretamente
+  - Removidas variáveis `confirmMessage` e `pathPreview`
+  - Mantida validação e alertas de erro
+
+**Resultado:**
+```
+Clique no botão → Grupos formados! ⚡
+(Antes: Clique → Pop-up → Confirmar → Grupos formados)
+```
+
+---
+
+### v0.10.2 - Proteção: Botão Limpar Categoria ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🔒 **Proteção do botão "Limpar Categoria":** Botão desabilitado quando há jogos registrados
+  - **Verificação:** Sistema verifica se há jogos com placares em qualquer grupo da categoria
+  - **Se há placares:** 
+    - Botão fica desabilitado (cinza)
+    - Cursor `not-allowed`
+    - Tooltip: "Não é possível limpar: existem jogos com placares registrados"
+    - Ao clicar: Alerta explicativo com alternativas
+  - **Se não há placares:** 
+    - Botão ativo (vermelho)
+    - Permite limpeza normal
+  - **Benefício:** Previne perda acidental de dados de torneios em andamento
+
+**Alerta quando bloqueado:**
+```
+⚠️ Não é possível limpar a categoria!
+
+Existem jogos com placares já registrados.
+
+Para limpar esta categoria:
+1. Use "Resortear Grupos" para resetar apenas a Fase 1, OU
+2. Finalize o torneio antes de limpar
+```
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `handleClearTournamentPlayers()` - bloqueia se houver jogos finalizados
+  - Variável `hasFinishedMatches` para verificação
+  - Variável `canClearCategory` para controle do botão
+  - Classes CSS condicionais no botão
+  - Tooltip dinâmico baseado no estado
+
+**Estados do botão:**
+```
+Sem placares: [Limpar Categoria] ← Vermelho, ativo ✅
+Com placares: [Limpar Categoria] ← Cinza, desabilitado 🔒
+```
+
+---
+
+### v0.10.1 - Gerenciamento de Jogadores: Remoção em Massa ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- 🗑️ **Botões de remoção em massa:** Controle completo sobre listas de jogadores
+  - **"Limpar Tudo"** na aba Lista de Espera:
+    - Remove todos os jogadores da lista de espera de uma categoria
+    - Confirmação de segurança antes de executar
+    - Apenas visível quando há jogadores
+  - **"Limpar Categoria"** na aba No Torneio:
+    - Remove todos os grupos e jogadores da categoria
+    - Retorna jogadores para a lista de espera
+    - Aviso especial se há jogos com placares registrados
+    - Limpa todas as fases (1, 2 e Final)
+
+**Funcionalidades de Remoção:**
+
+1. **Individual (Lista de Espera):**
+   - Botão "Remover" ao lado de cada jogador
+   - Já existia, mantido
+
+2. **Em Massa (Lista de Espera):**
+   - Novo botão vermelho "Limpar Tudo"
+   - Remove todos os jogadores da categoria
+   - Confirmação: "⚠️ ATENÇÃO: Remover TODOS os jogadores..."
+
+3. **Em Massa (Torneio):**
+   - Novo botão vermelho "Limpar Categoria"
+   - Remove todos os grupos de todas as fases
+   - Jogadores retornam para lista de espera
+   - Confirmação com alerta se há placares
+
+**Interface:**
+```
+Lista de Espera:
+┌────────────────────────────────────────┐
+│ Normal     20 jogadores [Formar Grupos] [Limpar Tudo] │
+│ • Thiago SEED               [Remover]   │
+│ • Dayanna SEED              [Remover]   │
+└────────────────────────────────────────┘
+
+No Torneio:
+┌────────────────────────────────────────┐
+│ Normal     20 jogadores [Resortear Fase 1] [Limpar Categoria] │
+│ • Thiago SEED                           │
+│ • Dayanna SEED                          │
+└────────────────────────────────────────┘
+```
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `handleClearWaitingList(categoria)` - limpa lista de espera
+  - `handleClearTournamentPlayers(categoria)` - limpa todos os grupos da categoria
+  - Confirmações de segurança com contadores
+  - Botões vermelhos para indicar ação destrutiva
+
+**Benefícios:**
+- ✅ **Limpeza rápida:** Reinicie categorias com um clique
+- ✅ **Segurança:** Confirmações claras antes de remover
+- ✅ **Flexibilidade:** Limpa espera ou torneio separadamente
+- ✅ **Feedback visual:** Botões vermelhos indicam ação destrutiva
 
 ---
 
@@ -1129,5 +1409,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.10.0  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, UX profissional, proteção de resorteio, e todas as funcionalidades anteriores mantidas!
+**Versão atual:** v0.11.3  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, e todas as funcionalidades anteriores mantidas!
