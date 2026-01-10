@@ -16,6 +16,7 @@ import { createEmptyTournament, isValidTournamentStructure, isV030Structure, mig
 import { getGroupName } from '@/types';
 import {
   isPhaseComplete as isPhaseCompleteService,
+  hasPendingTies as hasPendingTiesService,
   generateNextPhase,
   markEliminatedPlayers,
   getMaxPhase as getMaxPhaseService,
@@ -933,6 +934,12 @@ export function useTournament() {
     getPhaseAdvancePreview,
     isPhaseComplete: (categoria: string, phase: number) => 
       isPhaseCompleteService(tournament.grupos.filter(g => g.categoria === categoria), phase),
+    hasPendingTies: (categoria: string, phase: number) => 
+      hasPendingTiesService(
+        tournament.grupos.filter(g => g.categoria === categoria), 
+        phase,
+        (group) => getGroupRanking(group.id)
+      ),
     getMaxPhase: (categoria: string) => 
       getMaxPhaseService(tournament.grupos, categoria),
     isFinalPhase: isFinalPhaseService,

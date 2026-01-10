@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.12.3  
+**Versão:** v0.13.0  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,55 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.13.0 - Botão "Concluir Fase" com Validação de Desempates ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ **Botão "Concluir Fase" com validação:** Agora é necessário clicar em "Concluir Fase" para finalizar uma fase, e o botão só fica ativo quando todos os desempates foram resolvidos
+  - **Problema:** O card de "Fase Concluída" aparecia mesmo quando havia desempates pendentes
+  - **Solução:** 
+    - Criada função `hasPendingTies()` para verificar se há desempates pendentes em uma fase
+    - Card agora mostra "Fase Pronta para Conclusão" ou "Fase com Desempates Pendentes"
+    - Botão "Concluir Fase" só fica ativo quando não há desempates pendentes
+    - Na Fase 3, o botão é "Concluir Torneio"
+  - **Resultado:** Usuário precisa resolver todos os desempates antes de poder concluir a fase
+
+**Modificado:**
+- 🔄 `services/phaseGenerator.ts`:
+  - Nova função `hasPendingTies(groups, phase, calculateRanking)` que verifica se há desempates pendentes
+- 🔄 `hooks/useTournament.ts`:
+  - Exportada função `hasPendingTies` que usa `getGroupRanking` para calcular rankings
+- 🔄 `components/PhaseAdvanceCard.tsx`:
+  - Adicionada prop `hasPendingTies` para controlar estado do botão
+  - Card muda de cor (verde/amarelo) baseado em `hasPendingTies`
+  - Botão desabilitado quando há desempates pendentes
+  - Texto do botão: "Concluir Fase X" ou "Concluir Torneio" (Fase 3)
+  - Mensagem de aviso quando há desempates pendentes
+- 🔄 `app/page.tsx`:
+  - Card agora aparece para todas as fases (incluindo Fase 3)
+  - Verifica `hasPendingTies` antes de mostrar o card
+  - Passa `hasPendingTies` para o `PhaseAdvanceCard`
+
+**Comportamento:**
+```
+Fase com desempates pendentes:
+  ⚠️ Fase X com Desempates Pendentes
+  ⚠️ Resolva todos os desempates antes de concluir a fase
+  [⚠️ Resolva os desempates para concluir] ← Desabilitado
+
+Fase sem desempates pendentes:
+  ✓ Fase X Pronta para Conclusão!
+  Total: X jogadores para a Fase Y
+  [✓ Concluir Fase X] ← Ativo
+
+Fase 3 sem desempates pendentes:
+  🏆 Torneio Pronto para Conclusão!
+  Total: X jogadores para o GRUPO FINAL
+  [🏆 Concluir Torneio] ← Ativo
+```
 
 ---
 

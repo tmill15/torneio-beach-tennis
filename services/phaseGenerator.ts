@@ -25,6 +25,31 @@ export function isPhaseComplete(groups: Group[], phase: number): boolean {
 }
 
 /**
+ * Verifica se há desempates pendentes em uma fase
+ * Retorna true se há desempates não resolvidos
+ */
+export function hasPendingTies(groups: Group[], phase: number, calculateRanking: (group: Group) => any[]): boolean {
+  const phaseGroups = groups.filter(g => g.fase === phase);
+  if (phaseGroups.length === 0) return false;
+  
+  // Importar detectTies dinamicamente para evitar dependência circular
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { detectTies } = require('@/services/rankingService');
+  
+  for (const group of phaseGroups) {
+    const ranking = calculateRanking(group);
+    const ties = detectTies(ranking);
+    
+    // Se há empates detectados, há desempates pendentes
+    if (ties.length > 0) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Compara dois candidatos à repescagem/segundo lugar
  */
 function compareByRanking(a: RankingEntry, b: RankingEntry): number {

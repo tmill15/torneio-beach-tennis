@@ -27,6 +27,7 @@ export default function Home() {
     advanceToNextPhase,
     getPhaseAdvancePreview,
     isPhaseComplete,
+    hasPendingTies,
     getMaxPhase,
     isFinalPhase,
   } = useTournament();
@@ -238,15 +239,15 @@ export default function Home() {
           )}
         </div>
 
-        {/* Botão de Avançar Fase / Campeão */}
+        {/* Botão de Concluir Fase / Torneio */}
         {selectedPhase === getMaxPhase(selectedCategory) && 
-         isPhaseComplete(selectedCategory, selectedPhase) && 
-         !isFinalPhase(selectedPhase) && (
+         isPhaseComplete(selectedCategory, selectedPhase) && (
           <div className="mb-6">
             <PhaseAdvanceCard
               categoria={selectedCategory}
               currentPhase={selectedPhase}
               preview={getPhaseAdvancePreview(selectedCategory, selectedPhase)}
+              hasPendingTies={hasPendingTies(selectedCategory, selectedPhase)}
               onAdvance={() => advanceToNextPhase(selectedCategory, selectedPhase)}
             />
           </div>
