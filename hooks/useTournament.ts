@@ -327,10 +327,14 @@ export function useTournament() {
             
             // Atribuir ordem de desempate
             if (player.id === winnerId) {
+              // Vencedor sempre recebe posição 1 (melhor)
               return { ...player, tiebreakOrder: 1 };
             } else {
-              const otherIndex = tiedPlayerIds.indexOf(player.id);
-              return { ...player, tiebreakOrder: otherIndex + 1 };
+              // Outros recebem posições 2, 3, 4... baseado na ordem original
+              // Remover o vencedor do array e encontrar índice entre os perdedores
+              const losers = tiedPlayerIds.filter(id => id !== winnerId);
+              const loserIndex = losers.indexOf(player.id);
+              return { ...player, tiebreakOrder: loserIndex + 2 }; // +2 porque vencedor é 1
             }
           }),
         };
@@ -342,14 +346,16 @@ export function useTournament() {
    * Resolver desempate por sorteio
    */
   const resolveTieRandom = useCallback((groupId: string, tiedPlayerIds: string[]) => {
-    // Fisher-Yates shuffle para embaralhamento verdadeiramente aleatório
-    const shuffled = [...tiedPlayerIds];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
+    // Gerar índice aleatório diretamente (mais simples e garantidamente aleatório)
+    const randomIndex = Math.floor(Math.random() * tiedPlayerIds.length);
+    const winnerId = tiedPlayerIds[randomIndex];
     
-    const winnerId = shuffled[0];
+    // Log para debug (pode remover depois)
+    console.log('Sorteio de desempate:', {
+      jogadores: tiedPlayerIds.length,
+      indiceAleatorio: randomIndex,
+      vencedorId: winnerId
+    });
     
     resolveTieManual(groupId, winnerId, tiedPlayerIds);
   }, [resolveTieManual]);

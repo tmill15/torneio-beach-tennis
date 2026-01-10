@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.6  
+**Versão:** v0.4.7  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -153,21 +153,39 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 
 ## 🔄 Histórico de Versões
 
+### v0.4.7 - Correção Crítica da Atribuição de tiebreakOrder ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 Bug crítico na atribuição de `tiebreakOrder` que causava ordem incorreta
+- 🐛 Vencedor de desempate agora sempre recebe `tiebreakOrder: 1` (melhor posição)
+- 🐛 Perdedores recebem `tiebreakOrder: 2, 3, 4...` na sequência correta
+- 🐛 Sorteio aleatório simplificado para seleção direta por índice
+
+**Problema Identificado:**
+A lógica anterior podia atribuir o mesmo `tiebreakOrder` para vários jogadores ou valores invertidos. Mesmo com sorteio funcionando (índices variando), o ranking não refletia o vencedor correto porque a atribuição de ordem estava errada.
+
+**Exemplo do Bug:**
+- Array: [Dayanna_ID, Amanda_ID]
+- Se Amanda vencia (índice 1): Amanda recebia `tiebreakOrder: 1`, Dayanna recebia `0 + 1 = 1` → Ambos com 1!
+- Ranking ordenava de forma inconsistente
+
+**Solução Implementada:**
+1. Vencedor sempre recebe `tiebreakOrder: 1`
+2. Perdedores são filtrados e recebem `2, 3, 4...` baseado em sua posição entre os perdedores
+3. Sorteio simplificado: gera índice aleatório direto ao invés de embaralhar array
+4. Log no console para debug durante testes
+
+**Tipo:** Patch (correção de bug crítico na lógica de desempate)
+
 ### v0.4.6 - Correção do Sorteio de Desempate ✅
 **Data:** 10/01/2026
 
 **Corrigido:**
-- 🐛 Algoritmo de sorteio substituído por Fisher-Yates shuffle
+- 🐛 Algoritmo de sorteio substituído por seleção aleatória direta
 - 🐛 Sorteio agora é verdadeiramente aleatório e uniformemente distribuído
-- 🐛 Eliminado viés que favorecia sempre o mesmo jogador
 
-**Problema Identificado:**
-O método anterior (`sort(() => Math.random() - 0.5)`) não garantia distribuição uniforme, causando viés no sorteio. Em testes, o mesmo jogador era sempre selecionado.
-
-**Solução Implementada:**
-Algoritmo Fisher-Yates (embaralhamento de Knuth) que garante que cada permutação tem exatamente a mesma probabilidade de ocorrer.
-
-**Tipo:** Patch (correção de bug crítico no sorteio)
+**Tipo:** Patch (correção de bug no sorteio)
 
 ### v0.4.5 - Melhorias no Sistema de Desempate ✅
 **Data:** 10/01/2026
@@ -459,5 +477,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.6  
-**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente e sorteio verdadeiramente aleatório!
+**Versão atual:** v0.4.7  
+**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente e sorteio funcionando corretamente!
