@@ -43,12 +43,18 @@ export function useTournament() {
       console.log('🔄 Detectados dados da v0.3.0. Iniciando migração automática...');
       const migratedTournament = migrateV030ToV040(rawTournament);
       
-      // Regera matches para grupos existentes
+      // Regera matches para grupos existentes (preservando partidas de desempate)
       const groupsWithMatches = migratedTournament.grupos.map(group => {
         if (group.players.length === 4) {
+          // Preservar partidas de desempate existentes
+          const existingTiebreakers = group.matches?.filter(m => m.isTiebreaker) || [];
+          const regularMatches = generatePairsFor4Players({
+            ...group,
+            matches: group.matches?.filter(m => !m.isTiebreaker) || []
+          });
           return {
             ...group,
-            matches: generatePairsFor4Players(group),
+            matches: [...regularMatches, ...existingTiebreakers],
           };
         }
         return group;
@@ -521,6 +527,32 @@ export function useTournament() {
         };
       }),
     }));
+  }, [updateTournament]);
+
+  /**
+   * Remove uma partida (útil para remover partidas de desempate não finalizadas)
+   */
+  const removeMatch = useCallback((groupId: string, matchId: string) => {
+    updateTournament(prev => {
+      // Verificar se é partida de desempate entre grupos
+      const crossGroupTiebreak = prev.crossGroupTiebreaks?.find(t => t.matchId === matchId);
+      
+      return {
+        ...prev,
+        // Remover referência em crossGroupTiebreaks se existir
+        crossGroupTiebreaks: crossGroupTiebreak
+          ? prev.crossGroupTiebreaks?.filter(t => t.matchId !== matchId)
+          : prev.crossGroupTiebreaks,
+        grupos: prev.grupos.map(group => {
+          if (group.id !== groupId) return group;
+
+          return {
+            ...group,
+            matches: group.matches.filter(match => match.id !== matchId),
+          };
+        }),
+      };
+    });
   }, [updateTournament]);
 
   /**
@@ -1101,5 +1133,6 @@ export function useTournament() {
     getMaxPhase: (categoria: string) => 
       getMaxPhaseService(tournament.grupos, categoria),
     isFinalPhase: isFinalPhaseService,
+    removeMatch,
   };
 }

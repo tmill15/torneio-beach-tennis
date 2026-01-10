@@ -20,6 +20,7 @@ export default function Home() {
     updateMatchScore,
     finalizeMatch,
     reopenMatch,
+    removeMatch,
     getGroupRanking,
     resolveTieManual,
     resolveTieRandom,
@@ -318,6 +319,7 @@ export default function Home() {
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                   onReopenMatch={reopenMatch}
+                  onRemoveMatch={removeMatch}
                   onResolveTieManual={resolveTieManual}
                   onResolveTieRandom={resolveTieRandom}
                   onGenerateSingles={handleGenerateSingles}

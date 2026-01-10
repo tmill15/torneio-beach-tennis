@@ -10,6 +10,7 @@ export interface QualifiedPlayer {
   type: QualificationType;
   groupOrigin: string;
   position: number;
+  tiebreakCriteria?: string; // Critério usado para desempate (ex: "Games vencidos")
 }
 
 /**
@@ -128,15 +129,15 @@ export function detectCrossGroupTies(
   
   // Verificar se há empate técnico (mesmas estatísticas brutas) entre os primeiros candidatos
   // IMPORTANTE: Comparar apenas estatísticas brutas, sem considerar desempates entre grupos
-  // Critério de empate: mesmo número de vitórias E mesmo saldo de games E mesmo games ganhos
-  // (seguindo a mesma ordem de critérios do ranking dentro dos grupos)
+  // Critério de empate entre grupos: mesmo número de vitórias E mesmo saldo de games E mesmo games ganhos
+  // Se games ganhos for diferente, não é empate (o que tem mais games ganhos é classificado automaticamente)
   const ties: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
   const firstStats = candidates[0].stats;
   
   // Verificar se o primeiro candidato tem empate técnico com outros
   for (const candidate of candidates) {
-    // Comparar vitórias, saldo de games e games ganhos para detectar empate técnico
-    // (mesmo critério usado no ranking dentro dos grupos)
+    // Comparar vitórias, saldo de games e games ganhos para detectar empate técnico entre grupos
+    // Se todos os critérios são iguais, é empate e precisa resolução manual
     const isTied = candidate.stats.vitorias === firstStats.vitorias &&
                    candidate.stats.saldoGames === firstStats.saldoGames &&
                    candidate.stats.gamesGanhos === firstStats.gamesGanhos;
@@ -202,7 +203,48 @@ function getBestAtPosition(
     position
   ));
   
-  return candidates.slice(0, count).map(c => c.qualified);
+  // Verificar se o critério de games ganhos foi usado para desempate
+  const result = candidates.slice(0, count).map((c, index) => {
+    const qualified = c.qualified;
+    const currentStats = c.stats;
+    
+    // Verificar se há outros candidatos com mesmas vitórias e saldo, mas games ganhos diferente
+    // Se sim, games ganhos foi o critério usado para classificar este jogador
+    const hasTieWithDifferentGames = candidates.some((other, otherIndex) => {
+      if (otherIndex === index) return false; // Não comparar com ele mesmo
+      if (otherIndex >= count) return false; // Só verificar candidatos selecionados
+      
+      const otherStats = other.stats;
+      // Se vitórias e saldo são iguais, mas games ganhos é diferente
+      return currentStats.vitorias === otherStats.vitorias &&
+             currentStats.saldoGames === otherStats.saldoGames &&
+             currentStats.gamesGanhos !== otherStats.gamesGanhos;
+    });
+    
+    // Se este jogador tem mais games ganhos que alguém com mesmas vitórias e saldo, mostrar critério
+    if (hasTieWithDifferentGames) {
+      const tiedWithLessGames = candidates.some((other, otherIndex) => {
+        if (otherIndex === index) return false;
+        if (otherIndex >= count) return false;
+        
+        const otherStats = other.stats;
+        return currentStats.vitorias === otherStats.vitorias &&
+               currentStats.saldoGames === otherStats.saldoGames &&
+               currentStats.gamesGanhos > otherStats.gamesGanhos;
+      });
+      
+      if (tiedWithLessGames) {
+        return {
+          ...qualified,
+          tiebreakCriteria: 'Games vencidos'
+        };
+      }
+    }
+    
+    return qualified;
+  });
+  
+  return result;
 }
 
 /**
@@ -409,7 +451,7 @@ export function generateNextPhase(
       matches: []
     };
     
-    // Gerar jogos para o grupo final
+    // Gerar jogos para o grupo final (não há partidas de desempate ainda, então pode gerar normalmente)
     if (groupPlayers.length === 4) {
       finalGroup.matches = generatePairsFor4Players(finalGroup);
     } else {

@@ -119,20 +119,74 @@ export function PhaseAdvanceCard({
             <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
               <p>⚠️ Resolva todos os desempates antes de concluir a fase</p>
               {hasCrossGroupTies && (
-                <button
-                  onClick={() => {
-                    const position = currentPhase === 1 ? 2 : 1;
-                    setCrossGroupTieData({
-                      tiedPlayers: crossGroupTies,
-                      phase: currentPhase,
-                      position
-                    });
-                    setShowCrossGroupTieModal(true);
-                  }}
-                  className="mt-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  🔗 Resolver Empate entre Grupos ({crossGroupTies.length} jogadores)
-                </button>
+                <div className="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                  <p className="font-medium mb-2">
+                    🔗 Empate entre Grupos Detectado ({crossGroupTies.length} jogadores)
+                  </p>
+                  
+                  {/* Mostrar estatísticas dos jogadores empatados */}
+                  <div className="mb-2 space-y-1">
+                    {crossGroupTies.map((tied, index) => (
+                      <div key={tied.player.id} className="text-xs bg-white dark:bg-gray-800 p-2 rounded">
+                        <span className="font-medium">{tied.player.nome}</span>
+                        <span className="text-gray-500 ml-1">(Grupo {tied.groupOrigin})</span>
+                        <div className="mt-1 text-gray-600 dark:text-gray-400">
+                          {tied.stats.vitorias}V {tied.stats.derrotas}D | 
+                          Games: {tied.stats.gamesGanhos}-{tied.stats.gamesPerdidos} | 
+                          Saldo: {tied.stats.saldoGames >= 0 ? '+' : ''}{tied.stats.saldoGames}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Explicar por que estão empatados */}
+                  <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs">
+                    <p className="font-medium mb-1">Por que estão empatados?</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-gray-700 dark:text-gray-300">
+                      {crossGroupTies[0].stats.vitorias === crossGroupTies[1]?.stats.vitorias && (
+                        <li>✓ Mesmo número de vitórias ({crossGroupTies[0].stats.vitorias})</li>
+                      )}
+                      {crossGroupTies[0].stats.saldoGames === crossGroupTies[1]?.stats.saldoGames && (
+                        <li>✓ Mesmo saldo de games ({crossGroupTies[0].stats.saldoGames >= 0 ? '+' : ''}{crossGroupTies[0].stats.saldoGames})</li>
+                      )}
+                      {crossGroupTies[0].stats.gamesGanhos === crossGroupTies[1]?.stats.gamesGanhos ? (
+                        <li>✓ Mesmo número de games ganhos ({crossGroupTies[0].stats.gamesGanhos})</li>
+                      ) : (
+                        <li>
+                          ⚠ Games ganhos diferentes: {crossGroupTies.map(t => `${t.player.nome} (${t.stats.gamesGanhos})`).join(' vs ')}
+                          {crossGroupTies[0].stats.gamesGanhos > crossGroupTies[1]?.stats.gamesGanhos && (
+                            <span className="ml-1 text-green-600 dark:text-green-400">
+                              → {crossGroupTies[0].player.nome} tem mais games ganhos, mas o saldo é igual
+                            </span>
+                          )}
+                          {crossGroupTies[1]?.stats.gamesGanhos > crossGroupTies[0].stats.gamesGanhos && (
+                            <span className="ml-1 text-green-600 dark:text-green-400">
+                              → {crossGroupTies[1]?.player.nome} tem mais games ganhos, mas o saldo é igual
+                            </span>
+                          )}
+                        </li>
+                      )}
+                    </ul>
+                    <p className="mt-2 text-gray-600 dark:text-gray-400">
+                      Como todos os critérios principais são iguais, é necessário resolver o empate manualmente.
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      const position = currentPhase === 1 ? 2 : 1;
+                      setCrossGroupTieData({
+                        tiedPlayers: crossGroupTies,
+                        phase: currentPhase,
+                        position
+                      });
+                      setShowCrossGroupTieModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Resolver Empate entre Grupos
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -163,8 +217,13 @@ export function PhaseAdvanceCard({
             <div className="grid grid-cols-2 gap-2">
               {preview.direct.map(q => (
                 <div key={q.player.id} className="text-xs bg-white dark:bg-gray-800 p-2 rounded">
-                  <span className="font-medium">{q.player.nome}</span>
-                  <span className="text-gray-500 ml-1">({q.groupOrigin} - {q.position}º)</span>
+                  <div className="font-medium">{q.player.nome}</div>
+                  <div className="text-gray-500">({q.groupOrigin} - {q.position}º)</div>
+                  {q.tiebreakCriteria && (
+                    <div className="text-green-700 dark:text-green-300 font-medium mt-1">
+                      Critério: {q.tiebreakCriteria}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -179,8 +238,13 @@ export function PhaseAdvanceCard({
               <div className="grid grid-cols-2 gap-2">
                 {preview.repechage.map(q => (
                   <div key={q.player.id} className="text-xs bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded border border-yellow-300">
-                    <span className="font-medium">{q.player.nome}</span>
-                    <span className="text-gray-500 ml-1">({q.groupOrigin} - {q.position}º)</span>
+                    <div className="font-medium">{q.player.nome}</div>
+                    <div className="text-gray-500">({q.groupOrigin} - {q.position}º)</div>
+                    {q.tiebreakCriteria && (
+                      <div className="text-yellow-700 dark:text-yellow-300 font-medium mt-1">
+                        Critério: {q.tiebreakCriteria}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

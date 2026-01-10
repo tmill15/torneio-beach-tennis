@@ -20,6 +20,7 @@ interface GroupCardProps {
   onUpdateScore: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (groupId: string, matchId: string) => void;
+  onRemoveMatch?: (groupId: string, matchId: string) => void; // Opcional: remover partida
   onResolveTieManual: (groupId: string, winnerId: string, tiedPlayerIds: string[]) => void;
   onResolveTieRandom: (groupId: string, tiedPlayerIds: string[]) => void;
   onGenerateSingles: (groupId: string, player1Id: string, player2Id: string) => void;
@@ -36,6 +37,7 @@ export function GroupCard({
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
+  onRemoveMatch,
   onResolveTieManual,
   onResolveTieRandom,
   onGenerateSingles,
@@ -191,6 +193,7 @@ export function GroupCard({
             onUpdateScore={(matchId, sets) => onUpdateScore(group.id, matchId, sets)}
             onFinalizeMatch={(matchId, sets) => onFinalizeMatch(group.id, matchId, sets)}
             onReopenMatch={(matchId) => onReopenMatch(group.id, matchId)}
+            onRemoveMatch={onRemoveMatch ? (matchId) => onRemoveMatch(group.id, matchId) : undefined}
           />
         </div>
       )}

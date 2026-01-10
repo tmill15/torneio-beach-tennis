@@ -16,6 +16,7 @@ interface MatchListProps {
   onUpdateScore: (matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (matchId: string) => void;
+  onRemoveMatch?: (matchId: string) => void; // Opcional: remover partida
 }
 
 export function MatchList({
@@ -25,6 +26,7 @@ export function MatchList({
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
+  onRemoveMatch,
 }: MatchListProps) {
   const finishedMatches = matches.filter(m => m.isFinished);
   const pendingMatches = matches.filter(m => !m.isFinished);
@@ -118,13 +120,28 @@ export function MatchList({
                 </div>
                 
                 {!isReadOnly ? (
-                  <ScoreInput
-                    matchId={match.id}
-                    gameConfig={gameConfig}
-                    initialSets={match.sets}
-                    onSave={(sets) => onUpdateScore(match.id, sets)}
-                    onFinalize={(sets) => onFinalizeMatch(match.id, sets)}
-                  />
+                  <div>
+                    <ScoreInput
+                      matchId={match.id}
+                      gameConfig={gameConfig}
+                      initialSets={match.sets}
+                      onSave={(sets) => onUpdateScore(match.id, sets)}
+                      onFinalize={(sets) => onFinalizeMatch(match.id, sets)}
+                    />
+                    {/* Botão para remover partida de desempate não finalizada */}
+                    {match.isTiebreaker && onRemoveMatch && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Remover esta partida de desempate? Isso não pode ser desfeito.')) {
+                            onRemoveMatch(match.id);
+                          }
+                        }}
+                        className="mt-3 w-full px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                      >
+                        🗑️ Remover Partida de Desempate
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-2">
                     Partida pendente (modo visualização)

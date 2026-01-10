@@ -38,9 +38,12 @@ export function generatePairsFor4Players(group: Group): Match[] {
     return [];
   }
 
+  // IMPORTANTE: Preservar partidas de desempate existentes
+  const existingTiebreakerMatches = group.matches?.filter(m => m.isTiebreaker) || [];
+
   const [p1, p2, p3, p4] = players;
 
-  return [
+  const regularMatches: Match[] = [
     // Jogo 1: (p1+p2) vs (p3+p4)
     {
       id: uuidv4(),
@@ -84,6 +87,9 @@ export function generatePairsFor4Players(group: Group): Match[] {
       rodada: 3
     }
   ];
+
+  // Retornar partidas regulares + partidas de desempate preservadas
+  return [...regularMatches, ...existingTiebreakerMatches];
 }
 
 /**
