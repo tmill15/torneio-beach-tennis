@@ -108,6 +108,7 @@ export function detectCrossGroupTies(
 ): { player: Player; stats: RankingEntry; groupOrigin: string }[] {
   const candidates: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
   
+  // Coletar todos os candidatos da posição especificada
   for (const group of groups.filter(g => g.fase === phase)) {
     const ranking = calculateRanking(group);
     if (ranking.length > position) {
@@ -122,30 +123,31 @@ export function detectCrossGroupTies(
   
   if (candidates.length === 0) return [];
   
-  // Ordenar candidatos
+  // Ordenar candidatos considerando desempates entre grupos já resolvidos
   candidates.sort((a, b) => compareByRanking(a.stats, b.stats, crossGroupTiebreaks, phase, position));
   
-  if (candidates.length === 0) return [];
-  
-  // Ordenar candidatos
-  candidates.sort((a, b) => compareByRanking(a.stats, b.stats, crossGroupTiebreaks, phase, position));
-  
-  // Verificar se há empate técnico (mesmas estatísticas) entre os primeiros candidatos
+  // Verificar se há empate técnico (mesmas estatísticas brutas) entre os primeiros candidatos
+  // IMPORTANTE: Comparar apenas estatísticas brutas, sem considerar desempates entre grupos
+  // Critério de empate: mesmo número de vitórias E mesmo saldo de games E mesmo games ganhos
+  // (seguindo a mesma ordem de critérios do ranking dentro dos grupos)
   const ties: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
   const firstStats = candidates[0].stats;
   
   // Verificar se o primeiro candidato tem empate técnico com outros
   for (const candidate of candidates) {
-    // Comparar sem considerar desempates para detectar empate técnico
-    if (candidate.stats.vitorias === firstStats.vitorias &&
-        candidate.stats.saldoGames === firstStats.saldoGames &&
-        candidate.stats.gamesGanhos === firstStats.gamesGanhos) {
-      // Verificar se não há desempate já resolvido
+    // Comparar vitórias, saldo de games e games ganhos para detectar empate técnico
+    // (mesmo critério usado no ranking dentro dos grupos)
+    const isTied = candidate.stats.vitorias === firstStats.vitorias &&
+                   candidate.stats.saldoGames === firstStats.saldoGames &&
+                   candidate.stats.gamesGanhos === firstStats.gamesGanhos;
+    
+    if (isTied) {
+      // Verificar se não há desempate entre grupos já resolvido
       const hasResolvedTiebreak = crossGroupTiebreaks?.some(
         t => t.phase === phase && 
              t.position === position && 
              t.tiedPlayerIds.includes(candidate.player.id) &&
-             t.winnerId // Deve ter um vencedor definido
+             t.winnerId && t.winnerId.length > 0 // Deve ter um vencedor definido
       );
       
       if (!hasResolvedTiebreak) {

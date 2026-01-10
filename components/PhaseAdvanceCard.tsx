@@ -57,6 +57,15 @@ export function PhaseAdvanceCard({
       if (numGroups === 3) {
         // Verificar empate em 2º lugar (melhor 2º colocado)
         crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 1, tournament.crossGroupTiebreaks);
+        // Debug: log para verificar detecção
+        if (crossGroupTies.length > 1) {
+          console.log('🔗 Empate entre grupos detectado:', crossGroupTies.map(t => ({
+            nome: t.player.nome,
+            grupo: t.groupOrigin,
+            vitorias: t.stats.vitorias,
+            saldoGames: t.stats.saldoGames
+          })));
+        }
       }
     }
   }
@@ -107,8 +116,8 @@ export function PhaseAdvanceCard({
             </p>
           )}
           {!canComplete && (
-            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-              ⚠️ Resolva todos os desempates antes de concluir a fase
+            <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+              <p>⚠️ Resolva todos os desempates antes de concluir a fase</p>
               {hasCrossGroupTies && (
                 <button
                   onClick={() => {
@@ -120,12 +129,12 @@ export function PhaseAdvanceCard({
                     });
                     setShowCrossGroupTieModal(true);
                   }}
-                  className="ml-2 underline font-medium"
+                  className="mt-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
                 >
-                  Resolver empate entre grupos
+                  🔗 Resolver Empate entre Grupos ({crossGroupTies.length} jogadores)
                 </button>
               )}
-            </p>
+            </div>
           )}
         </div>
       </div>
