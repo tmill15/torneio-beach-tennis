@@ -424,15 +424,28 @@ export default function ConfigPage() {
     : tournament.waitingList;
 
   // Jogadores já alocados em grupos da categoria selecionada (para o formulário)
-  const enrolledPlayers = selectedCategory
+  // IMPORTANTE: Usar Set para garantir que cada jogador apareça apenas uma vez (mesmo que esteja em múltiplas fases)
+  const enrolledPlayersRaw = selectedCategory
     ? tournament.grupos
         .filter(g => g.categoria === selectedCategory)
         .flatMap(g => g.players)
     : tournament.grupos.flatMap(g => g.players);
+  
+  // Remover duplicatas por ID
+  const enrolledPlayersMap = new Map<string, typeof enrolledPlayersRaw[0]>();
+  enrolledPlayersRaw.forEach(player => {
+    if (!enrolledPlayersMap.has(player.id)) {
+      enrolledPlayersMap.set(player.id, player);
+    }
+  });
+  const enrolledPlayers = Array.from(enrolledPlayersMap.values());
 
   // Contadores totais para as abas (todas as categorias)
+  // IMPORTANTE: Contar apenas jogadores únicos (por ID) para evitar duplicatas quando jogadores avançam de fase
   const totalWaitingPlayers = tournament.waitingList.length;
-  const totalEnrolledPlayers = tournament.grupos.flatMap(g => g.players).length;
+  const allEnrolledPlayers = tournament.grupos.flatMap(g => g.players);
+  const uniqueEnrolledPlayerIds = new Set(allEnrolledPlayers.map(p => p.id));
+  const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
 
   // Evita erro de hydration - só renderiza após montar no cliente
   if (!isMounted) {

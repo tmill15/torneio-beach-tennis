@@ -4,7 +4,7 @@
  */
 
 import jsPDF from 'jspdf';
-import type { Tournament, Group, RankingEntry, Match, SetScore } from '@/types';
+import type { Tournament, Group, RankingEntry, Match, SetScore, Player } from '@/types';
 import { getMaxPhase as getMaxPhaseService } from './phaseGenerator';
 import { formatDupla } from '@/types';
 
@@ -84,15 +84,17 @@ export function generateTournamentPDF(
   );
   
   // Coletar todos os jogadores únicos que participaram
-  const allPlayers = new Map<string, { player: any; phases: number[] }>();
+  // Um jogador pode aparecer em múltiplas fases, mas deve aparecer apenas UMA VEZ na lista
+  const allPlayers = new Map<string, { player: Player; phases: number[] }>();
   categoryGroups.forEach(group => {
     group.players.forEach(player => {
       if (!allPlayers.has(player.id)) {
-        allPlayers.set(player.id, { player, phases: [] });
-      }
-      const entry = allPlayers.get(player.id)!;
-      if (!entry.phases.includes(group.fase)) {
-        entry.phases.push(group.fase);
+        allPlayers.set(player.id, { player, phases: [group.fase] });
+      } else {
+        const entry = allPlayers.get(player.id)!;
+        if (!entry.phases.includes(group.fase)) {
+          entry.phases.push(group.fase);
+        }
       }
     });
   });

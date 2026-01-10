@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.14.2  
+**Versão:** v0.14.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,38 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.14.3 - Correção: Contagem de Jogadores Duplicados ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Contagem duplicada de jogadores:** Jogadores que avançavam de fase estavam sendo contados múltiplas vezes
+  - **Problema:** Um jogador que participa da Fase 1, 2 e 3 aparecia 3 vezes na contagem total
+  - **Causa:** `totalEnrolledPlayers` usava `flatMap` que incluía o mesmo jogador de todos os grupos (múltiplas fases)
+  - **Solução:** Usar `Set` com `player.id` para contar apenas jogadores únicos
+  - **Resultado:** Contagem correta de jogadores únicos, independente de quantas fases participaram
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `totalEnrolledPlayers` agora usa `Set` para contar apenas IDs únicos
+  - `enrolledPlayers` (lista filtrada) também remove duplicatas por ID
+  - Comentários explicativos adicionados
+
+**Antes:**
+```typescript
+const totalEnrolledPlayers = tournament.grupos.flatMap(g => g.players).length;
+// Resultado: 40 jogadores (24 únicos × múltiplas fases)
+```
+
+**Agora:**
+```typescript
+const allEnrolledPlayers = tournament.grupos.flatMap(g => g.players);
+const uniqueEnrolledPlayerIds = new Set(allEnrolledPlayers.map(p => p.id));
+const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
+// Resultado: 24 jogadores únicos ✅
+```
 
 ---
 
