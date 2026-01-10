@@ -147,25 +147,27 @@ export default function Home() {
                   {[1, 2, 3].map((phase) => {
                     const phaseGroupsExist = groupsInCategory.some(g => g.fase === phase);
                     const maxPhase = getMaxPhase(selectedCategory);
-                    const isLocked = phase > maxPhase;
+                    const isLocked = phase > maxPhase; // Só bloqueia fases futuras
                     const isCurrent = phase === selectedPhase;
+                    const isCompleted = phase < maxPhase; // Fase já passou
 
                     return (
                       <button
                         key={phase}
                         onClick={() => setSelectedPhase(phase)}
-                        disabled={isLocked && !phaseGroupsExist}
+                        disabled={isLocked} // Só desabilita fases futuras
                         className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
                           isCurrent
                             ? 'bg-primary text-white'
-                            : isLocked && !phaseGroupsExist
+                            : isLocked
                               ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
                               : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
                         {phase === 3 ? 'FINAL' : `Fase ${phase}`}
-                        {isLocked && !phaseGroupsExist && <span className="ml-1">🔒</span>}
-                        {isCurrent && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
+                        {isLocked && <span className="ml-1">🔒</span>}
+                        {isCompleted && <span className="ml-1 text-xs">✓</span>}
+                        {isCurrent && phase === maxPhase && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
                       </button>
                     );
                   })}
@@ -246,6 +248,8 @@ export default function Home() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
+              const maxPhase = getMaxPhase(selectedCategory);
+              const isReadOnly = selectedPhase < maxPhase; // Fase anterior = read-only
 
               return (
                 <GroupCard
@@ -254,6 +258,7 @@ export default function Home() {
                   ranking={ranking}
                   gameConfig={tournament.gameConfig}
                   viewMode={viewMode}
+                  isReadOnly={isReadOnly}
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                   onReopenMatch={reopenMatch}

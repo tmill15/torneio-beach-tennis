@@ -16,6 +16,7 @@ interface GroupCardProps {
   ranking: RankingEntry[];
   gameConfig: GameConfig;
   viewMode: 'classificacao' | 'jogos';
+  isReadOnly?: boolean; // Indica se a fase é anterior (somente visualização)
   onUpdateScore: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (groupId: string, matchId: string) => void;
@@ -31,6 +32,7 @@ export function GroupCard({
   ranking,
   gameConfig,
   viewMode,
+  isReadOnly = false,
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
@@ -177,6 +179,7 @@ export function GroupCard({
           <MatchList
             matches={group.matches}
             gameConfig={gameConfig}
+            isReadOnly={isReadOnly}
             onUpdateScore={(matchId, sets) => onUpdateScore(group.id, matchId, sets)}
             onFinalizeMatch={(matchId, sets) => onFinalizeMatch(group.id, matchId, sets)}
             onReopenMatch={(matchId) => onReopenMatch(group.id, matchId)}
@@ -185,7 +188,7 @@ export function GroupCard({
       )}
 
       {/* Alertas de Empate */}
-      {viewMode === 'classificacao' && ties.length > 0 && (
+      {!isReadOnly && viewMode === 'classificacao' && ties.length > 0 && (
         <div className="px-6 pb-6">
           <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-3">
@@ -234,7 +237,7 @@ export function GroupCard({
       )}
 
       {/* Desempates Resolvidos */}
-      {viewMode === 'classificacao' && playersWithTiebreak.length > 0 && (
+      {!isReadOnly && viewMode === 'classificacao' && playersWithTiebreak.length > 0 && (
         <div className="px-6 pb-6">
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
@@ -287,6 +290,15 @@ export function GroupCard({
           }
           onClose={() => setShowTiebreakerModal(null)}
         />
+      )}
+
+      {/* Indicador de Read-Only */}
+      {isReadOnly && (
+        <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700">
+          <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
+            📋 Modo visualização - Esta fase já foi concluída
+          </p>
+        </div>
       )}
     </div>
   );

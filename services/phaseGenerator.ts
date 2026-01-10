@@ -255,7 +255,11 @@ export function generateNextPhase(
       players: groupPlayers.map(p => ({ 
         ...p, 
         status: 'enrolled',
-        qualificationType: allQualified.find(q => q.player.id === p.id)?.type
+        qualificationType: allQualified.find(q => q.player.id === p.id)?.type,
+        // Limpar badges da fase anterior
+        tiebreakOrder: undefined,
+        tiebreakMethod: undefined,
+        eliminatedInPhase: undefined
       })),
       matches: []
     };
@@ -299,7 +303,11 @@ export function generateNextPhase(
         players: groupPlayers.map(p => ({ 
           ...p, 
           status: 'enrolled',
-          qualificationType: allQualified.find(q => q.player.id === p.id)?.type
+          qualificationType: allQualified.find(q => q.player.id === p.id)?.type,
+          // Limpar badges da fase anterior
+          tiebreakOrder: undefined,
+          tiebreakMethod: undefined,
+          eliminatedInPhase: undefined
         })),
         matches: []
       };

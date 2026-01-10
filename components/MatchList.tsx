@@ -12,6 +12,7 @@ import { ScoreInput } from './ScoreInput';
 interface MatchListProps {
   matches: Match[];
   gameConfig: GameConfig;
+  isReadOnly?: boolean; // Indica se é modo somente visualização
   onUpdateScore: (matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (matchId: string) => void;
@@ -20,6 +21,7 @@ interface MatchListProps {
 export function MatchList({
   matches,
   gameConfig,
+  isReadOnly = false,
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
@@ -74,13 +76,15 @@ export function MatchList({
                       )}
                     </p>
                   </div>
-                  <button
-                    onClick={() => onReopenMatch(match.id)}
-                    className="ml-4 px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
-                    title="Reabrir para editar"
-                  >
-                    Reabrir
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => onReopenMatch(match.id)}
+                      className="ml-4 px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                      title="Reabrir para editar"
+                    >
+                      Reabrir
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -113,13 +117,19 @@ export function MatchList({
                   </p>
                 </div>
                 
-                <ScoreInput
-                  matchId={match.id}
-                  gameConfig={gameConfig}
-                  initialSets={match.sets}
-                  onSave={(sets) => onUpdateScore(match.id, sets)}
-                  onFinalize={(sets) => onFinalizeMatch(match.id, sets)}
-                />
+                {!isReadOnly ? (
+                  <ScoreInput
+                    matchId={match.id}
+                    gameConfig={gameConfig}
+                    initialSets={match.sets}
+                    onSave={(sets) => onUpdateScore(match.id, sets)}
+                    onFinalize={(sets) => onFinalizeMatch(match.id, sets)}
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-2">
+                    Partida pendente (modo visualização)
+                  </p>
+                )}
               </div>
             ))}
           </div>
