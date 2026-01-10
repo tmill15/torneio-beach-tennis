@@ -265,7 +265,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-white mb-2">
               CAMPEÃO DA CATEGORIA {selectedCategory.toUpperCase()}
             </h2>
-            <div className="text-2xl font-bold text-white bg-black/20 rounded-lg py-4 px-6 inline-block">
+            <div className="text-2xl font-bold text-white bg-black/20 rounded-lg py-4 px-6 inline-block mb-6">
               {(() => {
                 const finalGroup = groupsInSelectedPhase[0];
                 if (finalGroup) {
@@ -277,6 +277,17 @@ export default function Home() {
                 return '???';
               })()}
             </div>
+            <button
+              onClick={() => {
+                import('@/services/pdfService').then(({ generateTournamentPDF }) => {
+                  generateTournamentPDF(tournament, selectedCategory, getGroupRanking);
+                });
+              }}
+              className="px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2 mx-auto"
+            >
+              <span>📄</span>
+              <span>Gerar PDF do Torneio</span>
+            </button>
           </div>
         )}
 

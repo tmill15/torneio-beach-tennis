@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.13.1  
+**Versão:** v0.14.1  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,112 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.14.1 - Melhoria: PDF com Resultados de Jogos ✅
+**Data:** 10/01/2026
+
+**Melhorado:**
+- 📄 **Lista de participantes simplificada:** Removida informação de fases participadas
+  - **Antes:** "Jogador (SEED) - Fases: 1, 2, 3"
+  - **Agora:** "Jogador (SEED)"
+  - **Resultado:** Lista mais limpa e focada
+
+- 📄 **Resultados de todos os jogos adicionados:** PDF agora inclui resultados completos de todos os jogos
+  - **Conteúdo:**
+    - Seção "RESULTADOS DOS JOGOS" para cada fase
+    - Jogos organizados por grupo e rodada
+    - Formato: "R1: Jogador1 e Jogador2 × Jogador3 e Jogador4 (6-2, 6-4)"
+    - Partidas de desempate marcadas com [DESEMPATE]
+    - Partidas de simples formatadas corretamente
+  - **Resultado:** PDF completo com histórico de todos os jogos do torneio
+
+**Modificado:**
+- 🔄 `services/pdfService.ts`:
+  - Removida informação de fases da lista de participantes
+  - Adicionada seção completa de resultados de jogos por fase
+  - Funções auxiliares para formatar jogadores e placares
+  - Suporte a partidas de simples (desempate) e duplas
+  - Quebra de linha automática para textos longos
+
+**Estrutura do PDF (Atualizada):**
+```
+1. Cabeçalho
+2. Informações Gerais
+3. Lista de Participantes (simplificada)
+4. Classificações por Fase
+5. Resultados dos Jogos por Fase (NOVO)
+6. Campeão
+7. Rodapé
+```
+
+---
+
+### v0.14.0 - Feature: Geração de PDF do Torneio ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- 📄 **Geração de PDF completo do torneio:** Após finalizar o torneio, é possível gerar um PDF com todas as informações
+  - **Conteúdo do PDF:**
+    - Cabeçalho com nome do torneio e categoria
+    - Data de geração
+    - Configurações do jogo (formato, sets, games, tie-break)
+    - Informações gerais (total de grupos, partidas, jogadores, fases)
+    - Lista completa de participantes (alfabética, com seeds e fases participadas)
+    - Resultados de todas as fases (classificações finais de cada grupo)
+    - Campeão destacado (se fase 3 foi concluída)
+    - Numeração de páginas
+  - **Localização:** Botão "Gerar PDF do Torneio" no banner do campeão (após concluir o torneio)
+  - **Formato:** PDF A4 com formatação profissional
+
+**Modificado:**
+- 🔄 `services/pdfService.ts` (NOVO):
+  - Serviço completo para geração de PDFs usando jsPDF
+  - Formatação profissional com cores e layout organizado
+  - Suporte a múltiplas páginas automático
+  - Destaque especial para o campeão
+- 🔄 `app/page.tsx`:
+  - Botão "Gerar PDF do Torneio" adicionado ao banner do campeão
+  - Import dinâmico do serviço de PDF
+- 🔄 `package.json`:
+  - Adicionada dependência `jspdf`
+
+**Estrutura do PDF:**
+```
+1. Cabeçalho (laranja)
+   - Nome do Torneio
+   - Categoria
+
+2. Informações Gerais
+   - Data de geração
+   - Configurações do jogo
+   - Estatísticas (grupos, partidas, jogadores, fases)
+
+3. Lista de Participantes
+   - Ordenada alfabeticamente
+   - Indica seeds e fases participadas
+   - Layout em colunas
+
+4. Resultados por Fase
+   - Fase 1: Classificações de todos os grupos
+   - Fase 2: Classificações de todos os grupos
+   - Fase 3 (Final): Classificação do grupo final
+
+5. Campeão (se aplicável)
+   - Box destacado em laranja
+   - Nome do campeão
+   - Estatísticas do campeão
+
+6. Rodapé
+   - Numeração de páginas
+```
+
+**Exemplo de uso:**
+1. Finalizar todas as fases do torneio
+2. Clicar em "Concluir Torneio" na fase final
+3. Clicar em "Gerar PDF do Torneio" no banner do campeão
+4. PDF é gerado e baixado automaticamente
 
 ---
 
