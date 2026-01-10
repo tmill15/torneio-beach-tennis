@@ -16,6 +16,7 @@ export interface Player {
   isSeed: boolean;
   status: PlayerStatus;
   tiebreakOrder?: number; // Ordem de desempate manual (1 = vencedor, 2+ = outros)
+  tiebreakMethod?: 'manual' | 'random' | 'singles'; // Método usado para resolver desempate
 }
 
 // ============================================

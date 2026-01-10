@@ -314,7 +314,7 @@ export function useTournament() {
   /**
    * Resolver desempate por seleção manual
    */
-  const resolveTieManual = useCallback((groupId: string, winnerId: string, tiedPlayerIds: string[]) => {
+  const resolveTieManual = useCallback((groupId: string, winnerId: string, tiedPlayerIds: string[], method: 'manual' | 'random' = 'manual') => {
     updateTournament(prev => ({
       ...prev,
       grupos: prev.grupos.map(group => {
@@ -328,13 +328,13 @@ export function useTournament() {
             // Atribuir ordem de desempate
             if (player.id === winnerId) {
               // Vencedor sempre recebe posição 1 (melhor)
-              return { ...player, tiebreakOrder: 1 };
+              return { ...player, tiebreakOrder: 1, tiebreakMethod: method };
             } else {
               // Outros recebem posições 2, 3, 4... baseado na ordem original
               // Remover o vencedor do array e encontrar índice entre os perdedores
               const losers = tiedPlayerIds.filter(id => id !== winnerId);
               const loserIndex = losers.indexOf(player.id);
-              return { ...player, tiebreakOrder: loserIndex + 2 }; // +2 porque vencedor é 1
+              return { ...player, tiebreakOrder: loserIndex + 2, tiebreakMethod: method }; // +2 porque vencedor é 1
             }
           }),
         };
@@ -357,7 +357,7 @@ export function useTournament() {
       vencedorId: winnerId
     });
     
-    resolveTieManual(groupId, winnerId, tiedPlayerIds);
+    resolveTieManual(groupId, winnerId, tiedPlayerIds, 'random');
   }, [resolveTieManual]);
 
   /**
@@ -399,7 +399,7 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
-   * Desfazer desempate manual (remove tiebreakOrder)
+   * Desfazer desempate manual (remove tiebreakOrder e tiebreakMethod)
    */
   const undoTiebreak = useCallback((groupId: string, playerIds: string[]) => {
     updateTournament(prev => ({
@@ -412,8 +412,8 @@ export function useTournament() {
           players: group.players.map(player => {
             if (!playerIds.includes(player.id)) return player;
             
-            // Remover tiebreakOrder
-            const { tiebreakOrder, ...playerWithoutTiebreak } = player;
+            // Remover tiebreakOrder e tiebreakMethod
+            const { tiebreakOrder, tiebreakMethod, ...playerWithoutTiebreak } = player;
             return playerWithoutTiebreak;
           }),
         };

@@ -191,7 +191,10 @@ export function GroupCard({
         <div className="px-6 pb-6">
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
-              ℹ️ Desempates Resolvidos Manualmente
+              ℹ️ Desempates Resolvidos
+              {playersWithTiebreak[0]?.player.tiebreakMethod === 'manual' && ' (Seleção Manual)'}
+              {playersWithTiebreak[0]?.player.tiebreakMethod === 'random' && ' (Sorteio)'}
+              {playersWithTiebreak[0]?.player.tiebreakMethod === 'singles' && ' (Partida de Simples)'}
             </p>
             <div className="space-y-2 mb-3">
               {playersWithTiebreak.map((entry) => (
@@ -203,7 +206,7 @@ export function GroupCard({
             <button
               onClick={() => {
                 const playerIds = playersWithTiebreak.map(e => e.player.id);
-                if (window.confirm(`Desfazer desempate para ${playersWithTiebreak.length} jogador${playersWithTiebreak.length !== 1 ? 'es' : ''}?\n\nIsso removerá a ordem de desempate manual e eles voltarão a estar empatados.`)) {
+                if (window.confirm(`Desfazer desempate para ${playersWithTiebreak.length} jogador${playersWithTiebreak.length !== 1 ? 'es' : ''}?\n\nIsso removerá a ordem de desempate e eles voltarão a estar empatados.`)) {
                   onUndoTiebreak(group.id, playerIds);
                 }
               }}

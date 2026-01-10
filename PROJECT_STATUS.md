@@ -54,7 +54,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.4.7  
+**Versão:** v0.4.8  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis!
@@ -152,6 +152,28 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.8 - Identificação do Método de Desempate ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- 🎯 Campo `tiebreakMethod` no `Player` para identificar o método usado ('manual', 'random', 'singles')
+- 📝 Exibição correta do método usado no card de desempates resolvidos
+- 🧹 Remoção do `tiebreakMethod` ao desfazer desempate
+
+**Problema Identificado:**
+O card sempre exibia "Desempates Resolvidos Manualmente" mesmo quando o desempate foi feito por sorteio.
+
+**Solução Implementada:**
+1. Adicionado campo `tiebreakMethod` na interface `Player`
+2. `resolveTieManual` recebe parâmetro `method` (padrão 'manual')
+3. `resolveTieRandom` passa `method: 'random'`
+4. UI agora exibe:
+   - "(Seleção Manual)" para desempates manuais
+   - "(Sorteio)" para desempates aleatórios
+   - "(Partida de Simples)" para desempates via jogo (futuro)
+
+**Tipo:** Patch (melhoria de UX e clareza)
 
 ### v0.4.7 - Correção Crítica da Atribuição de tiebreakOrder ✅
 **Data:** 10/01/2026
@@ -477,5 +499,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.4.7  
-**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente e sorteio funcionando corretamente!
+**Versão atual:** v0.4.8  
+**Status:** ✅ ATIVO - Sistema completo com resolução de empates transparente, sorteio funcionando corretamente e métodos claramente identificados!
