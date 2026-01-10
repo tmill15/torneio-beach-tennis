@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.8.0  
+**Versão:** v0.8.4  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -257,6 +257,111 @@ Fase 3 (1 grupo final de 4):
 **Compatibilidade:**
 
 Esta versão mantém compatibilidade com backups da v0.6.x. Novos campos opcionais não quebram estruturas antigas.
+
+---
+
+### v0.8.4 - Proteção: Botão Resortear ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🔒 **Proteção do botão "Resortear Fase 1":** Botão agora é desabilitado quando o torneio já avançou
+  - **Lógica:** Verifica se há grupos na Fase 2 ou superior para a categoria
+  - **Se Fase 2+ existe:** Botão fica desabilitado (cinza) com cursor `not-allowed`
+  - **Se apenas Fase 1:** Botão permanece ativo (amarelo) e funcional
+  - **Tooltip dinâmico:** 
+    - Ativo: "Resorteia a Fase 1 e retorna jogadores para a lista de espera"
+    - Desabilitado: "Não é possível resortear: torneio já avançou para Fase 2 ou superior"
+  - **Benefício:** Previne destruição acidental de torneios em andamento
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - Variável `hasAdvancedPhases` verifica presença de Fase 2+
+  - Variável `canRedraw` determina se botão deve ser habilitado
+  - Classes CSS condicionais baseadas em `canRedraw`
+  - Tooltip contextual baseado no estado do botão
+
+**Exemplo:**
+```
+Torneio em Fase 1 apenas:
+  → Botão amarelo, ativo ✅
+
+Torneio avançou para Fase 2:
+  → Botão cinza, desabilitado 🔒
+```
+
+---
+
+### v0.8.3 - Simplificação: Botão Resortear ✅
+**Data:** 10/01/2026
+
+**Modificado:**
+- 🎨 **Simplificação da UX de resorteio:** Removido dropdown desnecessário na lista de participantes
+  - **Antes:** Dropdown para selecionar fase (1, 2 ou Final) + botão "Resortear Grupos"
+  - **Depois:** Apenas botão "Resortear Fase 1" com tooltip explicativo
+  - **Justificativa:** Resortear outras fases (2 ou Final) é raro e pode ser feito pelo dashboard. A página de configuração é focada em setup inicial (Fase 1)
+  - **Benefício:** Interface mais limpa e intuitiva
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - Removido estado `selectedPhaseForReset`
+  - `handleRedrawGroups()` sempre resorteia Fase 1
+  - Botão renomeado para "Resortear Fase 1" com tooltip
+  - Interface mais limpa na seção de participantes
+
+---
+
+### v0.8.2 - Correção: Contadores de Participantes ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Bug nos contadores das abas de participantes:** Contadores agora exibem totais corretos
+  - **Problema:** Contadores "No Torneio" e "Lista de Espera" mostravam (0) mesmo com jogadores visíveis
+  - **Causa:** Contadores eram filtrados por `selectedCategory` (mostravam apenas 1 categoria), mas as listas de jogadores mostravam TODAS as categorias
+  - **Solução:** 
+    - Criadas variáveis `totalEnrolledPlayers` e `totalWaitingPlayers` para contadores
+    - Contadores agora somam jogadores de TODAS as categorias
+    - Mantida variável `enrolledPlayers` e `waitingPlayers` (filtradas) para uso no formulário
+  - **Benefício:** Números nas abas agora são consistentes com o que é exibido nas listas
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - Separação de variáveis para contadores (totais) e para formulário (filtradas por categoria)
+  - `useEffect` para garantir que `selectedCategory` seja atualizado quando categorias mudarem
+
+---
+
+### v0.8.1 - Correção: Adição Incremental de Grupos ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Bug crítico na formação de grupos:** Sistema agora permite adicionar grupos incrementalmente à Fase 1
+  - **Problema:** Ao tentar formar grupos adicionais com jogadores da lista de espera, o sistema validava apenas os jogadores restantes (ex: 4) e bloqueava com mensagem de "mínimo 8 jogadores"
+  - **Causa:** Validação de 3 fases era aplicada sempre, ignorando grupos já existentes
+  - **Solução:** 
+    - Detecta se já existem grupos na Fase 1
+    - Verifica se há jogos com placares registrados
+    - Se SIM (há placares): BLOQUEIA formação de novos grupos
+    - Se NÃO (sem placares): PERMITE adicionar grupos incrementalmente (mínimo 4 jogadores por grupo)
+    - Validação de 3 fases só é aplicada na primeira formação de grupos
+
+**Exemplo de funcionamento:**
+```
+Situação: 20 jogadores inscritos
+1. Formou 4 grupos (16 jogadores) - 4 ficam em lista de espera
+2. Adiciona mais 2 jogadores - total 6 na lista de espera
+3. Clica "Formar Grupos":
+   - ✅ Sistema permite adicionar 1 novo grupo (4 jogadores)
+   - 📋 2 jogadores ficam na lista de espera
+   - ⚠️ Só bloqueia se houver placares registrados
+```
+
+**Modificado:**
+- 🔄 `app/config/page.tsx`:
+  - `handleFormGroups()` agora tem lógica condicional:
+    - Verifica existência de grupos na Fase 1
+    - Verifica presença de placares registrados
+    - Aplica validação apropriada ao contexto
+  - Mensagens mais claras e específicas para cada situação
 
 ---
 
@@ -896,5 +1001,5 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.8.0  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import de lista de jogadores, e todas as funcionalidades anteriores mantidas!
+**Versão atual:** v0.8.4  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import de lista de jogadores, adição incremental de grupos, UX simplificada, proteção de resorteio, e todas as funcionalidades anteriores mantidas!

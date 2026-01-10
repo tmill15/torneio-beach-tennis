@@ -32,16 +32,22 @@ export default function ConfigPage() {
     getMaxPhase,
   } = useTournament();
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
   const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('torneio');
-  const [selectedPhaseForReset, setSelectedPhaseForReset] = useState<number>(1);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Atualiza selectedCategory se não estiver mais nas categorias disponíveis
+  useEffect(() => {
+    if (!tournament.categorias.includes(selectedCategory) && tournament.categorias.length > 0) {
+      setSelectedCategory(tournament.categorias[0]);
+    }
+  }, [tournament.categorias, selectedCategory]);
 
   const waitingListStats = getWaitingListStats(tournament);
 
@@ -62,6 +68,56 @@ export default function ConfigPage() {
 
   const handleFormGroups = (categoria: string) => {
     const waitingCount = tournament.waitingList.filter(p => p.categoria === categoria).length;
+    const existingPhase1Groups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === 1);
+    
+    // Verificar se já existem grupos na Fase 1
+    if (existingPhase1Groups.length > 0) {
+      // Verificar se há jogos com placares registrados
+      const hasFinishedMatches = existingPhase1Groups.some(group => 
+        group.matches?.some(match => match.isFinished)
+      );
+      
+      if (hasFinishedMatches) {
+        alert(
+          `⚠️ Não é possível adicionar novos grupos!\n\n` +
+          `Existem jogos com placares já registrados nesta categoria.\n\n` +
+          `Para adicionar mais jogadores:\n` +
+          `1. Use "Resortear Grupos" para reiniciar a Fase 1, OU\n` +
+          `2. Aguarde o término do torneio atual`
+        );
+        return;
+      }
+      
+      // Permitir adicionar grupos adicionais se não há placares
+      if (waitingCount < 4) {
+        alert(
+          `⚠️ Jogadores insuficientes!\n\n` +
+          `São necessários pelo menos 4 jogadores na lista de espera para formar um novo grupo.\n` +
+          `Você tem ${waitingCount} jogador(es).`
+        );
+        return;
+      }
+      
+      const groupsToAdd = Math.floor(waitingCount / 4);
+      const remaining = waitingCount % 4;
+      
+      const confirmMessage = 
+        `Adicionar ${groupsToAdd} novo(s) grupo(s) à Fase 1?\n\n` +
+        `Jogadores na lista de espera: ${waitingCount}\n` +
+        `Novos grupos: ${groupsToAdd} grupo(s) de 4\n` +
+        (remaining > 0 
+          ? `Lista de espera: ${remaining} jogador(es)\n\n`
+          : `Todos os jogadores entrarão nos grupos\n\n`) +
+        `Os jogadores serão distribuídos nos novos grupos.\n\n` +
+        `Continuar?`;
+      
+      if (window.confirm(confirmMessage)) {
+        formGroups(categoria, 1);
+      }
+      return;
+    }
+    
+    // Primeira formação de grupos - validar estrutura de 3 fases
     const validation = validateThreePhaseTournament(waitingCount);
     
     if (!validation.isValid) {
@@ -100,23 +156,22 @@ export default function ConfigPage() {
   };
 
   const handleRedrawGroups = (categoria: string) => {
-    const maxPhase = getMaxPhase(categoria);
-    const groupsInPhase = tournament.grupos.filter(g => g.categoria === categoria && g.fase === selectedPhaseForReset);
+    const phase1Groups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === 1);
     
-    if (groupsInPhase.length === 0) {
-      alert(`Não há grupos na Fase ${selectedPhaseForReset} para resortear.`);
+    if (phase1Groups.length === 0) {
+      alert(`Não há grupos na Fase 1 para resortear.`);
       return;
     }
     
-    const message = `Tem certeza que deseja resortear a Fase ${selectedPhaseForReset}?\n\n` +
+    const message = `Tem certeza que deseja resortear a Fase 1?\n\n` +
       `Isso irá:\n` +
-      `- Apagar ${groupsInPhase.length} grupo(s) da Fase ${selectedPhaseForReset}\n` +
+      `- Apagar ${phase1Groups.length} grupo(s) da Fase 1\n` +
       `- Apagar todos os jogos e placares desta fase\n` +
-      `- Retornar jogadores desta fase para lista de espera\n\n` +
+      `- Retornar jogadores para lista de espera\n\n` +
       `Esta ação não pode ser desfeita!`;
     
     if (window.confirm(message)) {
-      resetAndRedrawGroups(categoria, selectedPhaseForReset);
+      resetAndRedrawGroups(categoria, 1);
     }
   };
 
@@ -126,15 +181,21 @@ export default function ConfigPage() {
     });
   };
 
-  // Jogadores na lista de espera
-  const waitingPlayers = tournament.waitingList.filter(
-    p => p.categoria === selectedCategory
-  );
+  // Jogadores na lista de espera da categoria selecionada (para o formulário)
+  const waitingPlayers = selectedCategory 
+    ? tournament.waitingList.filter(p => p.categoria === selectedCategory)
+    : tournament.waitingList;
 
-  // Jogadores já alocados em grupos
-  const enrolledPlayers = tournament.grupos
-    .filter(g => g.categoria === selectedCategory)
-    .flatMap(g => g.players);
+  // Jogadores já alocados em grupos da categoria selecionada (para o formulário)
+  const enrolledPlayers = selectedCategory
+    ? tournament.grupos
+        .filter(g => g.categoria === selectedCategory)
+        .flatMap(g => g.players)
+    : tournament.grupos.flatMap(g => g.players);
+
+  // Contadores totais para as abas (todas as categorias)
+  const totalWaitingPlayers = tournament.waitingList.length;
+  const totalEnrolledPlayers = tournament.grupos.flatMap(g => g.players).length;
 
   // Evita erro de hydration - só renderiza após montar no cliente
   if (!isMounted) {
@@ -338,7 +399,7 @@ export default function ConfigPage() {
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
-                    No Torneio ({enrolledPlayers.length})
+                    No Torneio ({totalEnrolledPlayers})
                   </button>
                   <button
                     onClick={() => setActiveTab('espera')}
@@ -348,7 +409,7 @@ export default function ConfigPage() {
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
-                    Lista de Espera ({waitingPlayers.length})
+                    Lista de Espera ({totalWaitingPlayers})
                   </button>
                 </div>
               </div>
@@ -428,6 +489,10 @@ export default function ConfigPage() {
 
                     // Coletar todos os jogadores da categoria (de todos os grupos)
                     const playersInCategory = groupsInCategory.flatMap(g => g.players);
+                    
+                    // Verificar se há grupos em Fase 2 ou superior
+                    const hasAdvancedPhases = groupsInCategory.some(g => g.fase >= 2);
+                    const canRedraw = !hasAdvancedPhases;
 
                     return (
                       <div key={categoria} className="mb-6 last:mb-0">
@@ -439,23 +504,21 @@ export default function ConfigPage() {
                             <span className="text-sm text-gray-600 dark:text-gray-400">
                               {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                             </span>
-                            {/* Seletor de Fase para Resorteio */}
-                            <select
-                              value={selectedPhaseForReset}
-                              onChange={(e) => setSelectedPhaseForReset(Number(e.target.value))}
-                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                            >
-                              {[1, 2, 3].map(phase => (
-                                <option key={phase} value={phase}>
-                                  Fase {phase === 3 ? 'Final' : phase}
-                                </option>
-                              ))}
-                            </select>
                             <button
                               onClick={() => handleRedrawGroups(categoria)}
-                              className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded font-medium transition-colors"
+                              disabled={!canRedraw}
+                              className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                                canRedraw
+                                  ? 'bg-yellow-600 hover:bg-yellow-700 cursor-pointer'
+                                  : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
+                              }`}
+                              title={
+                                canRedraw
+                                  ? 'Resorteia a Fase 1 e retorna jogadores para a lista de espera'
+                                  : 'Não é possível resortear: torneio já avançou para Fase 2 ou superior'
+                              }
                             >
-                              Resortear Grupos
+                              Resortear Fase 1
                             </button>
                           </div>
                         </div>
