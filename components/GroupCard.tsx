@@ -22,6 +22,7 @@ interface GroupCardProps {
   onReopenMatch: (groupId: string, matchId: string) => void;
   onRemoveMatch?: (groupId: string, matchId: string) => void; // Opcional: remover partida
   onResolveTieManual: (groupId: string, winnerId: string, tiedPlayerIds: string[]) => void;
+  onResolveTieManualOrder?: (groupId: string, orderedPlayerIds: string[], startPosition: number) => void;
   onResolveTieRandom: (groupId: string, tiedPlayerIds: string[]) => void;
   onGenerateSingles: (groupId: string, player1Id: string, player2Id: string) => void;
   onUndoTiebreak: (groupId: string, playerIds: string[]) => void;
@@ -39,6 +40,7 @@ export function GroupCard({
   onReopenMatch,
   onRemoveMatch,
   onResolveTieManual,
+  onResolveTieManualOrder,
   onResolveTieRandom,
   onGenerateSingles,
   onUndoTiebreak,
@@ -287,6 +289,11 @@ export function GroupCard({
             onResolveTieManual(group.id, winnerId, showTiebreakerModal.players.map((p: any) => p.id));
             setShowTiebreakerModal(null);
           }}
+          onManualOrder={onResolveTieManualOrder ? (orderedPlayerIds) => {
+            const startPosition = showTiebreakerModal.positions[0];
+            onResolveTieManualOrder(group.id, orderedPlayerIds, startPosition);
+            setShowTiebreakerModal(null);
+          } : undefined}
           onRandomSelect={() => {
             onResolveTieRandom(group.id, showTiebreakerModal.players.map((p: any) => p.id));
             setShowTiebreakerModal(null);

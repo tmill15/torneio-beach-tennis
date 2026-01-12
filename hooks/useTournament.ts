@@ -658,7 +658,7 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
-   * Resolver desempate por seleção manual
+   * Resolver desempate por seleção manual (para 2 jogadores)
    */
   const resolveTieManual = useCallback((groupId: string, winnerId: string, tiedPlayerIds: string[], method: 'manual' | 'random' = 'manual') => {
     updateTournament(prev => ({
@@ -682,6 +682,35 @@ export function useTournament() {
               const loserIndex = losers.indexOf(player.id);
               return { ...player, tiebreakOrder: loserIndex + 2, tiebreakMethod: method }; // +2 porque vencedor é 1
             }
+          }),
+        };
+      }),
+    }));
+  }, [updateTournament]);
+
+  /**
+   * Resolver desempate por ordenação manual completa (para 3+ jogadores)
+   */
+  const resolveTieManualOrder = useCallback((groupId: string, orderedPlayerIds: string[], startPosition: number, method: 'manual' | 'random' = 'manual') => {
+    updateTournament(prev => ({
+      ...prev,
+      grupos: prev.grupos.map(group => {
+        if (group.id !== groupId) return group;
+        
+        return {
+          ...group,
+          players: group.players.map(player => {
+            if (!orderedPlayerIds.includes(player.id)) return player;
+            
+            // Atribuir ordem de desempate baseada na posição na lista ordenada
+            // startPosition é a posição inicial do empate (ex: 2 para empate nas posições 2,3,4)
+            // O primeiro na lista ordenada vai para startPosition, segundo para startPosition+1, etc.
+            const orderIndex = orderedPlayerIds.indexOf(player.id);
+            return { 
+              ...player, 
+              tiebreakOrder: orderIndex + 1, // 1, 2, 3... (ordem relativa dentro do empate)
+              tiebreakMethod: method 
+            };
           }),
         };
       }),
@@ -1176,6 +1205,7 @@ export function useTournament() {
     redrawGroupsInPlace,
     clearCategory,
     resolveTieManual,
+    resolveTieManualOrder,
     resolveTieRandom,
     generateSinglesMatch,
     undoTiebreak,

@@ -24,6 +24,7 @@ export default function Home() {
     removeMatch,
     getGroupRanking,
     resolveTieManual,
+    resolveTieManualOrder,
     resolveTieRandom,
     generateSinglesMatch,
     undoTiebreak,
@@ -390,6 +391,7 @@ export default function Home() {
                   onReopenMatch={reopenMatch}
                   onRemoveMatch={removeMatch}
                   onResolveTieManual={resolveTieManual}
+                  onResolveTieManualOrder={resolveTieManualOrder}
                   onResolveTieRandom={resolveTieRandom}
                   onGenerateSingles={handleGenerateSingles}
                   onUndoTiebreak={undoTiebreak}
