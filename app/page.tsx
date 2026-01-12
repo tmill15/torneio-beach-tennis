@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
+import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 
 export default function Home() {
@@ -29,6 +30,7 @@ export default function Home() {
     resolveCrossGroupTieManual,
     resolveCrossGroupTieRandom,
     generateCrossGroupSinglesMatch,
+    undoCrossGroupTiebreak,
     advanceToNextPhase,
     getPhaseAdvancePreview,
     isPhaseComplete,
@@ -99,7 +101,15 @@ export default function Home() {
     }
   }, [selectedCategory, tournament.grupos, groupsInCategory, selectedPhase, getMaxPhase]);
 
-  const groupsInSelectedPhase = groupsInCategory.filter(g => g.fase === selectedPhase);
+  // Filtrar grupos normais (excluir grupos de desempate cross-group)
+  const groupsInSelectedPhase = groupsInCategory.filter(
+    g => g.fase === selectedPhase && !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
+  );
+  
+  // Encontrar desempates cross-group para a fase selecionada
+  const crossGroupTiebreaks = (tournament.crossGroupTiebreaks || []).filter(
+    t => t.phase === selectedPhase
+  );
 
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
     finalizeMatch(groupId, matchId, sets);
@@ -299,6 +309,65 @@ export default function Home() {
             </button>
           </div>
         ) : null}
+
+        {/* Desempates Cross-Group */}
+        {crossGroupTiebreaks.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Desempates entre Grupos
+            </h2>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              {crossGroupTiebreaks.map((tiebreak, index) => {
+                // Encontrar a partida se existir
+                const tiebreakGroup = tournament.grupos.find(
+                  g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') && 
+                       g.categoria === selectedCategory && 
+                       g.fase === tiebreak.phase
+                );
+                const tiebreakMatch = tiebreak.matchId && tiebreakGroup
+                  ? tiebreakGroup.matches.find(m => m.id === tiebreak.matchId)
+                  : undefined;
+                
+                // Funções auxiliares para partidas de desempate cross-group
+                const handleCrossGroupUpdateScore = (matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
+                  if (tiebreakGroup) {
+                    updateMatchScore(tiebreakGroup.id, matchId, sets);
+                  }
+                };
+                
+                const handleCrossGroupFinalizeMatch = (matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
+                  if (tiebreakGroup) {
+                    finalizeMatch(tiebreakGroup.id, matchId, sets);
+                  }
+                };
+                
+                const handleCrossGroupReopenMatch = (matchId: string) => {
+                  if (tiebreakGroup) {
+                    reopenMatch(tiebreakGroup.id, matchId);
+                  }
+                };
+                
+                const maxPhase = getMaxPhase(selectedCategory);
+                const isReadOnly = selectedPhase < maxPhase;
+                
+                return (
+                  <CrossGroupTiebreakerCard
+                    key={`tiebreak-${tiebreak.phase}-${tiebreak.position}-${index}`}
+                    tiebreak={tiebreak}
+                    tournament={tournament}
+                    categoria={selectedCategory}
+                    gameConfig={tournament.gameConfig}
+                    isReadOnly={isReadOnly}
+                    onUpdateScore={handleCrossGroupUpdateScore}
+                    onFinalizeMatch={handleCrossGroupFinalizeMatch}
+                    onReopenMatch={handleCrossGroupReopenMatch}
+                    onUndoTiebreak={undoCrossGroupTiebreak}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (

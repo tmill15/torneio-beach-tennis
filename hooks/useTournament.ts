@@ -92,51 +92,21 @@ export function useTournament() {
       return tournamentWithVersion;
     }
     
-    // 🧹 MIGRAÇÃO v0.7.0: Limpar badges de desempate em fases 2+
-    // Ao avançar de fase, tiebreakOrder e tiebreakMethod devem ser limpos
-    // Esta migração sempre roda para garantir limpeza
-    const hasPhase2Plus = rawTournament.grupos.some(group => group.fase > 1);
-    
-    if (hasPhase2Plus) {
-      // v0.11.9: NÃO limpar dados de desempate da Fase 3 (fase final)
-      // Desempates podem ocorrer na fase final e devem ser preservados
-      const needsBadgeCleanup = rawTournament.grupos.some(group => 
-        group.fase === 2 && group.players.some(p => 
-          p.tiebreakOrder !== undefined || p.tiebreakMethod !== undefined
-        )
-      );
-      
-      if (needsBadgeCleanup) {
-        console.log('🧹 v0.7.0: Limpando badges de desempate na Fase 2 (Fase 3 preservada)...');
-        const cleanedTournament = {
-          ...rawTournament,
-          grupos: rawTournament.grupos.map(group => {
-            // Só limpa se for fase 2 (não limpa fase 3 - fase final pode ter desempates)
-            if (group.fase === 2) {
-              return {
-                ...group,
-                players: group.players.map(p => {
-                  // Remove tiebreakOrder e tiebreakMethod apenas da Fase 2
-                  const { tiebreakOrder, tiebreakMethod, ...cleanPlayer } = p;
-                  return {
-                    ...cleanPlayer,
-                    // Mantém os outros campos
-                    status: p.status,
-                    qualificationType: p.qualificationType,
-                    eliminatedInPhase: p.eliminatedInPhase
-                  };
-                })
-              };
-            }
-            return group;
-          }),
-          version: '0.7.0'
-        };
-        setTimeout(() => setRawTournament(cleanedTournament), 0);
-        console.log('✅ Badges limpos com sucesso!');
-        return cleanedTournament;
-      }
-    }
+    // 🧹 MIGRAÇÃO v0.7.0: DESABILITADA
+    // Esta migração estava removendo desempates válidos ao recarregar a página
+    // Desempates devem ser preservados em todas as fases até serem explicitamente resolvidos
+    // A limpeza de desempates agora é feita apenas quando necessário (ex: ao avançar de fase)
+    // 
+    // Código comentado para referência:
+    // const hasPhase2Plus = rawTournament.grupos.some(group => group.fase > 1);
+    // if (hasPhase2Plus) {
+    //   const needsBadgeCleanup = rawTournament.grupos.some(group => 
+    //     group.fase === 2 && group.players.some(p => 
+    //       p.tiebreakOrder !== undefined || p.tiebreakMethod !== undefined
+    //     )
+    //   );
+    //   if (needsBadgeCleanup) { ... }
+    // }
     
     // 🔤 MIGRAÇÃO v0.11.2: Garantir que todos os grupos tenham nome (letra)
     const groupsWithoutName = rawTournament.grupos.filter(g => !g.nome || g.nome.trim() === '');
@@ -915,10 +885,32 @@ export function useTournament() {
     position: number,
     tiedPlayerIds: string[]
   ) => {
-    const randomIndex = Math.floor(Math.random() * tiedPlayerIds.length);
-    const winnerId = tiedPlayerIds[randomIndex];
-    resolveCrossGroupTieManual(categoria, phase, position, winnerId, tiedPlayerIds);
-  }, [resolveCrossGroupTieManual]);
+    updateTournament(prev => {
+      const randomIndex = Math.floor(Math.random() * tiedPlayerIds.length);
+      const winnerId = tiedPlayerIds[randomIndex];
+      
+      const existingTiebreaks = prev.crossGroupTiebreaks || [];
+      
+      // Remover desempate existente para esta combinação (se houver)
+      const filteredTiebreaks = existingTiebreaks.filter(
+        t => !(t.phase === phase && t.position === position && t.tiedPlayerIds.some(id => tiedPlayerIds.includes(id)))
+      );
+      
+      // Adicionar novo desempate com método 'random'
+      const newTiebreak: CrossGroupTiebreak = {
+        phase,
+        position,
+        winnerId,
+        method: 'random',
+        tiedPlayerIds
+      };
+      
+      return {
+        ...prev,
+        crossGroupTiebreaks: [...filteredTiebreaks, newTiebreak]
+      };
+    });
+  }, [updateTournament]);
 
   /**
    * Gera partida de simples para desempate entre grupos
@@ -945,15 +937,17 @@ export function useTournament() {
       
       if (!player1 || !player2) return prev;
       
-      // Criar grupo "virtual" para a partida de desempate
-      // Usar o primeiro grupo da fase como base
-      const baseGroup = categoryGroups[0];
-      if (!baseGroup) return prev;
+      // Criar grupo especial para desempate cross-group
+      // Verificar se já existe um grupo especial para esta fase/categoria
+      const tiebreakGroupName = `DESEMPATE_CROSS_GROUP_${categoria}_FASE${phase}`;
+      let tiebreakGroup = prev.grupos.find(
+        g => g.nome === tiebreakGroupName && g.categoria === categoria && g.fase === phase
+      );
       
       const matchId = uuidv4();
       const singlesMatch: Match = {
         id: matchId,
-        groupId: baseGroup.id, // Usar ID do grupo base (será tratado como partida especial)
+        groupId: tiebreakGroup?.id || uuidv4(),
         jogador1A: player1,
         jogador2A: player1, // Duplicar para indicar que é simples
         jogador1B: player2,
@@ -966,16 +960,30 @@ export function useTournament() {
         isTiebreaker: true
       };
       
-      // Adicionar partida ao grupo base
-      const updatedGroups = prev.grupos.map(group => {
-        if (group.id === baseGroup.id) {
-          return {
-            ...group,
-            matches: [...group.matches, singlesMatch]
-          };
-        }
-        return group;
-      });
+      // Se não existe grupo especial, criar um
+      let updatedGroups = prev.grupos;
+      if (!tiebreakGroup) {
+        tiebreakGroup = {
+          id: singlesMatch.groupId,
+          nome: tiebreakGroupName,
+          fase: phase,
+          categoria,
+          players: [player1, player2].map(p => ({ ...p, status: 'enrolled' as const })),
+          matches: [singlesMatch]
+        };
+        updatedGroups = [...prev.grupos, tiebreakGroup];
+      } else {
+        // Adicionar partida ao grupo existente
+        updatedGroups = prev.grupos.map(group => {
+          if (group.id === tiebreakGroup!.id) {
+            return {
+              ...group,
+              matches: [...group.matches, singlesMatch]
+            };
+          }
+          return group;
+        });
+      }
       
       // Registrar desempate (será atualizado quando partida for finalizada)
       const existingTiebreaks = prev.crossGroupTiebreaks || [];
@@ -996,6 +1004,40 @@ export function useTournament() {
         ...prev,
         grupos: updatedGroups,
         crossGroupTiebreaks: [...filteredTiebreaks, newTiebreak]
+      };
+    });
+  }, [updateTournament]);
+
+  /**
+   * Desfazer desempate cross-group
+   */
+  const undoCrossGroupTiebreak = useCallback((tiebreak: CrossGroupTiebreak) => {
+    updateTournament(prev => {
+      // Remover o tiebreak
+      const updatedTiebreaks = (prev.crossGroupTiebreaks || []).filter(
+        t => !(t.phase === tiebreak.phase && 
+               t.position === tiebreak.position && 
+               t.tiedPlayerIds.length === tiebreak.tiedPlayerIds.length &&
+               t.tiedPlayerIds.every(id => tiebreak.tiedPlayerIds.includes(id)))
+      );
+
+      // Se há partida de desempate, removê-la do grupo
+      let updatedGroups = prev.grupos;
+      if (tiebreak.matchId) {
+        updatedGroups = prev.grupos.map(group => {
+          // Remover a partida de desempate
+          const matches = group.matches.filter(m => m.id !== tiebreak.matchId);
+          return {
+            ...group,
+            matches
+          };
+        });
+      }
+
+      return {
+        ...prev,
+        grupos: updatedGroups,
+        crossGroupTiebreaks: updatedTiebreaks
       };
     });
   }, [updateTournament]);
@@ -1140,6 +1182,7 @@ export function useTournament() {
     resolveCrossGroupTieManual,
     resolveCrossGroupTieRandom,
     generateCrossGroupSinglesMatch,
+    undoCrossGroupTiebreak,
     resetTournament,
     // Funções do sistema de fases
     advanceToNextPhase,
