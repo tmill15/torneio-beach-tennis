@@ -6,7 +6,6 @@ export const metadata: Metadata = {
   title: "BeachTennis Manager",
   description: "Gestão de torneios de Beach Tennis",
   manifest: "/manifest.json",
-  themeColor: "#f97316",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -23,6 +22,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#f97316",
 };
 
 export default function RootLayout({
