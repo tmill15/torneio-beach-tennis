@@ -137,44 +137,56 @@ export function generateTournamentPDF(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   
-  let playersPerColumn = 0;
-  const maxPlayersPerPage = 25;
+  const maxPlayersPerColumn = 25;
   const columnWidth = (pageWidth - 2 * margin) / 2;
-  let currentColumn = 0;
-  let columnX = margin;
+  const startY = yPosition;
+  let column1Y = startY;
+  let column2Y = startY;
+  let column1Count = 0;
+  let column2Count = 0;
+  let isFirstPage = true;
 
-  playersList.forEach((entry, index) => {
-    if (playersPerColumn >= maxPlayersPerPage) {
-      if (currentColumn === 0) {
-        currentColumn = 1;
-        columnX = margin + columnWidth;
-        yPosition = margin + 18; // Reset Y para segunda coluna
-        playersPerColumn = 0;
-      } else {
-        // Nova página
-        doc.addPage();
-        yPosition = margin + 18;
-        currentColumn = 0;
-        columnX = margin;
-        playersPerColumn = 0;
-      }
-    }
-
+  playersList.forEach((entry) => {
     const playerName = entry.player.nome;
     const seedText = entry.player.isSeed ? ' (SEED)' : '';
+    const fullText = `${playerName}${seedText}`;
     
-    doc.text(`${playerName}${seedText}`, columnX, yPosition);
-    yPosition += 5;
-    playersPerColumn++;
+    // Decidir em qual coluna colocar
+    if (column1Count < maxPlayersPerColumn) {
+      // Coluna 1
+      doc.text(fullText, margin, column1Y);
+      column1Y += 5;
+      column1Count++;
+    } else if (column2Count < maxPlayersPerColumn) {
+      // Coluna 2
+      doc.text(fullText, margin + columnWidth, column2Y);
+      column2Y += 5;
+      column2Count++;
+    } else {
+      // Nova página - resetar tudo
+      doc.addPage();
+      // Reescrever título na nova página
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...darkGray);
+      doc.text('PARTICIPANTES', margin, margin + 8);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      column1Y = margin + 16;
+      column2Y = margin + 16;
+      column1Count = 0;
+      column2Count = 0;
+      doc.text(fullText, margin, column1Y);
+      column1Y += 5;
+      column1Count++;
+    }
   });
 
-  // Reset para próxima seção - calcular Y corretamente
-  if (currentColumn === 1) {
-    // Se estava na segunda coluna, calcular Y baseado na coluna
-    yPosition = margin + 18 + (playersPerColumn * 5) + 10;
-  } else {
-    yPosition += 10;
-  }
+  // Calcular Y final baseado na coluna mais baixa
+  yPosition = Math.max(column1Y, column2Y) + 10;
+  
+  // Verificar se precisa de nova página
   if (yPosition > pageHeight - 40) {
     doc.addPage();
     yPosition = margin;
@@ -226,11 +238,11 @@ export function generateTournamentPDF(
       
       doc.setTextColor(0, 0, 0);
       doc.text('Pos', margin + 2, yPosition);
-      doc.text('Jogador', margin + 15, yPosition);
-      doc.text('V', margin + 75, yPosition);
-      doc.text('D', margin + 85, yPosition);
-      doc.text('Games', margin + 95, yPosition);
-      doc.text('Pts (saldo)', margin + 130, yPosition);
+      doc.text('Jogador', margin + 12, yPosition);
+      doc.text('V', margin + 70, yPosition);
+      doc.text('D', margin + 78, yPosition);
+      doc.text('Games', margin + 86, yPosition);
+      doc.text('Pts (saldo)', margin + 120, yPosition);
       yPosition += 6;
 
       // Linhas da tabela
@@ -256,13 +268,24 @@ export function generateTournamentPDF(
         if (entry.player.isSeed) playerName += ' (SEED)';
         // Não mostrar badges de classificação/eliminação no PDF - são apenas para visualização histórica
         
-        doc.text(playerName.substring(0, 28), margin + 15, yPosition);
-        doc.text(`${entry.vitorias}`, margin + 75, yPosition);
-        doc.text(`${entry.derrotas}`, margin + 85, yPosition);
-        doc.text(`${entry.gamesGanhos}-${entry.gamesPerdidos}`, margin + 95, yPosition);
-        doc.text(`${entry.vitorias} (${entry.saldoGames >= 0 ? '+' : ''}${entry.saldoGames})`, margin + 130, yPosition);
+        // Truncar nome se necessário, mas usar splitTextToSize para quebrar linha se muito longo
+        const maxNameWidth = 55; // Largura máxima para nome (até coluna V)
+        const nameLines = doc.splitTextToSize(playerName, maxNameWidth);
+        const nameY = yPosition;
+        nameLines.forEach((line: string, lineIndex: number) => {
+          doc.text(line, margin + 12, nameY + (lineIndex * 4));
+        });
         
-        yPosition += 5;
+        // Ajustar Y position se nome quebrou em múltiplas linhas
+        const nameHeight = nameLines.length > 1 ? (nameLines.length - 1) * 4 : 0;
+        const statsY = yPosition + nameHeight;
+        
+        doc.text(`${entry.vitorias}`, margin + 70, statsY);
+        doc.text(`${entry.derrotas}`, margin + 78, statsY);
+        doc.text(`${entry.gamesGanhos}-${entry.gamesPerdidos}`, margin + 86, statsY);
+        doc.text(`${entry.vitorias} (${entry.saldoGames >= 0 ? '+' : ''}${entry.saldoGames})`, margin + 120, statsY);
+        
+        yPosition += 5 + nameHeight;
       });
 
       yPosition += 5; // Espaço entre grupos
