@@ -698,16 +698,22 @@ export default function ConfigPage() {
                 <>
                   {Object.entries(waitingListStats).map(([categoria, stats]) => (
                     <div key={categoria} className="mb-6 last:mb-0">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          {categoria}
-                        </h3>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
-                          </span>
-                          {stats.total > 0 && (
-                            <div className="relative group">
+                      <div className="mb-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                          <div>
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {categoria}
+                            </h3>
+                            <span className="text-xs text-gray-600 dark:text-gray-400 sm:hidden">
+                              {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
+                            </span>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                              {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
+                            </span>
+                            {stats.total > 0 && (
+                              <div className="relative group self-start sm:self-auto">
                               {(() => {
                                 const existingPhase1Groups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === 1);
                                 const isFirstFormation = existingPhase1Groups.length === 0;
@@ -733,7 +739,7 @@ export default function ConfigPage() {
                                       <div className="md:hidden mt-1 text-xs text-yellow-600 dark:text-yellow-400 max-w-xs">
                                         {needsMinPlayers 
                                           ? `⚠️ Mínimo de 8 jogadores necessário para iniciar o torneio`
-                                          : validation.blockingReason || 'Não é possível formar grupos'
+                                          : ('blockingReason' in validation ? validation.blockingReason : 'Não é possível formar grupos')
                                         }
                                       </div>
                                     )}
@@ -742,7 +748,7 @@ export default function ConfigPage() {
                                       <div className="hidden md:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap max-w-xs">
                                         {needsMinPlayers 
                                           ? `Mínimo de 8 jogadores necessário para iniciar torneio de 3 fases`
-                                          : validation.blockingReason || 'Não é possível formar grupos'
+                                          : ('blockingReason' in validation ? validation.blockingReason : 'Não é possível formar grupos')
                                         }
                                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                                           <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
@@ -752,17 +758,18 @@ export default function ConfigPage() {
                                   </>
                                 );
                               })()}
-                            </div>
-                          )}
-                          {stats.total > 0 && (
-                            <button
-                              onClick={() => handleClearWaitingList(categoria)}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium transition-colors"
-                              title="Remover todos os jogadores da lista de espera"
-                            >
-                              Limpar Tudo
-                            </button>
-                          )}
+                              </div>
+                            )}
+                            {stats.total > 0 && (
+                              <button
+                                onClick={() => handleClearWaitingList(categoria)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium transition-colors whitespace-nowrap self-start sm:self-auto"
+                                title="Remover todos os jogadores da lista de espera"
+                              >
+                                Limpar Tudo
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -844,15 +851,21 @@ export default function ConfigPage() {
 
                     return (
                       <div key={categoria} className="mb-6 last:mb-0">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {categoria}
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
-                            </span>
-                            <button
+                        <div className="mb-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                            <div>
+                              <h3 className="font-medium text-gray-900 dark:text-white">
+                                {categoria}
+                              </h3>
+                              <span className="text-xs text-gray-600 dark:text-gray-400 sm:hidden">
+                                {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
+                              </span>
+                              <button
                               onClick={() => handleRedrawGroups(categoria)}
                               disabled={!canRedraw}
                               className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
@@ -888,6 +901,7 @@ export default function ConfigPage() {
                             </button>
                           </div>
                         </div>
+                      </div>
 
                         <div className="space-y-2">
                           {playersInCategory.map((player) => (
