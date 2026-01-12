@@ -54,15 +54,28 @@ export function hasPendingTies(
   }
   
   // Verificar empates entre grupos (para repescagem)
-  // Fase 1 → Fase 2: verificar empates em 3º lugar
-  // Fase 2 → Fase 3: verificar empates em 2º lugar (quando há 3 grupos)
+  // IMPORTANTE: Só verificar empates cross-group quando realmente precisamos selecionar
+  // jogadores de uma posição específica entre grupos diferentes
+  
   if (phase === 1) {
-    const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 2, tournament?.crossGroupTiebreaks);
-    if (crossGroupTies.length > 1) return true;
+    // Fase 1 → Fase 2: verificar empates em 3º lugar APENAS se precisar de repescagem
+    // Calcular se precisa de repescagem
+    const directCount = phaseGroups.length * 2; // Top 2 de cada grupo
+    const targetGroupSize = 4;
+    const idealGroups = Math.floor(directCount / targetGroupSize);
+    const remainder = directCount % targetGroupSize;
+    const repechageCount = remainder > 0 ? (idealGroups + 1) * targetGroupSize - directCount : 0;
+    
+    // Só verificar empates cross-group se realmente precisamos de repescagem
+    if (repechageCount > 0) {
+      const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 2, tournament?.crossGroupTiebreaks);
+      if (crossGroupTies.length > 1) return true;
+    }
   } else if (phase === 2) {
     const numGroups = phaseGroups.length;
+    // Fase 2 → Fase 3: verificar empates em 2º lugar APENAS quando há 3 grupos
+    // (quando precisamos pegar o melhor 2º colocado)
     if (numGroups === 3) {
-      // Verificar empate em 2º lugar (melhor 2º colocado)
       const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 1, tournament?.crossGroupTiebreaks);
       if (crossGroupTies.length > 1) return true;
     }

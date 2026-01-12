@@ -46,26 +46,30 @@ export function PhaseAdvanceCard({
   const isFinal = currentPhase === 3; // Fase 3 é a fase final
   
   // Detectar empates entre grupos
+  // IMPORTANTE: Só verificar empates cross-group quando realmente precisamos selecionar
+  // jogadores de uma posição específica entre grupos diferentes
   let crossGroupTies: { player: any; stats: any; groupOrigin: string }[] = [];
   if (tournament) {
     const categoryGroups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === currentPhase);
     if (currentPhase === 1) {
-      // Verificar empate em 3º lugar (repescagem)
-      crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 2, tournament.crossGroupTiebreaks);
+      // Fase 1 → Fase 2: verificar empate em 3º lugar APENAS se precisar de repescagem
+      // Calcular se precisa de repescagem
+      const directCount = categoryGroups.length * 2; // Top 2 de cada grupo
+      const targetGroupSize = 4;
+      const idealGroups = Math.floor(directCount / targetGroupSize);
+      const remainder = directCount % targetGroupSize;
+      const repechageCount = remainder > 0 ? (idealGroups + 1) * targetGroupSize - directCount : 0;
+      
+      // Só verificar empates cross-group se realmente precisamos de repescagem
+      if (repechageCount > 0) {
+        crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 2, tournament.crossGroupTiebreaks);
+      }
     } else if (currentPhase === 2) {
       const numGroups = categoryGroups.length;
+      // Fase 2 → Fase 3: verificar empate em 2º lugar APENAS quando há 3 grupos
+      // (quando precisamos pegar o melhor 2º colocado)
       if (numGroups === 3) {
-        // Verificar empate em 2º lugar (melhor 2º colocado)
         crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 1, tournament.crossGroupTiebreaks);
-        // Debug: log para verificar detecção
-        if (crossGroupTies.length > 1) {
-          console.log('🔗 Empate entre grupos detectado:', crossGroupTies.map(t => ({
-            nome: t.player.nome,
-            grupo: t.groupOrigin,
-            vitorias: t.stats.vitorias,
-            saldoGames: t.stats.saldoGames
-          })));
-        }
       }
     }
   }
