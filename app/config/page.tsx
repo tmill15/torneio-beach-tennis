@@ -121,11 +121,7 @@ export default function ConfigPage() {
     const validation = validateThreePhaseTournament(waitingCount);
     
     if (!validation.isValid) {
-      alert(
-        `⚠️ Impossível formar torneio de 3 fases!\n\n` +
-        `${validation.blockingReason}\n\n` +
-        `Ajuste o número de jogadores antes de continuar.`
-      );
+      // Não mostrar alerta - o botão já está desabilitado
       return;
     }
     
@@ -706,17 +702,57 @@ export default function ConfigPage() {
                         <h3 className="font-medium text-gray-900 dark:text-white">
                           {categoria}
                         </h3>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                           <span className="text-sm text-gray-600 dark:text-gray-400">
                             {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
                           </span>
-                          {stats.canFormGroup && (
-                            <button
-                              onClick={() => handleFormGroups(categoria)}
-                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors"
-                            >
-                              Formar {stats.groupsReady} Grupo{stats.groupsReady !== 1 ? 's' : ''}
-                            </button>
+                          {stats.total > 0 && (
+                            <div className="relative group">
+                              {(() => {
+                                const existingPhase1Groups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === 1);
+                                const isFirstFormation = existingPhase1Groups.length === 0;
+                                const needsMinPlayers = isFirstFormation && stats.total < 8;
+                                const validation = isFirstFormation ? validateThreePhaseTournament(stats.total) : { isValid: true };
+                                const isDisabled = !validation.isValid || needsMinPlayers;
+                                
+                                return (
+                                  <>
+                                    <button
+                                      onClick={() => handleFormGroups(categoria)}
+                                      disabled={isDisabled}
+                                      className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                                        isDisabled
+                                          ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
+                                          : 'bg-green-600 hover:bg-green-700'
+                                      }`}
+                                    >
+                                      Formar {stats.groupsReady > 0 ? stats.groupsReady : 0} Grupo{stats.groupsReady !== 1 ? 's' : ''}
+                                    </button>
+                                    {/* Aviso para mobile (sempre visível quando desabilitado) */}
+                                    {isDisabled && (
+                                      <div className="md:hidden mt-1 text-xs text-yellow-600 dark:text-yellow-400 max-w-xs">
+                                        {needsMinPlayers 
+                                          ? `⚠️ Mínimo de 8 jogadores necessário para iniciar o torneio`
+                                          : validation.blockingReason || 'Não é possível formar grupos'
+                                        }
+                                      </div>
+                                    )}
+                                    {/* Tooltip para desktop (hover) */}
+                                    {isDisabled && (
+                                      <div className="hidden md:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap max-w-xs">
+                                        {needsMinPlayers 
+                                          ? `Mínimo de 8 jogadores necessário para iniciar torneio de 3 fases`
+                                          : validation.blockingReason || 'Não é possível formar grupos'
+                                        }
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                          <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
                           )}
                           {stats.total > 0 && (
                             <button

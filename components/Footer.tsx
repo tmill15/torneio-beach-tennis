@@ -16,7 +16,7 @@ export function Footer() {
             BeachTennis Manager v{packageJson.version}
           </p>
           <p className="text-center sm:text-right">
-            © {new Date().getFullYear()} - Desenvolvido com ❤️
+            © {new Date().getFullYear()} - Desenvolvido por Thiago Milhomem
           </p>
         </div>
       </div>
