@@ -286,8 +286,10 @@ export function generateTournamentPDF(
 
     // Função auxiliar para formatar jogadores (definida uma vez por fase)
     const formatMatchPlayers = (match: Match): string => {
-      if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
-        // Partida de simples (desempate)
+      // Verificar se é partida de simples (jogadores duplicados - pode ser desempate ou final)
+      const isSingles = match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id;
+      if (isSingles) {
+        // Partida de simples (desempate ou final com 2 jogadores)
         return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
       }
       // Partida de duplas
