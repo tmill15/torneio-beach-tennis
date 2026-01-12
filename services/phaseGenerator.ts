@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Group, Player, Tournament, RankingEntry, CrossGroupTiebreak } from '@/types';
 import { calculateRanking } from './rankingService';
 import { generatePairsFor4Players } from './matchGenerator';
+import { shufflePlayers } from './groupGenerator';
 
 export type QualificationType = 'direct' | 'repechage' | 'eliminated';
 
@@ -477,22 +478,27 @@ export function generateNextPhase(
     // Fase 2 = Múltiplos grupos de 4
     const numGroups = Math.floor(totalPlayers / targetGroupSize);
   
-  let seedIndex = 0;
-  let nonSeedIndex = 0;
+    // IMPORTANTE: Embaralhar seeds e non-seeds antes de distribuir
+    // Isso evita agrupamento sequencial (A com B, C com D, etc.)
+    const shuffledSeeds = shufflePlayers(seeds.map(q => q.player));
+    const shuffledNonSeeds = shufflePlayers(nonSeeds.map(q => q.player));
   
+    // Distribuir seeds uniformemente (serpentina) para evitar que seeds fiquem juntos
+    const seedGroups: Player[][] = Array.from({ length: numGroups }, () => []);
+    shuffledSeeds.forEach((seed, index) => {
+      const groupIndex = index % numGroups;
+      seedGroups[groupIndex].push(seed);
+    });
+  
+    // Distribuir non-seeds sequencialmente nos grupos
+    let nonSeedIndex = 0;
     for (let i = 0; i < numGroups; i++) {
-    const groupPlayers: Player[] = [];
-    
-      // Distribuir seeds uniformemente
-      const seedsPerGroup = Math.ceil(seeds.length / numGroups);
-      for (let j = 0; j < seedsPerGroup && seedIndex < seeds.length; j++) {
-        groupPlayers.push(seeds[seedIndex++].player);
-    }
-    
-    // Completar com não-seeds
-      while (groupPlayers.length < targetGroupSize && nonSeedIndex < nonSeeds.length) {
-        groupPlayers.push(nonSeeds[nonSeedIndex++].player);
-    }
+      const groupPlayers: Player[] = [...seedGroups[i]]; // Começar com seeds do grupo
+      
+      // Completar com não-seeds
+      while (groupPlayers.length < targetGroupSize && nonSeedIndex < shuffledNonSeeds.length) {
+        groupPlayers.push(shuffledNonSeeds[nonSeedIndex++]);
+      }
     
       const groupName = String.fromCharCode(65 + i); // A, B, C...
       const group: Group = {
