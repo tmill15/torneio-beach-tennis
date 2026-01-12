@@ -74,10 +74,16 @@ export function hasPendingTies(
     }
   } else if (phase === 2) {
     const numGroups = phaseGroups.length;
-    // Fase 2 → Fase 3: verificar empates em 2º lugar APENAS quando há 3 grupos
-    // (quando precisamos pegar o melhor 2º colocado)
     if (numGroups === 3) {
+      // Fase 2 → Fase 3: verificar empates em 2º lugar quando há 3 grupos
+      // (quando precisamos pegar o melhor 2º colocado)
       const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 1, tournament?.crossGroupTiebreaks);
+      if (crossGroupTies.length > 1) return true;
+    } else if (numGroups >= 5) {
+      // Fase 2 → Fase 3: verificar empates em Top 1 (posição 0) quando há 5+ grupos
+      // (quando precisamos selecionar apenas 4 dos Top 1 para a fase final)
+      // Verificar empates na zona de corte (4ª vaga)
+      const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 0, tournament?.crossGroupTiebreaks, 4);
       if (crossGroupTies.length > 1) return true;
     }
   }
@@ -199,18 +205,32 @@ export function detectCrossGroupTies(
                        candidateStats.gamesGanhos === lastQualifiedStats.gamesGanhos;
         
         if (isTied) {
-          // Verificar se não há desempate entre grupos já resolvido
-          const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+          // Verificar se não há desempate entre grupos já resolvido ou partida pendente
+          // Verificar se há algum tiebreak que inclua este jogador (mesma fase e posição)
+          const tiebreak = crossGroupTiebreaks?.find(
             t => t.phase === phase && 
                  t.position === position && 
-                 t.tiedPlayerIds.includes(candidate.player.id) &&
-                 t.winnerId && t.winnerId.length > 0
+                 t.tiedPlayerIds.includes(candidate.player.id)
           );
           
-          if (!hasResolvedTiebreak) {
+          // Se não encontrou, verificar se há algum tiebreak na mesma fase (pode ser posição diferente)
+          const anyTiebreakInPhase = !tiebreak ? crossGroupTiebreaks?.find(
+            t => t.phase === phase && 
+                 t.tiedPlayerIds.includes(candidate.player.id)
+          ) : null;
+          
+          const relevantTiebreak = tiebreak || anyTiebreakInPhase;
+          
+          // Se há desempate resolvido (com winnerId não vazio) ou partida pendente (com matchId mas sem winnerId), não incluir
+          const hasResolved = relevantTiebreak && relevantTiebreak.winnerId && relevantTiebreak.winnerId.length > 0;
+          const hasPending = relevantTiebreak && relevantTiebreak.matchId && (!relevantTiebreak.winnerId || relevantTiebreak.winnerId.length === 0);
+          const hasResolvedOrPending = hasResolved || hasPending;
+          
+          if (!hasResolvedOrPending) {
+            // Só incluir se não há desempate resolvido nem partida pendente
             ties.push(candidate);
           } else {
-            // Se há desempate resolvido, parar de verificar (os seguintes não estão mais empatados)
+            // Se há desempate resolvido ou partida pendente, parar de verificar
             break;
           }
         } else {
@@ -229,14 +249,29 @@ export function detectCrossGroupTies(
                      candidate.stats.gamesGanhos === firstStats.gamesGanhos;
       
       if (isTied) {
-        const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+        // Verificar se não há desempate entre grupos já resolvido ou partida pendente
+        // Verificar se há algum tiebreak que inclua este jogador (mesma fase e posição)
+        const tiebreak = crossGroupTiebreaks?.find(
           t => t.phase === phase && 
                t.position === position && 
-               t.tiedPlayerIds.includes(candidate.player.id) &&
-               t.winnerId && t.winnerId.length > 0
+               t.tiedPlayerIds.includes(candidate.player.id)
         );
         
-        if (!hasResolvedTiebreak) {
+        // Se não encontrou, verificar se há algum tiebreak na mesma fase (pode ser posição diferente)
+        const anyTiebreakInPhase = !tiebreak ? crossGroupTiebreaks?.find(
+          t => t.phase === phase && 
+               t.tiedPlayerIds.includes(candidate.player.id)
+        ) : null;
+        
+        const relevantTiebreak = tiebreak || anyTiebreakInPhase;
+        
+        // Se há desempate resolvido (com winnerId não vazio) ou partida pendente (com matchId mas sem winnerId), não incluir
+        const hasResolved = relevantTiebreak && relevantTiebreak.winnerId && relevantTiebreak.winnerId.length > 0;
+        const hasPending = relevantTiebreak && relevantTiebreak.matchId && (!relevantTiebreak.winnerId || relevantTiebreak.winnerId.length === 0);
+        const hasResolvedOrPending = hasResolved || hasPending;
+        
+        if (!hasResolvedOrPending) {
+          // Só incluir se não há desempate resolvido nem partida pendente
           ties.push(candidate);
         }
       } else {
@@ -381,6 +416,7 @@ export function getPhase1ToPhase2Classification(
 /**
  * Obtém classificados para Fase 2 → Fase 3 (Final)
  * Lógica dinâmica baseada no número de grupos
+ * GARANTE que a Fase 3 sempre tenha 2 ou 4 jogadores
  */
 export function getPhase2ToPhase3Classification(
   groups: Group[],
@@ -393,7 +429,7 @@ export function getPhase2ToPhase3Classification(
   let repechage: QualifiedPlayer[] = [];
   
   if (numGroups <= 2) {
-    // Top 2 de cada grupo
+    // Top 2 de cada grupo = 2 ou 4 jogadores (OK)
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       ranking.slice(0, 2).forEach((entry, index) => {
@@ -406,7 +442,7 @@ export function getPhase2ToPhase3Classification(
       });
     }
   } else if (numGroups === 3) {
-    // Top 1 de cada + melhor 2º
+    // Top 1 de cada + melhor 2º = 4 jogadores (OK)
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       if (ranking.length > 0) {
@@ -418,10 +454,9 @@ export function getPhase2ToPhase3Classification(
         });
       }
     }
-    // Nota: tournament será passado quando necessário via função wrapper
     repechage = getBestAtPosition(phaseGroups, phase, 1, 1, 'repechage', tournament);
-  } else {
-    // Top 1 de cada grupo (4+ grupos)
+  } else if (numGroups === 4) {
+    // Top 1 de cada = 4 jogadores (OK)
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       if (ranking.length > 0) {
@@ -433,6 +468,39 @@ export function getPhase2ToPhase3Classification(
         });
       }
     }
+  } else {
+    // 5+ grupos: Rankear Top 1 de cada e levar apenas os 4 melhores
+    // Coletar todos os Top 1
+    const top1s: { qualified: QualifiedPlayer, stats: RankingEntry }[] = [];
+    for (const group of phaseGroups) {
+      const ranking = calculateRanking(group);
+      if (ranking.length > 0) {
+        top1s.push({
+          qualified: {
+            player: ranking[0].player,
+            type: 'direct',
+            groupOrigin: group.nome,
+            position: 1
+          },
+          stats: ranking[0]
+        });
+      }
+    }
+    
+    // Ordenar por estatísticas (usando compareByRanking para considerar desempates resolvidos)
+    top1s.sort((a, b) => compareByRanking(
+      a.stats, 
+      b.stats, 
+      tournament?.crossGroupTiebreaks, 
+      phase, 
+      0 // Top 1 = posição 0
+    ));
+    
+    // Pegar apenas os 4 melhores
+    // Se houver empate na 4ª posição, o sistema de desempate cross-group será acionado automaticamente
+    top1s.slice(0, 4).forEach(item => {
+      direct.push(item.qualified);
+    });
   }
   
   return { direct, repechage };

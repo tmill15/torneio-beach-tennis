@@ -66,10 +66,15 @@ export function PhaseAdvanceCard({
       }
     } else if (currentPhase === 2) {
       const numGroups = categoryGroups.length;
-      // Fase 2 → Fase 3: verificar empate em 2º lugar APENAS quando há 3 grupos
-      // (quando precisamos pegar o melhor 2º colocado)
       if (numGroups === 3) {
+        // Fase 2 → Fase 3: verificar empate em 2º lugar quando há 3 grupos
+        // (quando precisamos pegar o melhor 2º colocado)
         crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 1, tournament.crossGroupTiebreaks);
+      } else if (numGroups >= 5) {
+        // Fase 2 → Fase 3: verificar empate em Top 1 (posição 0) quando há 5+ grupos
+        // (quando precisamos selecionar apenas 4 dos Top 1 para a fase final)
+        // Verificar empates na zona de corte (4ª vaga)
+        crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 0, tournament.crossGroupTiebreaks, 4);
       }
     }
   }
@@ -176,7 +181,23 @@ export function PhaseAdvanceCard({
                   
                   <button
                     onClick={() => {
-                      const position = currentPhase === 1 ? 2 : 1;
+                      // Determinar a posição correta baseada na fase e número de grupos
+                      let position: number;
+                      if (currentPhase === 1) {
+                        position = 2; // 3º lugar
+                      } else if (currentPhase === 2) {
+                        const numGroups = tournament?.grupos.filter(g => g.categoria === categoria && g.fase === currentPhase).length || 0;
+                        if (numGroups >= 5) {
+                          position = 0; // Top 1 (para selecionar 4 melhores)
+                        } else if (numGroups === 3) {
+                          position = 1; // 2º lugar (para melhor 2º colocado)
+                        } else {
+                          position = 1; // Default: 2º lugar
+                        }
+                      } else {
+                        position = 1; // Default
+                      }
+                      
                       setCrossGroupTieData({
                         tiedPlayers: crossGroupTies,
                         phase: currentPhase,

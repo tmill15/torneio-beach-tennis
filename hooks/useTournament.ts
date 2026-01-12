@@ -1089,8 +1089,11 @@ export function useTournament() {
         rule = 'Top 2 de cada grupo';
       } else if (numGroups === 3) {
         rule = 'Top 1 de cada grupo + melhor 2º colocado';
-      } else {
+      } else if (numGroups === 4) {
         rule = 'Top 1 de cada grupo';
+      } else {
+        // 5+ grupos: seleciona os 4 melhores entre os Top 1
+        rule = '4 melhores entre os Top 1 de cada grupo';
       }
     }
       
