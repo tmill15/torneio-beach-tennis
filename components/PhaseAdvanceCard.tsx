@@ -62,7 +62,7 @@ export function PhaseAdvanceCard({
       
       // Só verificar empates cross-group se realmente precisamos de repescagem
       if (repechageCount > 0) {
-        crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 2, tournament.crossGroupTiebreaks);
+        crossGroupTies = detectCrossGroupTies(categoryGroups, currentPhase, 2, tournament.crossGroupTiebreaks, repechageCount);
       }
     } else if (currentPhase === 2) {
       const numGroups = categoryGroups.length;
@@ -147,25 +147,23 @@ export function PhaseAdvanceCard({
                   <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs">
                     <p className="font-medium mb-1">Por que estão empatados?</p>
                     <ul className="list-disc list-inside space-y-0.5 text-gray-700 dark:text-gray-300">
-                      {crossGroupTies[0].stats.vitorias === crossGroupTies[1]?.stats.vitorias && (
+                      {/* Verificar se todos têm as mesmas vitórias */}
+                      {crossGroupTies.every(t => t.stats.vitorias === crossGroupTies[0].stats.vitorias) && (
                         <li>✓ Mesmo número de vitórias ({crossGroupTies[0].stats.vitorias})</li>
                       )}
-                      {crossGroupTies[0].stats.saldoGames === crossGroupTies[1]?.stats.saldoGames && (
+                      {/* Verificar se todos têm o mesmo saldo de games */}
+                      {crossGroupTies.every(t => t.stats.saldoGames === crossGroupTies[0].stats.saldoGames) && (
                         <li>✓ Mesmo saldo de games ({crossGroupTies[0].stats.saldoGames >= 0 ? '+' : ''}{crossGroupTies[0].stats.saldoGames})</li>
                       )}
-                      {crossGroupTies[0].stats.gamesGanhos === crossGroupTies[1]?.stats.gamesGanhos ? (
+                      {/* Verificar games ganhos */}
+                      {crossGroupTies.every(t => t.stats.gamesGanhos === crossGroupTies[0].stats.gamesGanhos) ? (
                         <li>✓ Mesmo número de games ganhos ({crossGroupTies[0].stats.gamesGanhos})</li>
                       ) : (
                         <li>
                           ⚠ Games ganhos diferentes: {crossGroupTies.map(t => `${t.player.nome} (${t.stats.gamesGanhos})`).join(' vs ')}
-                          {crossGroupTies[0].stats.gamesGanhos > crossGroupTies[1]?.stats.gamesGanhos && (
+                          {crossGroupTies.every(t => t.stats.saldoGames === crossGroupTies[0].stats.saldoGames) && (
                             <span className="ml-1 text-green-600 dark:text-green-400">
-                              → {crossGroupTies[0].player.nome} tem mais games ganhos, mas o saldo é igual
-                            </span>
-                          )}
-                          {crossGroupTies[1]?.stats.gamesGanhos > crossGroupTies[0].stats.gamesGanhos && (
-                            <span className="ml-1 text-green-600 dark:text-green-400">
-                              → {crossGroupTies[1]?.player.nome} tem mais games ganhos, mas o saldo é igual
+                              → Todos têm o mesmo saldo de games ({crossGroupTies[0].stats.saldoGames >= 0 ? '+' : ''}{crossGroupTies[0].stats.saldoGames})
                             </span>
                           )}
                         </li>

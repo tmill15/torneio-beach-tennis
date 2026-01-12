@@ -69,7 +69,7 @@ export function hasPendingTies(
     
     // Só verificar empates cross-group se realmente precisamos de repescagem
     if (repechageCount > 0) {
-      const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 2, tournament?.crossGroupTiebreaks);
+      const crossGroupTies = detectCrossGroupTies(phaseGroups, phase, 2, tournament?.crossGroupTiebreaks, repechageCount);
       if (crossGroupTies.length > 1) return true;
     }
   } else if (phase === 2) {
@@ -109,17 +109,26 @@ function compareByRanking(a: RankingEntry, b: RankingEntry, crossGroupTiebreaks?
     }
   }
   
-  return 0;
+  // Critério final de desempate: ordem alfabética do nome do jogador
+  // Isso garante ordenação determinística quando há empate técnico completo
+  // (mesmas vitórias, saldo de games e games ganhos)
+  return a.player.nome.localeCompare(b.player.nome, 'pt-BR');
 }
 
 /**
  * Detecta empates entre jogadores de grupos diferentes em uma posição específica
+ * @param groups - Grupos da fase
+ * @param phase - Número da fase
+ * @param position - Posição no ranking (0 = 1º, 1 = 2º, 2 = 3º, etc.)
+ * @param crossGroupTiebreaks - Desempates cross-group já resolvidos
+ * @param repechageCount - Número de vagas disponíveis (opcional, para detectar empates na zona de corte)
  */
 export function detectCrossGroupTies(
   groups: Group[],
   phase: number,
   position: number,
-  crossGroupTiebreaks?: CrossGroupTiebreak[]
+  crossGroupTiebreaks?: CrossGroupTiebreak[],
+  repechageCount?: number
 ): { player: Player; stats: RankingEntry; groupOrigin: string }[] {
   const candidates: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
   
@@ -139,38 +148,100 @@ export function detectCrossGroupTies(
   if (candidates.length === 0) return [];
   
   // Ordenar candidatos considerando desempates entre grupos já resolvidos
-  candidates.sort((a, b) => compareByRanking(a.stats, b.stats, crossGroupTiebreaks, phase, position));
-  
-  // Verificar se há empate técnico (mesmas estatísticas brutas) entre os primeiros candidatos
-  // IMPORTANTE: Comparar apenas estatísticas brutas, sem considerar desempates entre grupos
-  // Critério de empate entre grupos: mesmo número de vitórias E mesmo saldo de games E mesmo games ganhos
-  // Se games ganhos for diferente, não é empate (o que tem mais games ganhos é classificado automaticamente)
-  const ties: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
-  const firstStats = candidates[0].stats;
-  
-  // Verificar se o primeiro candidato tem empate técnico com outros
-  for (const candidate of candidates) {
-    // Comparar vitórias, saldo de games e games ganhos para detectar empate técnico entre grupos
-    // Se todos os critérios são iguais, é empate e precisa resolução manual
-    const isTied = candidate.stats.vitorias === firstStats.vitorias &&
-                   candidate.stats.saldoGames === firstStats.saldoGames &&
-                   candidate.stats.gamesGanhos === firstStats.gamesGanhos;
+  // IMPORTANTE: Remover o critério alfabético temporariamente para detectar empates técnicos
+  candidates.sort((a, b) => {
+    if (a.stats.vitorias !== b.stats.vitorias) return b.stats.vitorias - a.stats.vitorias;
+    if (a.stats.saldoGames !== b.stats.saldoGames) return b.stats.saldoGames - a.stats.saldoGames;
+    if (a.stats.gamesGanhos !== b.stats.gamesGanhos) return b.stats.gamesGanhos - a.stats.gamesGanhos;
     
-    if (isTied) {
-      // Verificar se não há desempate entre grupos já resolvido
-      const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+    // Verificar desempates cross-group resolvidos
+    if (crossGroupTiebreaks) {
+      const tiebreak = crossGroupTiebreaks.find(
         t => t.phase === phase && 
              t.position === position && 
-             t.tiedPlayerIds.includes(candidate.player.id) &&
-             t.winnerId && t.winnerId.length > 0 // Deve ter um vencedor definido
+             t.tiedPlayerIds.includes(a.player.id) && 
+             t.tiedPlayerIds.includes(b.player.id)
       );
       
-      if (!hasResolvedTiebreak) {
-        ties.push(candidate);
+      if (tiebreak) {
+        if (tiebreak.winnerId === a.player.id) return -1;
+        if (tiebreak.winnerId === b.player.id) return 1;
       }
-    } else {
-      // Se encontrou alguém melhor, parar de procurar empates
-      break;
+    }
+    
+    return 0; // Empate técnico - não usar ordem alfabética aqui
+  });
+  
+  // Determinar quais candidatos estão competindo pela mesma vaga
+  // Se há repechageCount definido, verificar empates apenas na zona de corte
+  const ties: { player: Player; stats: RankingEntry; groupOrigin: string }[] = [];
+  
+  if (repechageCount !== undefined && repechageCount > 0) {
+    // Verificar empates apenas entre candidatos que competem pela última vaga disponível
+    // Exemplo: se precisa de 2 vagas, verificar empates entre o candidato na posição 1 (2ª vaga) 
+    // e candidatos seguintes que têm as mesmas estatísticas
+    
+    const lastQualifiedIndex = repechageCount - 1; // Índice do último candidato que seria classificado
+    
+    if (candidates.length > lastQualifiedIndex) {
+      const lastQualified = candidates[lastQualifiedIndex];
+      const lastQualifiedStats = lastQualified.stats;
+      
+      // Verificar todos os candidatos que têm empate técnico com o último classificado
+      // (incluindo o próprio último classificado e os seguintes)
+      for (let i = lastQualifiedIndex; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        const candidateStats = candidate.stats;
+        
+        // Verificar se tem empate técnico completo com o último classificado
+        const isTied = candidateStats.vitorias === lastQualifiedStats.vitorias &&
+                       candidateStats.saldoGames === lastQualifiedStats.saldoGames &&
+                       candidateStats.gamesGanhos === lastQualifiedStats.gamesGanhos;
+        
+        if (isTied) {
+          // Verificar se não há desempate entre grupos já resolvido
+          const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+            t => t.phase === phase && 
+                 t.position === position && 
+                 t.tiedPlayerIds.includes(candidate.player.id) &&
+                 t.winnerId && t.winnerId.length > 0
+          );
+          
+          if (!hasResolvedTiebreak) {
+            ties.push(candidate);
+          } else {
+            // Se há desempate resolvido, parar de verificar (os seguintes não estão mais empatados)
+            break;
+          }
+        } else {
+          // Se encontrou alguém com estatísticas diferentes, parar (não há mais empates)
+          break;
+        }
+      }
+    }
+  } else {
+    // Sem repechageCount, verificar apenas empates no primeiro candidato (comportamento original)
+    const firstStats = candidates[0].stats;
+    
+    for (const candidate of candidates) {
+      const isTied = candidate.stats.vitorias === firstStats.vitorias &&
+                     candidate.stats.saldoGames === firstStats.saldoGames &&
+                     candidate.stats.gamesGanhos === firstStats.gamesGanhos;
+      
+      if (isTied) {
+        const hasResolvedTiebreak = crossGroupTiebreaks?.some(
+          t => t.phase === phase && 
+               t.position === position && 
+               t.tiedPlayerIds.includes(candidate.player.id) &&
+               t.winnerId && t.winnerId.length > 0
+        );
+        
+        if (!hasResolvedTiebreak) {
+          ties.push(candidate);
+        }
+      } else {
+        break;
+      }
     }
   }
   
