@@ -100,9 +100,43 @@ export function canGenerateMatches(group: Group): boolean {
 }
 
 /**
- * Retorna o número de partidas que serão geradas para um grupo de 4 jogadores
+ * Gera uma partida de simples para 2 jogadores (final)
+ */
+export function generateSinglesMatch(group: Group): Match[] {
+  const players = group.players;
+  
+  if (players.length !== 2) {
+    console.warn('Este método funciona apenas para grupos de 2 jogadores');
+    return [];
+  }
+
+  const [p1, p2] = players;
+
+  // Partida de simples: jogador1A vs jogador1B
+  // jogador2A e jogador2B ficam como o mesmo jogador (dupla consigo mesmo)
+  const match: Match = {
+    id: uuidv4(),
+    groupId: group.id,
+    jogador1A: p1,
+    jogador2A: p1, // Mesmo jogador (simples)
+    jogador1B: p2,
+    jogador2B: p2, // Mesmo jogador (simples)
+    sets: [],
+    setsWonA: 0,
+    setsWonB: 0,
+    isFinished: false,
+    rodada: 1,
+    isTiebreaker: false // Não é desempate, é a final
+  };
+
+  return [match];
+}
+
+/**
+ * Retorna o número de partidas que serão geradas para um grupo
  */
 export function getExpectedMatchCount(playerCount: number): number {
-  if (playerCount !== 4) return 0;
-  return 3; // 3 jogos para Round Robin de pareamentos com 4 jogadores
+  if (playerCount === 4) return 3; // 3 jogos para Round Robin de pareamentos com 4 jogadores
+  if (playerCount === 2) return 1; // 1 jogo de simples para 2 jogadores
+  return 0;
 }

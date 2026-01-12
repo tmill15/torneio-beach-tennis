@@ -95,6 +95,9 @@ export function getPlayerStats(player: Player, matches: Match[]) {
     // Partidas de desempate servem APENAS para resolver empates, não para afetar estatísticas
     if (match.isTiebreaker) continue;
     
+    // Verificar se é partida de simples (jogadores duplicados)
+    const isSingles = match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id;
+    
     // Verifica se jogador está na dupla A
     const isInDuplaA = 
       match.jogador1A.id === player.id || 
@@ -106,6 +109,13 @@ export function getPlayerStats(player: Player, matches: Match[]) {
       match.jogador2B.id === player.id;
     
     if (!isInDuplaA && !isInDuplaB) continue;
+    
+    // Em partidas de simples, evitar contagem duplicada
+    // Se o jogador está em ambas as duplas (simples), processar apenas uma vez
+    if (isSingles && isInDuplaA && isInDuplaB) {
+      // Processar como se estivesse apenas na dupla A
+      // (a lógica abaixo já trata corretamente)
+    }
     
     jogos++;
     

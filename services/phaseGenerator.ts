@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Group, Player, Tournament, RankingEntry, CrossGroupTiebreak } from '@/types';
 import { calculateRanking } from './rankingService';
-import { generatePairsFor4Players } from './matchGenerator';
+import { generatePairsFor4Players, generateSinglesMatch } from './matchGenerator';
 import { shufflePlayers } from './groupGenerator';
 
 export type QualificationType = 'direct' | 'repechage' | 'eliminated';
@@ -465,11 +465,16 @@ export function generateNextPhase(
       matches: []
     };
     
-    // Gerar jogos para o grupo final (não há partidas de desempate ainda, então pode gerar normalmente)
-    if (groupPlayers.length === 4) {
+    // Gerar jogos para o grupo final
+    if (groupPlayers.length === 2) {
+      // Final com 2 jogadores: partida de simples
+      finalGroup.matches = generateSinglesMatch(finalGroup);
+    } else if (groupPlayers.length === 4) {
+      // Final com 4 jogadores: Round Robin de pareamentos
       finalGroup.matches = generatePairsFor4Players(finalGroup);
     } else {
-      // TODO: Implementar gerador para grupos maiores que 4
+      // Para outros tamanhos, usar Round Robin de pareamentos (pode ser expandido no futuro)
+      console.warn(`Grupo final com ${groupPlayers.length} jogadores - usando Round Robin padrão`);
       finalGroup.matches = generatePairsFor4Players(finalGroup);
     }
     

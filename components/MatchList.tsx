@@ -40,8 +40,9 @@ export function MatchList({
 
   // Função para formatar o nome dos jogadores (simples ou duplas)
   const formatMatchPlayers = (match: Match): string => {
-    // Se é desempate de simples (jogadores duplicados)
-    if (match.isTiebreaker && match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id) {
+    // Se é partida de simples (jogadores duplicados - pode ser desempate ou final)
+    const isSingles = match.jogador1A.id === match.jogador2A.id && match.jogador1B.id === match.jogador2B.id;
+    if (isSingles) {
       return `${match.jogador1A.nome} × ${match.jogador1B.nome}`;
     }
     // Se é duplas normal
