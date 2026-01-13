@@ -960,14 +960,14 @@ export default function ConfigPage() {
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
                               <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                               <button
                               onClick={() => handleRedrawGroups(categoria)}
                               disabled={!canRedraw}
-                              className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
                                 canRedraw
                                   ? 'bg-yellow-600 hover:bg-yellow-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
@@ -983,7 +983,7 @@ export default function ConfigPage() {
                             <button
                               onClick={() => handleClearTournamentPlayers(categoria)}
                               disabled={!canClearCategory}
-                              className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
                                 canClearCategory
                                   ? 'bg-red-600 hover:bg-red-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
