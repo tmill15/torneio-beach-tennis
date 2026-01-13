@@ -161,16 +161,13 @@ export type SortCriteria = 'vitorias' | 'saldoSets' | 'saldoGames';
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   quantidadeSets: 1,              // Melhor de 1 (jogo único)
-  gamesPerSet: 6,                 // Primeiro a 6 games
+  gamesPerSet: 6,                 // 6 games por set
   tieBreakDecisivo: false,        // Set normal
   pontosTieBreak: 7               // Tie-break de 7 pontos
 };
 
-export const MIN_GAMES_PER_SET = 4;
-export const MAX_GAMES_PER_SET = 10;
-export const MIN_TIE_BREAK_POINTS = 7;
 export const PLAYERS_PER_GROUP = 4;         // 4 jogadores por grupo
-export const MIN_GAME_DIFFERENCE = 2;
+export const MIN_GAME_DIFFERENCE = 2;       // Diferença mínima de 2 games/pontos
 
 // ============================================
 // HELPER FUNCTIONS

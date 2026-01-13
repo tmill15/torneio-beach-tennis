@@ -470,7 +470,9 @@ export function generateTournamentPDF(
         }
 
         const playersText = formatMatchPlayers(match);
-        const scoreText = match.sets.map(formatSetScore).join(', ');
+        // Filtrar sets vazios
+        const displayedSets = match.sets.filter(set => set.gamesA > 0 || set.gamesB > 0);
+        const scoreText = displayedSets.map(formatSetScore).join(', ');
         const isTiebreaker = match.isTiebreaker ? ' [DESEMPATE]' : '';
         
         // Truncar texto se muito longo
@@ -647,7 +649,9 @@ export function generateTournamentPDF(
           const playersText = isSingles
             ? `${tiebreakMatch.jogador1A.nome} × ${tiebreakMatch.jogador1B.nome}`
             : `${formatDupla(tiebreakMatch.jogador1A, tiebreakMatch.jogador2A)} × ${formatDupla(tiebreakMatch.jogador1B, tiebreakMatch.jogador2B)}`;
-          const scoreText = tiebreakMatch.sets.map(formatSetScore).join(', ');
+          // Filtrar sets vazios
+          const displayedSets = tiebreakMatch.sets.filter(set => set.gamesA > 0 || set.gamesB > 0);
+          const scoreText = displayedSets.map(formatSetScore).join(', ');
           
           doc.text(`Partida: ${playersText} (${scoreText})`, margin + 10, yPosition);
           yPosition += 6;

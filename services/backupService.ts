@@ -3,7 +3,7 @@
  * Export/Import de torneios em formato JSON
  */
 
-import type { Tournament, TournamentBackup } from '@/types';
+import type { Tournament, TournamentBackup, GameConfig } from '@/types';
 import { z } from 'zod';
 
 /**
@@ -107,6 +107,46 @@ export function downloadBackup(tournament: Tournament, categoria?: string): void
 }
 
 /**
+ * Normaliza gameConfig para valores válidos (4 ou 6 games, 1 ou 3 sets, 7 ou 10 pontos)
+ */
+function normalizeGameConfig(config: any): GameConfig {
+  // Normalizar quantidadeSets: 1 ou 3 (qualquer outro valor vira 1)
+  let quantidadeSets: 1 | 3 = 1;
+  if (config.quantidadeSets === 3) {
+    quantidadeSets = 3;
+  } else if (config.quantidadeSets !== 1) {
+    quantidadeSets = 1; // Padrão para valores inválidos
+  }
+
+  // Normalizar gamesPerSet: 4 ou 6 (valores próximos vão para o mais próximo)
+  let gamesPerSet: 4 | 6 = 6;
+  if (config.gamesPerSet === 4) {
+    gamesPerSet = 4;
+  } else if (config.gamesPerSet !== 6) {
+    // Se for 5 ou menos, vira 4; se for 7 ou mais, vira 6
+    gamesPerSet = config.gamesPerSet <= 5 ? 4 : 6;
+  }
+
+  // Normalizar pontosTieBreak: 7 ou 10 (valores próximos vão para o mais próximo)
+  let pontosTieBreak: 7 | 10 = 7;
+  if (config.pontosTieBreak === 7) {
+    pontosTieBreak = 7;
+  } else if (config.pontosTieBreak === 10) {
+    pontosTieBreak = 10;
+  } else if (config.pontosTieBreak !== undefined) {
+    // Se for 8 ou menos, vira 7; se for 9 ou mais, vira 10
+    pontosTieBreak = config.pontosTieBreak <= 8 ? 7 : 10;
+  }
+
+  return {
+    quantidadeSets,
+    gamesPerSet,
+    tieBreakDecisivo: config.tieBreakDecisivo || false,
+    pontosTieBreak,
+  };
+}
+
+/**
  * Importa torneio a partir de string JSON
  * Retorna o torneio importado e indica se é backup de categoria específica
  */
@@ -120,12 +160,18 @@ export function importTournament(jsonData: string): { tournament: Tournament; is
       throw new Error(`Versão do backup (${backup.version}) não é compatível com a versão atual (${BACKUP_VERSION})`);
     }
 
+    // Normalizar gameConfig para valores válidos
+    const normalizedTournament: Tournament = {
+      ...backup.tournament,
+      gameConfig: normalizeGameConfig(backup.tournament.gameConfig),
+    };
+
     // Verifica se é backup de categoria específica (tem apenas 1 categoria)
-    const isSingleCategory = backup.tournament.categorias.length === 1;
-    const category = isSingleCategory ? backup.tournament.categorias[0] : undefined;
+    const isSingleCategory = normalizedTournament.categorias.length === 1;
+    const category = isSingleCategory ? normalizedTournament.categorias[0] : undefined;
 
     return {
-      tournament: backup.tournament,
+      tournament: normalizedTournament,
       isSingleCategory,
       category,
     };
@@ -208,7 +254,7 @@ export function createEmptyTournament(): Tournament {
       gamesPerSet: 6,
       tieBreakDecisivo: false,
       pontosTieBreak: 7,
-    },
+    } as GameConfig,
     grupos: [],
     waitingList: [],
     completedCategories: [],
@@ -385,12 +431,12 @@ export function migrateV030ToV040(oldTournament: any): Tournament {
     version: CURRENT_DATA_VERSION,
     nome: oldTournament.nome || 'Novo Torneio',
     categorias: oldTournament.categorias || ['Iniciante', 'Normal'],
-    gameConfig: oldTournament.gameConfig || {
+    gameConfig: normalizeGameConfig(oldTournament.gameConfig || {
       quantidadeSets: 1,
       gamesPerSet: 6,
       tieBreakDecisivo: false,
       pontosTieBreak: 7,
-    },
+    }),
     grupos: [],
     waitingList: [],
   };

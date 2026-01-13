@@ -6,7 +6,6 @@
 'use client';
 
 import type { GameConfig } from '@/types';
-import { MIN_GAMES_PER_SET, MAX_GAMES_PER_SET, MIN_TIE_BREAK_POINTS } from '@/types';
 
 interface GameConfigFormProps {
   config: GameConfig;
@@ -29,18 +28,16 @@ export function GameConfigForm({ config, onChange, disabled = false }: GameConfi
         <select
           id="quantidadeSets"
           value={config.quantidadeSets}
-          onChange={(e) => onChange({ ...config, quantidadeSets: Number(e.target.value) })}
+          onChange={(e) => onChange({ ...config, quantidadeSets: Number(e.target.value) as 1 | 3 })}
           disabled={disabled}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value={1}>Melhor de 1 set</option>
           <option value={3}>Melhor de 3 sets</option>
-          <option value={5}>Melhor de 5 sets</option>
         </select>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {config.quantidadeSets === 1 && 'Jogo único (1 set)'}
           {config.quantidadeSets === 3 && 'Primeiro a ganhar 2 sets vence'}
-          {config.quantidadeSets === 5 && 'Primeiro a ganhar 3 sets vence'}
         </p>
       </div>
 
@@ -49,18 +46,18 @@ export function GameConfigForm({ config, onChange, disabled = false }: GameConfi
         <label htmlFor="gamesPerSet" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Games por set
         </label>
-        <input
+        <select
           id="gamesPerSet"
-          type="number"
-          min={MIN_GAMES_PER_SET}
-          max={MAX_GAMES_PER_SET}
           value={config.gamesPerSet}
-          onChange={(e) => onChange({ ...config, gamesPerSet: Number(e.target.value) })}
+          onChange={(e) => onChange({ ...config, gamesPerSet: Number(e.target.value) as 4 | 6 })}
           disabled={disabled}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        />
+        >
+          <option value={4}>4 games</option>
+          <option value={6}>6 games</option>
+        </select>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Primeiro a atingir {config.gamesPerSet} games (com diferença mínima de 2)
+          Primeiro a atingir {config.gamesPerSet} games (com diferença mínima de 2, seguindo regras do tênis)
         </p>
       </div>
 
@@ -96,12 +93,11 @@ export function GameConfigForm({ config, onChange, disabled = false }: GameConfi
           <select
             id="pontosTieBreak"
             value={config.pontosTieBreak}
-            onChange={(e) => onChange({ ...config, pontosTieBreak: Number(e.target.value) })}
+            onChange={(e) => onChange({ ...config, pontosTieBreak: Number(e.target.value) as 7 | 10 })}
             disabled={disabled}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value={7}>7 pontos</option>
-            <option value={9}>9 pontos</option>
             <option value={10}>10 pontos</option>
           </select>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

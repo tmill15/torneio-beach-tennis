@@ -38,7 +38,25 @@ export function ScoreInput({
   const handleSetChange = (index: number, field: 'gamesA' | 'gamesB', value: string) => {
     const numValue = Math.max(0, parseInt(value) || 0);
     const newSets = [...sets];
-    newSets[index] = { ...newSets[index], [field]: numValue };
+    const currentSet = newSets[index];
+    
+    // Limitar games baseado na configuração
+    // Para sets normais: máximo é gamesPerSet + 1 (para permitir tie-break)
+    // Para tie-break decisivo: máximo é pontosTieBreak + 2 (para permitir diferença mínima)
+    const isDecisive = index === gameConfig.quantidadeSets - 1;
+    const isTieBreakSet = isDecisive && gameConfig.tieBreakDecisivo;
+    
+    let maxValue: number;
+    if (isTieBreakSet) {
+      // Tie-break decisivo: máximo é pontosTieBreak + 2
+      maxValue = gameConfig.pontosTieBreak + 2;
+    } else {
+      // Set normal: máximo é gamesPerSet + 1 (para permitir 6-6 ou 4-4 e depois tie-break)
+      maxValue = gameConfig.gamesPerSet + 1;
+    }
+    
+    const limitedValue = Math.min(numValue, maxValue);
+    newSets[index] = { ...currentSet, [field]: limitedValue };
     setSets(newSets);
   };
 
@@ -77,53 +95,102 @@ export function ScoreInput({
     <div className="space-y-4">
       {sets.map((set, index) => {
         const isDecisive = index === gameConfig.quantidadeSets - 1;
-        const isTieBreak = isDecisive && gameConfig.tieBreakDecisivo;
+        const isTieBreakDecisive = isDecisive && gameConfig.tieBreakDecisivo;
         const isValid = isSetValid(index);
         const hasData = set.gamesA > 0 || set.gamesB > 0;
+        
+        // Verificar se precisa de tie-break (empate em gamesPerSet)
+        const needsTieBreak = set.gamesA === gameConfig.gamesPerSet && 
+                              set.gamesB === gameConfig.gamesPerSet && 
+                              !isTieBreakDecisive;
+        const hasTieBreak = set.tieBreakA !== undefined && set.tieBreakB !== undefined;
 
         return (
           <div
             key={index}
-            className={`flex items-center gap-4 p-4 rounded-lg border ${
+            className={`space-y-2 p-4 rounded-lg border ${
               hasData && !isValid
                 ? 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20'
                 : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
             }`}
           >
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-              Set {index + 1}
-              {isTieBreak && ' (TB)'}
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+                Set {index + 1}
+                {isTieBreakDecisive && ' (TB)'}
+                {needsTieBreak && ' (TB)'}
+              </span>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                value={set.gamesA || ''}
-                onChange={(e) => handleSetChange(index, 'gamesA', e.target.value)}
-                disabled={disabled}
-                placeholder="0"
-                className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <span className="text-gray-500 dark:text-gray-400 font-medium">×</span>
-              <input
-                type="number"
-                min="0"
-                value={set.gamesB || ''}
-                onChange={(e) => handleSetChange(index, 'gamesB', e.target.value)}
-                disabled={disabled}
-                placeholder="0"
-                className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={isTieBreakDecisive ? gameConfig.pontosTieBreak + 2 : gameConfig.gamesPerSet + 1}
+                  value={set.gamesA || ''}
+                  onChange={(e) => handleSetChange(index, 'gamesA', e.target.value)}
+                  disabled={disabled}
+                  placeholder="0"
+                  className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span className="text-gray-500 dark:text-gray-400 font-medium">×</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={isTieBreakDecisive ? gameConfig.pontosTieBreak + 2 : gameConfig.gamesPerSet + 1}
+                  value={set.gamesB || ''}
+                  onChange={(e) => handleSetChange(index, 'gamesB', e.target.value)}
+                  disabled={disabled}
+                  placeholder="0"
+                  className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              {hasData && (
+                <div className="ml-2">
+                  {isValid ? (
+                    <span className="text-green-600 dark:text-green-400 text-xl" title="Válido">✓</span>
+                  ) : (
+                    <span className="text-red-600 dark:text-red-400 text-xl" title="Inválido">⚠️</span>
+                  )}
+                </div>
+              )}
             </div>
 
-            {hasData && (
-              <div className="ml-2">
-                {isValid ? (
-                  <span className="text-green-600 dark:text-green-400 text-xl" title="Válido">✓</span>
-                ) : (
-                  <span className="text-red-600 dark:text-red-400 text-xl" title="Inválido">⚠️</span>
-                )}
+            {/* Campos de tie-break quando necessário */}
+            {(needsTieBreak || hasTieBreak) && (
+              <div className="flex items-center gap-2 pl-20">
+                <span className="text-xs text-gray-500 dark:text-gray-400">TB:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={set.tieBreakA || ''}
+                  onChange={(e) => {
+                    const numValue = Math.max(0, parseInt(e.target.value) || 0);
+                    const newSets = [...sets];
+                    newSets[index] = { ...newSets[index], tieBreakA: numValue };
+                    setSets(newSets);
+                  }}
+                  disabled={disabled}
+                  placeholder="0"
+                  className="w-12 px-2 py-1 text-center text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">×</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={set.tieBreakB || ''}
+                  onChange={(e) => {
+                    const numValue = Math.max(0, parseInt(e.target.value) || 0);
+                    const newSets = [...sets];
+                    newSets[index] = { ...newSets[index], tieBreakB: numValue };
+                    setSets(newSets);
+                  }}
+                  disabled={disabled}
+                  placeholder="0"
+                  className="w-12 px-2 py-1 text-center text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                />
               </div>
             )}
           </div>

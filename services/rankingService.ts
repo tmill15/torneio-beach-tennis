@@ -177,10 +177,20 @@ export function updateMatchResult(
   let setsB = 0;
 
   for (const set of sets) {
-    if (set.gamesA > set.gamesB) {
-      setsA++;
-    } else if (set.gamesB > set.gamesA) {
-      setsB++;
+    // Se tem tie-break, o vencedor é determinado pelo tie-break
+    if (set.tieBreakA !== undefined && set.tieBreakB !== undefined) {
+      if (set.tieBreakA > set.tieBreakB) {
+        setsA++;
+      } else if (set.tieBreakB > set.tieBreakA) {
+        setsB++;
+      }
+    } else {
+      // Sem tie-break, vencedor é determinado pelos games
+      if (set.gamesA > set.gamesB) {
+        setsA++;
+      } else if (set.gamesB > set.gamesA) {
+        setsB++;
+      }
     }
   }
 
@@ -246,7 +256,34 @@ export function validateSetScore(
   // Set normal
   const winner = Math.max(gamesA, gamesB);
   const minGames = gameConfig.gamesPerSet;
+  
+  // Verificar se chegou ao empate (6-6 ou 4-4) e tem tie-break
+  const isTied = gamesA === gamesB && gamesA === minGames;
+  const hasTieBreak = set.tieBreakA !== undefined && set.tieBreakB !== undefined;
 
+  if (isTied && hasTieBreak) {
+    // Validar tie-break: diferença mínima de 2 pontos
+    const tieBreakDiff = Math.abs(set.tieBreakA! - set.tieBreakB!);
+    const tieBreakWinner = Math.max(set.tieBreakA!, set.tieBreakB!);
+    
+    if (tieBreakWinner < 7) {
+      return {
+        isValid: false,
+        error: 'Tie-break precisa ter no mínimo 7 pontos',
+      };
+    }
+    
+    if (tieBreakDiff < 2) {
+      return {
+        isValid: false,
+        error: 'Diferença mínima de 2 pontos no tie-break',
+      };
+    }
+    
+    return { isValid: true };
+  }
+
+  // Se não tem tie-break, validar diferença mínima de 2 games
   if (winner < minGames) {
     return {
       isValid: false,
@@ -254,6 +291,15 @@ export function validateSetScore(
     };
   }
 
+  // Se chegou ao empate mas não tem tie-break, não é válido
+  if (isTied && !hasTieBreak) {
+    return {
+      isValid: false,
+      error: `Empate em ${minGames}-${minGames}: é necessário tie-break`,
+    };
+  }
+
+  // Se não é empate, validar diferença mínima de 2 games
   if (diff < 2) {
     return {
       isValid: false,

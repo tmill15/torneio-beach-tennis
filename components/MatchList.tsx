@@ -38,6 +38,11 @@ export function MatchList({
     return `${set.gamesA}-${set.gamesB}`;
   };
 
+  // Filtrar sets vazios para exibição
+  const getDisplayedSets = (match: Match): SetScore[] => {
+    return match.sets.filter(set => set.gamesA > 0 || set.gamesB > 0);
+  };
+
   // Função para formatar o nome dos jogadores (simples ou duplas)
   const formatMatchPlayers = (match: Match): string => {
     // Se é partida de simples (jogadores duplicados - pode ser desempate ou final)
@@ -70,7 +75,7 @@ export function MatchList({
                       <span className="text-gray-500 dark:text-gray-400">R{match.rodada}:</span>{' '}
                       {formatMatchPlayers(match)}{' '}
                       <span className="font-bold text-primary">
-                        ({match.sets.map(formatSetScore).join(', ')})
+                        ({getDisplayedSets(match).map(formatSetScore).join(', ')})
                       </span>
                       {match.isTiebreaker && (
                         <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium">
