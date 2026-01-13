@@ -1114,8 +1114,8 @@ export function useTournament() {
             ...group,
             players: group.players.map(player => {
               const qualified = allQualified.find(q => q.player.id === player.id);
-              if (qualified) {
-                return { ...player, qualificationType: qualified.type };
+              if (qualified && (qualified.type === 'direct' || qualified.type === 'repechage')) {
+                return { ...player, qualificationType: qualified.type as 'direct' | 'repechage' };
               }
               return player;
             })
