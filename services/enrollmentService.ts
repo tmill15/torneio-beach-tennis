@@ -58,8 +58,15 @@ export function formGroupsFromWaitingList(
     p => p.categoria === categoria
   );
 
-  // Validação: mínimo de 8 jogadores para torneio de 3 fases
-  if (fase === 1 && playersInCategory.length < 8) {
+  // Verifica se já existem grupos na Fase 1 desta categoria
+  const existingPhase1Groups = tournament.grupos.filter(
+    g => g.categoria === categoria && g.fase === 1
+  );
+  const isFirstFormation = existingPhase1Groups.length === 0;
+
+  // Validação: mínimo de 8 jogadores APENAS na primeira formação de grupos
+  // Para grupos adicionais, basta 4 jogadores (1 grupo)
+  if (fase === 1 && isFirstFormation && playersInCategory.length < 8) {
     console.warn(`Mínimo de 8 jogadores necessário para iniciar torneio de 3 fases. Você tem ${playersInCategory.length} jogador(es).`);
     return tournament;
   }
