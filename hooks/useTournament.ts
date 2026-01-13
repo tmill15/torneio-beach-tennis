@@ -322,6 +322,48 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Renomeia uma categoria (atualiza em todos os lugares: grupos, jogadores, etc.)
+   */
+  const updateCategoryName = useCallback((oldName: string, newName: string) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    
+    const trimmedNewName = newName.trim();
+    
+    // Verificar se o novo nome já existe
+    updateTournament(prev => {
+      if (prev.categorias.includes(trimmedNewName) && trimmedNewName !== oldName) {
+        throw new Error(`Já existe uma categoria com o nome "${trimmedNewName}"`);
+      }
+      
+      // Atualizar array de categorias
+      const newCategorias = prev.categorias.map(c => c === oldName ? trimmedNewName : c);
+      
+      // Atualizar grupos
+      const newGrupos = prev.grupos.map(g => 
+        g.categoria === oldName ? { ...g, categoria: trimmedNewName } : g
+      );
+      
+      // Atualizar lista de espera
+      const newWaitingList = prev.waitingList.map(p =>
+        p.categoria === oldName ? { ...p, categoria: trimmedNewName } : p
+      );
+      
+      // Atualizar completedCategories
+      const newCompletedCategories = (prev.completedCategories || []).map(c =>
+        c === oldName ? trimmedNewName : c
+      );
+      
+      return {
+        ...prev,
+        categorias: newCategorias,
+        grupos: newGrupos,
+        waitingList: newWaitingList,
+        completedCategories: newCompletedCategories,
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Atualiza configurações de jogo
    */
   const updateGameConfig = useCallback((config: Tournament['gameConfig']) => {
@@ -1338,6 +1380,7 @@ export function useTournament() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    updateCategoryName,
     moveCategoryUp,
     moveCategoryDown,
     updateGameConfig,

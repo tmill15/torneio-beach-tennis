@@ -21,6 +21,7 @@ export default function ConfigPage() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    updateCategoryName,
     moveCategoryUp,
     moveCategoryDown,
     updateGameConfig,
@@ -42,6 +43,8 @@ export default function ConfigPage() {
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
   const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('torneio');
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
   
   // Estados para modais de export/import
   const [showExportModal, setShowExportModal] = useState(false);
@@ -553,44 +556,111 @@ export default function ConfigPage() {
                     key={cat}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
                   >
-                    <span className="text-gray-900 dark:text-white font-medium">{cat}</span>
-                    
-                    <div className="flex items-center gap-2">
-                      {/* Botões de ordenação */}
-                      <button
-                        onClick={() => moveCategoryUp(cat)}
-                        disabled={index === 0}
-                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Mover para cima"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      
-                      <button
-                        onClick={() => moveCategoryDown(cat)}
-                        disabled={index === tournament.categorias.length - 1}
-                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Mover para baixo"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {/* Botão de remover */}
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Remover categoria "${cat}"?`)) {
-                            removeCategory(cat);
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
-                      >
-                        Remover
-                      </button>
-                    </div>
+                    {editingCategory === cat ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={editingCategoryName}
+                          onChange={(e) => setEditingCategoryName(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              try {
+                                updateCategoryName(cat, editingCategoryName);
+                                setEditingCategory(null);
+                                setEditingCategoryName('');
+                              } catch (error) {
+                                alert(error instanceof Error ? error.message : 'Erro ao renomear categoria');
+                              }
+                            } else if (e.key === 'Escape') {
+                              setEditingCategory(null);
+                              setEditingCategoryName('');
+                            }
+                          }}
+                          autoFocus
+                          className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            try {
+                              updateCategoryName(cat, editingCategoryName);
+                              setEditingCategory(null);
+                              setEditingCategoryName('');
+                            } catch (error) {
+                              alert(error instanceof Error ? error.message : 'Erro ao renomear categoria');
+                            }
+                          }}
+                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                          title="Salvar"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingCategory(null);
+                            setEditingCategoryName('');
+                          }}
+                          className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
+                          title="Cancelar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-gray-900 dark:text-white font-medium">{cat}</span>
+                        
+                        <div className="flex items-center gap-2">
+                          {/* Botão de editar */}
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setEditingCategoryName(cat);
+                            }}
+                            className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            title="Editar nome"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          
+                          {/* Botões de ordenação */}
+                          <button
+                            onClick={() => moveCategoryUp(cat)}
+                            disabled={index === 0}
+                            className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Mover para cima"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          
+                          <button
+                            onClick={() => moveCategoryDown(cat)}
+                            disabled={index === tournament.categorias.length - 1}
+                            className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Mover para baixo"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          
+                          {/* Botão de remover */}
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Remover categoria "${cat}"?`)) {
+                                removeCategory(cat);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
