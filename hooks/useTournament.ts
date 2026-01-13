@@ -322,6 +322,48 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Renomeia uma categoria (atualiza em todos os lugares: grupos, jogadores, etc.)
+   */
+  const updateCategoryName = useCallback((oldName: string, newName: string) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    
+    const trimmedNewName = newName.trim();
+    
+    // Verificar se o novo nome já existe
+    updateTournament(prev => {
+      if (prev.categorias.includes(trimmedNewName) && trimmedNewName !== oldName) {
+        throw new Error(`Já existe uma categoria com o nome "${trimmedNewName}"`);
+      }
+      
+      // Atualizar array de categorias
+      const newCategorias = prev.categorias.map(c => c === oldName ? trimmedNewName : c);
+      
+      // Atualizar grupos
+      const newGrupos = prev.grupos.map(g => 
+        g.categoria === oldName ? { ...g, categoria: trimmedNewName } : g
+      );
+      
+      // Atualizar lista de espera
+      const newWaitingList = prev.waitingList.map(p =>
+        p.categoria === oldName ? { ...p, categoria: trimmedNewName } : p
+      );
+      
+      // Atualizar completedCategories
+      const newCompletedCategories = (prev.completedCategories || []).map(c =>
+        c === oldName ? trimmedNewName : c
+      );
+      
+      return {
+        ...prev,
+        categorias: newCategorias,
+        grupos: newGrupos,
+        waitingList: newWaitingList,
+        completedCategories: newCompletedCategories,
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Atualiza configurações de jogo
    */
   const updateGameConfig = useCallback((config: Tournament['gameConfig']) => {
@@ -535,10 +577,78 @@ export function useTournament() {
   }, [tournament.grupos]);
 
   /**
-   * Importa um torneio (substituindo o atual)
+   * Importa um torneio
+   * Se for backup de categoria específica, faz merge apenas dessa categoria
+   * Se for backup completo, substitui tudo
    */
-  const importTournament = useCallback((newTournament: Tournament) => {
-    updateTournament(newTournament);
+  const importTournament = useCallback((importData: { tournament: Tournament; isSingleCategory: boolean; category?: string }) => {
+    if (importData.isSingleCategory && importData.category) {
+      // Backup de categoria específica: fazer merge
+      updateTournament(prev => {
+        const categoria = importData.category!;
+        
+        // 1. Remover dados antigos da categoria
+        const gruposSemCategoria = prev.grupos.filter(g => g.categoria !== categoria);
+        const waitingListSemCategoria = prev.waitingList.filter(p => p.categoria !== categoria);
+        
+        // 2. Adicionar dados novos da categoria importada
+        const novosGrupos = importData.tournament.grupos;
+        const novaWaitingList = importData.tournament.waitingList;
+        
+        // 3. Garantir que a categoria existe no array de categorias
+        const categorias = prev.categorias.includes(categoria)
+          ? prev.categorias
+          : [...prev.categorias, categoria];
+        
+        // 4. Fazer merge de completedCategories
+        const completedCategories = importData.tournament.completedCategories || [];
+        const updatedCompletedCategories = prev.completedCategories || [];
+        const mergedCompletedCategories = completedCategories.includes(categoria)
+          ? [...updatedCompletedCategories.filter(c => c !== categoria), categoria]
+          : updatedCompletedCategories.filter(c => c !== categoria);
+        
+        // 5. Fazer merge de crossGroupTiebreaks (remover da categoria importada e adicionar novos)
+        // Identificar fases que têm grupos da categoria importada (após adicionar os novos grupos)
+        const fasesComGruposCategoria = new Set(
+          novosGrupos.map(g => g.fase)
+        );
+        
+        // Remover tiebreaks que pertencem às fases da categoria importada
+        // Como os tiebreaks não têm categoria direta, verificamos se há grupos da categoria na fase
+        // Se há grupos da categoria na fase, o tiebreak provavelmente pertence à categoria
+        const crossGroupTiebreaksSemCategoria = (prev.crossGroupTiebreaks || []).filter(t => {
+          // Se a fase do tiebreak está nas fases com grupos da categoria importada
+          if (fasesComGruposCategoria.has(t.phase)) {
+            // Verificar se há grupos de outras categorias nesta fase (após remover grupos da categoria importada)
+            // Se há grupos de outras categorias, o tiebreak pode ser de outra categoria, manter
+            const temGruposOutrasCategorias = gruposSemCategoria.some(
+              g => g.categoria !== categoria && g.fase === t.phase
+            );
+            // Se não há grupos de outras categorias nesta fase, remover o tiebreak (provavelmente é da categoria importada)
+            return temGruposOutrasCategorias;
+          }
+          // Se a fase não está nas fases importadas, manter o tiebreak
+          return true;
+        });
+        
+        const novosCrossGroupTiebreaks = importData.tournament.crossGroupTiebreaks || [];
+        
+        return {
+          ...prev,
+          nome: importData.tournament.nome || prev.nome, // Manter nome atual ou usar do backup
+          categorias,
+          grupos: [...gruposSemCategoria, ...novosGrupos],
+          waitingList: [...waitingListSemCategoria, ...novaWaitingList],
+          completedCategories: mergedCompletedCategories,
+          crossGroupTiebreaks: [...crossGroupTiebreaksSemCategoria, ...novosCrossGroupTiebreaks],
+          // Manter gameConfig atual (não sobrescrever)
+          gameConfig: prev.gameConfig,
+        };
+      });
+    } else {
+      // Backup completo: substituir tudo
+      updateTournament(importData.tournament);
+    }
   }, [updateTournament]);
 
   /**
@@ -788,9 +898,11 @@ export function useTournament() {
         .forEach(g => {
           g.players.forEach(p => {
             // Se o jogador ainda não foi adicionado, adiciona com status limpo
+            // IMPORTANTE: Garantir que a categoria do jogador seja a mesma da categoria sendo limpa
             if (!playersMap.has(p.id)) {
               playersMap.set(p.id, {
                 ...p,
+                categoria: categoria, // Garantir que a categoria está correta
                 status: 'waiting' as const,
                 tiebreakOrder: undefined,
                 tiebreakMethod: undefined,
@@ -820,6 +932,88 @@ export function useTournament() {
         ...prev,
         grupos: remainingGroups,
         waitingList: newWaitingList,
+      };
+    });
+  }, [updateTournament]);
+
+  /**
+   * Finaliza o torneio: limpa categoria(es) e retorna jogadores para lista de espera
+   * @param categoria - Categoria específica a ser finalizada. Se não fornecida, finaliza todas as categorias
+   */
+  const finalizeTournament = useCallback((categoria?: string) => {
+    updateTournament(prev => {
+      let updated = prev;
+      
+      // Se categoria for especificada, limpa apenas essa categoria
+      // Caso contrário, limpa todas as categorias
+      const categoriasToClear = categoria ? [categoria] : prev.categorias;
+      
+      // Limpar cada categoria uma por uma
+      categoriasToClear.forEach(cat => {
+        // 1. Coletar todos os jogadores de todos os grupos da categoria
+        const playersMap = new Map<string, Player>();
+        
+        updated.grupos
+          .filter(g => g.categoria === cat)
+          .forEach(g => {
+            g.players.forEach(p => {
+              if (!playersMap.has(p.id)) {
+                playersMap.set(p.id, {
+                  ...p,
+                  status: 'waiting' as const,
+                  tiebreakOrder: undefined,
+                  tiebreakMethod: undefined,
+                  eliminatedInPhase: undefined,
+                  qualificationType: undefined
+                });
+              }
+            });
+          });
+
+        const allPlayers = Array.from(playersMap.values());
+
+        // 2. Remover todos os grupos da categoria
+        updated = {
+          ...updated,
+          grupos: updated.grupos.filter(g => g.categoria !== cat),
+        };
+
+        // 3. Adicionar jogadores de volta à lista de espera, evitando duplicatas
+        const existingPlayerIds = new Set(updated.waitingList.map(p => p.id));
+        const newPlayers = allPlayers.filter(p => !existingPlayerIds.has(p.id));
+        updated = {
+          ...updated,
+          waitingList: [...updated.waitingList, ...newPlayers],
+        };
+      });
+
+      // 4. Limpar completedCategories e crossGroupTiebreaks da(s) categoria(s)
+      // Para crossGroupTiebreaks, verificamos se ainda há grupos relacionados à categoria
+      let filteredCrossGroupTiebreaks = updated.crossGroupTiebreaks || [];
+      
+      if (categoria) {
+        // Para uma categoria específica, remover tiebreaks relacionados
+        // Verificar se ainda há grupos da categoria (incluindo grupos de desempate) na fase do tiebreak
+        filteredCrossGroupTiebreaks = (updated.crossGroupTiebreaks || []).filter(tiebreak => {
+          // Verificar se ainda há grupos da categoria na fase do tiebreak
+          // Isso inclui grupos normais e grupos de desempate cross-group
+          const hasGroupsInPhase = updated.grupos.some(
+            g => g.categoria === categoria && g.fase === tiebreak.phase
+          );
+          // Se não há mais grupos, remover o tiebreak
+          return hasGroupsInPhase;
+        });
+      } else {
+        // Se finalizando todas as categorias, limpar todos os tiebreaks
+        filteredCrossGroupTiebreaks = [];
+      }
+      
+      return {
+        ...updated,
+        completedCategories: categoria
+          ? (updated.completedCategories || []).filter(c => c !== categoria)
+          : [],
+        crossGroupTiebreaks: filteredCrossGroupTiebreaks,
       };
     });
   }, [updateTournament]);
@@ -1188,6 +1382,7 @@ export function useTournament() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    updateCategoryName,
     moveCategoryUp,
     moveCategoryDown,
     updateGameConfig,
@@ -1204,6 +1399,7 @@ export function useTournament() {
     resetAndRedrawGroups,
     redrawGroupsInPlace,
     clearCategory,
+    finalizeTournament,
     resolveTieManual,
     resolveTieManualOrder,
     resolveTieRandom,

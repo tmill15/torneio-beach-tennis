@@ -9,7 +9,37 @@ import { PLAYERS_PER_GROUP } from '@/types';
 import { createGroups, canFormGroups as checkCanFormGroups } from './groupGenerator';
 
 /**
+ * Verifica se já existe um jogador com o mesmo nome na mesma categoria
+ * (tanto na lista de espera quanto nos grupos do torneio)
+ */
+export function hasDuplicatePlayerName(
+  nome: string,
+  categoria: string,
+  tournament: Tournament
+): boolean {
+  const normalizedName = nome.trim().toLowerCase();
+  
+  // Verifica na lista de espera
+  const inWaitingList = tournament.waitingList.some(
+    p => p.categoria === categoria && p.nome.trim().toLowerCase() === normalizedName
+  );
+  
+  if (inWaitingList) return true;
+  
+  // Verifica nos grupos do torneio
+  const inGroups = tournament.grupos.some(group => 
+    group.categoria === categoria &&
+    group.players.some(
+      p => p.nome.trim().toLowerCase() === normalizedName
+    )
+  );
+  
+  return inGroups;
+}
+
+/**
  * Adiciona um jogador à lista de espera do torneio
+ * Retorna o torneio atualizado ou lança um erro se o nome já existir
  */
 export function addPlayer(
   nome: string,
@@ -17,6 +47,11 @@ export function addPlayer(
   isSeed: boolean,
   tournament: Tournament
 ): Tournament {
+  // Verifica se já existe jogador com o mesmo nome na mesma categoria
+  if (hasDuplicatePlayerName(nome, categoria, tournament)) {
+    throw new Error(`Já existe um participante com o nome "${nome}" na categoria "${categoria}".`);
+  }
+  
   const newPlayer: Player = {
     id: uuidv4(),
     nome,
@@ -58,8 +93,15 @@ export function formGroupsFromWaitingList(
     p => p.categoria === categoria
   );
 
-  // Validação: mínimo de 8 jogadores para torneio de 3 fases
-  if (fase === 1 && playersInCategory.length < 8) {
+  // Verifica se já existem grupos na Fase 1 desta categoria
+  const existingPhase1Groups = tournament.grupos.filter(
+    g => g.categoria === categoria && g.fase === 1
+  );
+  const isFirstFormation = existingPhase1Groups.length === 0;
+
+  // Validação: mínimo de 8 jogadores APENAS na primeira formação de grupos
+  // Para grupos adicionais, basta 4 jogadores (1 grupo)
+  if (fase === 1 && isFirstFormation && playersInCategory.length < 8) {
     console.warn(`Mínimo de 8 jogadores necessário para iniciar torneio de 3 fases. Você tem ${playersInCategory.length} jogador(es).`);
     return tournament;
   }
@@ -120,7 +162,13 @@ export function getWaitingListStats(tournament: Tournament) {
     remaining: number;
   }> = {};
 
-  for (const categoria of tournament.categorias) {
+  // Coletar todas as categorias únicas da lista de espera (pode haver categorias antigas)
+  const allCategoriesInWaitingList = new Set(tournament.waitingList.map(p => p.categoria));
+  
+  // Combinar categorias do torneio com categorias encontradas na lista de espera
+  const allCategoriesArray = Array.from(new Set([...tournament.categorias, ...Array.from(allCategoriesInWaitingList)]));
+
+  for (const categoria of allCategoriesArray) {
     const players = tournament.waitingList.filter(p => p.categoria === categoria);
     const total = players.length;
     const seeds = players.filter(p => p.isSeed).length;

@@ -26,10 +26,10 @@ export interface Player {
 // ============================================
 
 export interface GameConfig {
-  quantidadeSets: number;           // Ex: 1, 3, 5 (melhor de X)
-  gamesPerSet: number;              // Ex: 6 (primeiro a 6 games)
-  tieBreakDecisivo: boolean;        // Set decisivo é tie-break?
-  pontosTieBreak: number;           // Ex: 7, 9, 10 (pontos do tie-break)
+  quantidadeSets: 1 | 3;             // Melhor de 1 ou 3 sets
+  gamesPerSet: 4 | 6;                // 4 ou 6 games por set (regras do tênis: diferença mínima de 2)
+  tieBreakDecisivo: boolean;         // Set decisivo é tie-break?
+  pontosTieBreak: 7 | 10;            // 7 ou 10 pontos no tie-break (diferença mínima de 2)
 }
 
 // ============================================
@@ -161,16 +161,13 @@ export type SortCriteria = 'vitorias' | 'saldoSets' | 'saldoGames';
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   quantidadeSets: 1,              // Melhor de 1 (jogo único)
-  gamesPerSet: 6,                 // Primeiro a 6 games
+  gamesPerSet: 6,                 // 6 games por set
   tieBreakDecisivo: false,        // Set normal
   pontosTieBreak: 7               // Tie-break de 7 pontos
 };
 
-export const MIN_GAMES_PER_SET = 4;
-export const MAX_GAMES_PER_SET = 10;
-export const MIN_TIE_BREAK_POINTS = 7;
 export const PLAYERS_PER_GROUP = 4;         // 4 jogadores por grupo
-export const MIN_GAME_DIFFERENCE = 2;
+export const MIN_GAME_DIFFERENCE = 2;       // Diferença mínima de 2 games/pontos
 
 // ============================================
 // HELPER FUNCTIONS

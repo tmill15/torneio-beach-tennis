@@ -6,7 +6,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - Sistema de inscrição individual e formação de grupos (4 jogadores por grupo)
 - Geração automática de partidas em duplas no formato Round Robin de pareamentos
 - Ranking individual em tempo real com critérios de desempate
-- Configurações flexíveis de jogo (sets, games, tie-break)
+- Configurações simplificadas de jogo (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos)
 - Sistema de backup/restore (export/import JSON)
 - Funciona offline e é instalável
 
@@ -31,8 +31,8 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Cálculo de ranking INDIVIDUAL (Vitórias > Saldo Sets > Saldo Games)
 - [x] Jogos em formato de duplas (4 jogadores por jogo)
 - [x] Estatísticas individuais acumuladas de todos os jogos
-- [x] Configurações de jogo (sets, games, tie-break)
-- [x] Input de placares com validação em tempo real
+- [x] Configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos)
+- [x] Input de placares flexível (sem validações rígidas)
 - [x] Diferenciação visual jogos pendentes/concluídos
 - [x] Atualização automática de ranking individual
 
@@ -55,7 +55,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
 **Última atualização:** 10/01/2026  
-**Versão:** v0.14.4  
+**Versão:** v0.2.3  
 **Status:** ✅ Pronto para uso
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
@@ -131,11 +131,17 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
   - Cria GitHub Release com changelog automático
   - Commit do bump inclui `[skip ci]` para evitar loops
 
-- **Versionamento:**
-  - `feat:` → Bump Minor (0.14.4 → 0.15.0)
-  - `fix:` → Bump Patch (0.14.4 → 0.14.5)
-  - `BREAKING CHANGE:` → Bump Major (0.14.4 → 1.0.0)
-  - `chore/docs/refactor:` → Sem bump (não cria release)
+- **Versionamento Automático:**
+  - Versão é gerenciada **exclusivamente** via GitHub Actions
+  - **NÃO altere a versão manualmente** no `package.json`
+  - Versão atual: **0.2.3** (conforme `package.json`)
+  - Regras de bump:
+    - `feat:` → Bump Minor (0.2.3 → 0.3.0)
+    - `fix:` → Bump Patch (0.2.3 → 0.2.4)
+    - `BREAKING CHANGE:` → Bump Major (0.2.3 → 1.0.0)
+    - `chore/docs/refactor:` → Sem bump (não cria release)
+  - `package.json` é atualizado automaticamente pelo workflow
+  - Versão sempre sincronizada entre `package.json` e GitHub Releases
 
 - **Exposição de Versão:**
   - Variável `NEXT_PUBLIC_APP_VERSION` exposta no build
@@ -167,8 +173,8 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 
 ### Partidas ✅
 - [x] Gerar jogos Round Robin automaticamente
-- [x] Configurar formato do jogo (sets, games, tie-break)
-- [x] Inserir placares com validação
+- [x] Configurar formato do jogo (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos)
+- [x] Inserir placares (interface flexível, sem validações rígidas)
 - [x] Salvar parcial e finalizar partida
 - [x] Mostrar jogos pendentes e concluídos
 
@@ -186,6 +192,75 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.15.0 - Simplificação e Melhorias na Configuração de Jogos ✅
+**Data:** 10/01/2026
+
+**Adicionado:**
+- ✅ **Configurações simplificadas de jogos:**
+  - Opções de games: 4 ou 6 games por set
+  - Opções de sets: Melhor de 1 ou 3 sets
+  - Tie-break decisivo: 7 ou 10 pontos
+  - Interface mais limpa e intuitiva
+- ✅ **Simplificação da interface de placares:**
+  - Removidos campos de tie-break em cada set
+  - Removidas validações rígidas de preenchimento
+  - Usuário pode preencher quantos sets quiser
+  - Configurações mantidas apenas para referência e PDF
+- ✅ **PDF atualizado:**
+  - Mostra pontos do tie-break quando configurado (7 ou 10 pontos)
+  - Informação completa das configurações do jogo
+
+**Modificado:**
+- 🔄 `types/index.ts`:
+  - `GameConfig` agora usa tipos restritos: `quantidadeSets: 1 | 3`, `gamesPerSet: 4 | 6`, `pontosTieBreak: 7 | 10`
+- 🔄 `components/GameConfigForm.tsx`:
+  - Selects ao invés de inputs numéricos
+  - Opções claras e limitadas
+- 🔄 `components/ScoreInput.tsx`:
+  - Removidos campos de tie-break
+  - Removidas validações rígidas
+  - Interface simplificada
+- 🔄 `services/rankingService.ts`:
+  - Validação simplificada (apenas verifica se há vencedor)
+  - Removida lógica complexa de tie-break em sets normais
+- 🔄 `services/pdfService.ts`:
+  - Mostra pontos do tie-break no formato do jogo
+- 🔄 `services/backupService.ts`:
+  - Função de normalização para compatibilidade com backups antigos
+
+**Comportamento:**
+- Configurações de sets/games/tie-break são apenas para referência
+- Usuário tem total flexibilidade ao preencher placares
+- PDF mostra informações completas das configurações
+- Backups antigos são normalizados automaticamente
+
+**Benefícios:**
+- ✅ Interface mais simples e intuitiva
+- ✅ Flexibilidade total para diferentes formatos de jogo
+- ✅ Menos validações bloqueando o usuário
+- ✅ Configurações claras e limitadas
+
+---
+
+### v0.14.5 - Correção: Limpar Categoria e Lista de Espera ✅
+**Data:** 10/01/2026
+
+**Corrigido:**
+- 🐛 **Limpar Categoria não mostrava jogadores na lista de espera:** O contador mostrava o número correto, mas a lista estava vazia
+  - **Problema:** Jogadores eram adicionados com categoria incorreta ou não apareciam devido a categorias órfãs
+  - **Solução:** 
+    - Garantia explícita de categoria ao retornar jogadores para lista de espera
+    - `getWaitingListStats` agora inclui categorias encontradas na lista de espera, mesmo que não estejam no array de categorias
+  - **Resultado:** Lista de espera mostra todos os jogadores corretamente após limpar categoria
+
+**Modificado:**
+- 🔄 `hooks/useTournament.ts`:
+  - `clearCategory` agora garante explicitamente `categoria: categoria` ao retornar jogadores
+- 🔄 `services/enrollmentService.ts`:
+  - `getWaitingListStats` agora inclui todas as categorias únicas encontradas na lista de espera
+
+---
 
 ### v0.7.0 - Sistema de 3 Fases Progressivas ✅
 **Data:** 10/01/2026
@@ -1930,7 +2005,7 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 - Sistema de torneios com categorias múltiplas
 - Formação automática de grupos de 4 duplas
 - Geração de partidas Round Robin (todos contra todos)
-- Configuração flexível de jogo (sets, games, tie-break)
+- Configuração simplificada de jogo (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos)
 - Input de placares com validação em tempo real
 - Ranking automático com critérios de desempate
 - Backup/Restore completo em JSON
@@ -1981,5 +2056,12 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 ---
 
 **Última atualização:** 10/01/2026  
-**Versão atual:** v0.11.3  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, e todas as funcionalidades anteriores mantidas!
+**Versão atual:** v0.2.3 (gerenciada automaticamente via GitHub Actions)  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos), interface de placares flexível sem validações rígidas, e todas as funcionalidades anteriores mantidas!
+
+**⚠️ Importante sobre Versionamento:**
+- A versão é gerenciada **automaticamente** via GitHub Actions
+- **NÃO altere manualmente** a versão no `package.json`
+- Versão atual: **0.2.3** (conforme `package.json`)
+- O workflow atualiza o `package.json` e cria GitHub Releases automaticamente
+- Consulte a seção "Fase 9: CI/CD e Versionamento Automático" para detalhes

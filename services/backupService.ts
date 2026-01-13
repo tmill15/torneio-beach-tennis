@@ -3,7 +3,7 @@
  * Export/Import de torneios em formato JSON
  */
 
-import type { Tournament, TournamentBackup } from '@/types';
+import type { Tournament, TournamentBackup, GameConfig } from '@/types';
 import { z } from 'zod';
 
 /**
@@ -32,32 +32,69 @@ const tournamentBackupSchema = z.object({
 });
 
 /**
- * Exporta torneio para string JSON
+ * Exporta torneio para string JSON (completo ou filtrado por categoria)
  */
-export function exportTournament(tournament: Tournament): string {
+export function exportTournament(tournament: Tournament, categoria?: string): string {
+  let filteredTournament: Tournament = tournament;
+  
+  // Se categoria for especificada, filtrar apenas dados dessa categoria
+  if (categoria) {
+    filteredTournament = {
+      ...tournament,
+      grupos: tournament.grupos.filter(g => g.categoria === categoria),
+      waitingList: tournament.waitingList.filter(p => p.categoria === categoria),
+      categorias: [categoria], // Manter apenas a categoria selecionada
+    };
+  }
+  
   const backup: TournamentBackup = {
     version: BACKUP_VERSION,
     exportDate: new Date().toISOString(),
-    tournament,
+    tournament: filteredTournament,
   };
 
   return JSON.stringify(backup, null, 2);
 }
 
 /**
- * Gera e faz download do arquivo de backup
+ * Gera nome do arquivo de backup
  */
-export function downloadBackup(tournament: Tournament): void {
-  const json = exportTournament(tournament);
+function generateBackupFilename(tournament: Tournament, categoria?: string): string {
+  const date = new Date();
+  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+  
+  // Sanitiza nome do torneio (remove caracteres especiais)
+  const tournamentName = tournament.nome
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase()
+    .substring(0, 30);
+  
+  // Sanitiza nome da categoria (se houver)
+  const categoryName = categoria
+    ? categoria
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .toLowerCase()
+        .substring(0, 20)
+    : 'todas';
+  
+  return `backup-${tournamentName}-${categoryName}-${dateStr}-${timeStr}.json`;
+}
+
+/**
+ * Gera e faz download do arquivo de backup
+ * @param tournament - Torneio completo
+ * @param categoria - Categoria específica (opcional). Se não informada, faz backup de todas as categorias
+ */
+export function downloadBackup(tournament: Tournament, categoria?: string): void {
+  const json = exportTournament(tournament, categoria);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
-  // Gera nome do arquivo com timestamp
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, '-')
-    .slice(0, 19);
-  const filename = `beachtennis-backup-${timestamp}.json`;
+  // Gera nome do arquivo com nome do torneio, categoria e data
+  const filename = generateBackupFilename(tournament, categoria);
 
   // Cria link temporário e aciona download
   const link = document.createElement('a');
@@ -70,9 +107,50 @@ export function downloadBackup(tournament: Tournament): void {
 }
 
 /**
- * Importa torneio a partir de string JSON
+ * Normaliza gameConfig para valores válidos (4 ou 6 games, 1 ou 3 sets, 7 ou 10 pontos)
  */
-export function importTournament(jsonData: string): Tournament {
+function normalizeGameConfig(config: any): GameConfig {
+  // Normalizar quantidadeSets: 1 ou 3 (qualquer outro valor vira 1)
+  let quantidadeSets: 1 | 3 = 1;
+  if (config.quantidadeSets === 3) {
+    quantidadeSets = 3;
+  } else if (config.quantidadeSets !== 1) {
+    quantidadeSets = 1; // Padrão para valores inválidos
+  }
+
+  // Normalizar gamesPerSet: 4 ou 6 (valores próximos vão para o mais próximo)
+  let gamesPerSet: 4 | 6 = 6;
+  if (config.gamesPerSet === 4) {
+    gamesPerSet = 4;
+  } else if (config.gamesPerSet !== 6) {
+    // Se for 5 ou menos, vira 4; se for 7 ou mais, vira 6
+    gamesPerSet = config.gamesPerSet <= 5 ? 4 : 6;
+  }
+
+  // Normalizar pontosTieBreak: 7 ou 10 (valores próximos vão para o mais próximo)
+  let pontosTieBreak: 7 | 10 = 7;
+  if (config.pontosTieBreak === 7) {
+    pontosTieBreak = 7;
+  } else if (config.pontosTieBreak === 10) {
+    pontosTieBreak = 10;
+  } else if (config.pontosTieBreak !== undefined) {
+    // Se for 8 ou menos, vira 7; se for 9 ou mais, vira 10
+    pontosTieBreak = config.pontosTieBreak <= 8 ? 7 : 10;
+  }
+
+  return {
+    quantidadeSets,
+    gamesPerSet,
+    tieBreakDecisivo: config.tieBreakDecisivo || false,
+    pontosTieBreak,
+  };
+}
+
+/**
+ * Importa torneio a partir de string JSON
+ * Retorna o torneio importado e indica se é backup de categoria específica
+ */
+export function importTournament(jsonData: string): { tournament: Tournament; isSingleCategory: boolean; category?: string } {
   try {
     const data = JSON.parse(jsonData);
     const backup = tournamentBackupSchema.parse(data);
@@ -82,7 +160,21 @@ export function importTournament(jsonData: string): Tournament {
       throw new Error(`Versão do backup (${backup.version}) não é compatível com a versão atual (${BACKUP_VERSION})`);
     }
 
-    return backup.tournament;
+    // Normalizar gameConfig para valores válidos
+    const normalizedTournament: Tournament = {
+      ...backup.tournament,
+      gameConfig: normalizeGameConfig(backup.tournament.gameConfig),
+    };
+
+    // Verifica se é backup de categoria específica (tem apenas 1 categoria)
+    const isSingleCategory = normalizedTournament.categorias.length === 1;
+    const category = isSingleCategory ? normalizedTournament.categorias[0] : undefined;
+
+    return {
+      tournament: normalizedTournament,
+      isSingleCategory,
+      category,
+    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new Error('Estrutura do backup inválida: ' + error.message);
@@ -162,7 +254,7 @@ export function createEmptyTournament(): Tournament {
       gamesPerSet: 6,
       tieBreakDecisivo: false,
       pontosTieBreak: 7,
-    },
+    } as GameConfig,
     grupos: [],
     waitingList: [],
     completedCategories: [],
@@ -339,12 +431,12 @@ export function migrateV030ToV040(oldTournament: any): Tournament {
     version: CURRENT_DATA_VERSION,
     nome: oldTournament.nome || 'Novo Torneio',
     categorias: oldTournament.categorias || ['Iniciante', 'Normal'],
-    gameConfig: oldTournament.gameConfig || {
+    gameConfig: normalizeGameConfig(oldTournament.gameConfig || {
       quantidadeSets: 1,
       gamesPerSet: 6,
       tieBreakDecisivo: false,
       pontosTieBreak: 7,
-    },
+    }),
     grupos: [],
     waitingList: [],
   };

@@ -246,7 +246,34 @@ export function validateSetScore(
   // Set normal
   const winner = Math.max(gamesA, gamesB);
   const minGames = gameConfig.gamesPerSet;
+  
+  // Verificar se chegou ao empate (6-6 ou 4-4) e tem tie-break
+  const isTied = gamesA === gamesB && gamesA === minGames;
+  const hasTieBreak = set.tieBreakA !== undefined && set.tieBreakB !== undefined;
 
+  if (isTied && hasTieBreak) {
+    // Validar tie-break: diferença mínima de 2 pontos
+    const tieBreakDiff = Math.abs(set.tieBreakA! - set.tieBreakB!);
+    const tieBreakWinner = Math.max(set.tieBreakA!, set.tieBreakB!);
+    
+    if (tieBreakWinner < 7) {
+      return {
+        isValid: false,
+        error: 'Tie-break precisa ter no mínimo 7 pontos',
+      };
+    }
+    
+    if (tieBreakDiff < 2) {
+      return {
+        isValid: false,
+        error: 'Diferença mínima de 2 pontos no tie-break',
+      };
+    }
+    
+    return { isValid: true };
+  }
+
+  // Se não tem tie-break, validar diferença mínima de 2 games
   if (winner < minGames) {
     return {
       isValid: false,
@@ -254,6 +281,15 @@ export function validateSetScore(
     };
   }
 
+  // Se chegou ao empate mas não tem tie-break, não é válido
+  if (isTied && !hasTieBreak) {
+    return {
+      isValid: false,
+      error: `Empate em ${minGames}-${minGames}: é necessário tie-break`,
+    };
+  }
+
+  // Se não é empate, validar diferença mínima de 2 games
   if (diff < 2) {
     return {
       isValid: false,
@@ -266,6 +302,7 @@ export function validateSetScore(
 
 /**
  * Verifica se uma partida pode ser finalizada
+ * Simplificado: apenas verifica se há sets e se há vencedor
  */
 export function canFinalizeMatch(
   match: Match,
@@ -273,26 +310,23 @@ export function canFinalizeMatch(
 ): { canFinalize: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Precisa ter pelo menos 1 set
-  if (match.sets.length === 0) {
-    errors.push('É necessário jogar pelo menos 1 set');
+  // Precisa ter pelo menos 1 set preenchido
+  const hasAnySet = match.sets.some(s => s.gamesA > 0 || s.gamesB > 0);
+  if (!hasAnySet) {
+    errors.push('É necessário preencher pelo menos 1 set');
     return { canFinalize: false, errors };
   }
 
-  // Valida todos os sets
-  for (let i = 0; i < match.sets.length; i++) {
-    const isDecisive = i === gameConfig.quantidadeSets - 1;
-    const validation = validateSetScore(match.sets[i], gameConfig, isDecisive);
-    
-    if (!validation.isValid) {
-      errors.push(`Set ${i + 1}: ${validation.error}`);
-    }
-  }
+  // Verifica se há vencedor (pelo menos um set com diferença)
+  let setsA = 0;
+  let setsB = 0;
+  match.sets.forEach(set => {
+    if (set.gamesA > set.gamesB) setsA++;
+    else if (set.gamesB > set.gamesA) setsB++;
+  });
 
-  // Verifica se há vencedor
-  const winner = determineMatchWinner(match, gameConfig);
-  if (winner === null) {
-    errors.push('Nenhuma dupla atingiu o número de sets necessário para vencer');
+  if (setsA === setsB) {
+    errors.push('É necessário haver um vencedor (pelo menos um set com diferença)');
   }
 
   return {

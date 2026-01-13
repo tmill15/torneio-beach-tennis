@@ -21,6 +21,7 @@ export default function ConfigPage() {
     updateTournamentName,
     addCategory,
     removeCategory,
+    updateCategoryName,
     moveCategoryUp,
     moveCategoryDown,
     updateGameConfig,
@@ -42,6 +43,8 @@ export default function ConfigPage() {
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
   const [isPlayerSeed, setIsPlayerSeed] = useState(false);
   const [activeTab, setActiveTab] = useState<'espera' | 'torneio'>('torneio');
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
   
   // Estados para modais de export/import
   const [showExportModal, setShowExportModal] = useState(false);
@@ -74,9 +77,13 @@ export default function ConfigPage() {
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim() && selectedCategory) {
-      addPlayer(newPlayerName.trim(), selectedCategory, isPlayerSeed);
-      setNewPlayerName('');
-      setIsPlayerSeed(false);
+      try {
+        addPlayer(newPlayerName.trim(), selectedCategory, isPlayerSeed);
+        setNewPlayerName('');
+        setIsPlayerSeed(false);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Erro ao adicionar jogador');
+      }
     }
   };
 
@@ -373,6 +380,7 @@ export default function ConfigPage() {
 
       // Adicionar jogadores de uma vez (evita problemas de estado)
       let skippedCount = 0;
+      let duplicateCount = 0;
       
       const playersToAdd = data.players
         .filter((p: any) => {
@@ -381,6 +389,24 @@ export default function ConfigPage() {
             skippedCount++;
             return false;
           }
+          
+          // Verifica duplicatas antes de adicionar
+          const normalizedName = p.nome.trim().toLowerCase();
+          const isDuplicate = tournament.waitingList.some(
+            w => w.categoria === targetCategory && w.nome.trim().toLowerCase() === normalizedName
+          ) || tournament.grupos.some(group => 
+            group.categoria === targetCategory &&
+            group.players.some(
+              player => player.nome.trim().toLowerCase() === normalizedName
+            )
+          );
+          
+          if (isDuplicate) {
+            console.warn(`Jogador duplicado ignorado: "${p.nome}" na categoria "${targetCategory}"`);
+            duplicateCount++;
+            return false;
+          }
+          
           return true;
         })
         .map((p: any) => ({
@@ -396,16 +422,22 @@ export default function ConfigPage() {
       }
 
       const addedCount = playersToAdd.length;
-      console.log(`✅ Importação concluída: ${addedCount} adicionado(s), ${skippedCount} ignorado(s)`);
+      const totalSkipped = skippedCount + duplicateCount;
+      console.log(`✅ Importação concluída: ${addedCount} adicionado(s), ${totalSkipped} ignorado(s) (${skippedCount} sem nome, ${duplicateCount} duplicados)`);
 
       setShowImportModal(false);
       setImportFile(null);
       setImportFileInfo(null);
       setImportOverwrite(false);
       
+      const skippedMessages = [];
+      if (skippedCount > 0) skippedMessages.push(`${skippedCount} sem nome`);
+      if (duplicateCount > 0) skippedMessages.push(`${duplicateCount} duplicado(s)`);
+      const skippedText = skippedMessages.length > 0 ? `\n\n⚠️ ${skippedMessages.join(', ')} ignorado(s).` : '';
+      
       const message = addedCount > 0
-        ? `✅ ${addedCount} jogador(es) importado(s) com sucesso para "${targetCategory}"!${skippedCount > 0 ? `\n\n⚠️ ${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`
-        : `⚠️ Nenhum jogador foi importado.${skippedCount > 0 ? `\n\n${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`;
+        ? `✅ ${addedCount} jogador(es) importado(s) com sucesso para "${targetCategory}"!${skippedText}`
+        : `⚠️ Nenhum jogador foi importado.${skippedText}`;
       
       alert(message);
     } catch (err) {
@@ -524,44 +556,111 @@ export default function ConfigPage() {
                     key={cat}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
                   >
-                    <span className="text-gray-900 dark:text-white font-medium">{cat}</span>
-                    
-                    <div className="flex items-center gap-2">
-                      {/* Botões de ordenação */}
-                      <button
-                        onClick={() => moveCategoryUp(cat)}
-                        disabled={index === 0}
-                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Mover para cima"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      
-                      <button
-                        onClick={() => moveCategoryDown(cat)}
-                        disabled={index === tournament.categorias.length - 1}
-                        className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Mover para baixo"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {/* Botão de remover */}
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Remover categoria "${cat}"?`)) {
-                            removeCategory(cat);
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
-                      >
-                        Remover
-                      </button>
-                    </div>
+                    {editingCategory === cat ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={editingCategoryName}
+                          onChange={(e) => setEditingCategoryName(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              try {
+                                updateCategoryName(cat, editingCategoryName);
+                                setEditingCategory(null);
+                                setEditingCategoryName('');
+                              } catch (error) {
+                                alert(error instanceof Error ? error.message : 'Erro ao renomear categoria');
+                              }
+                            } else if (e.key === 'Escape') {
+                              setEditingCategory(null);
+                              setEditingCategoryName('');
+                            }
+                          }}
+                          autoFocus
+                          className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            try {
+                              updateCategoryName(cat, editingCategoryName);
+                              setEditingCategory(null);
+                              setEditingCategoryName('');
+                            } catch (error) {
+                              alert(error instanceof Error ? error.message : 'Erro ao renomear categoria');
+                            }
+                          }}
+                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                          title="Salvar"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingCategory(null);
+                            setEditingCategoryName('');
+                          }}
+                          className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
+                          title="Cancelar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-gray-900 dark:text-white font-medium">{cat}</span>
+                        
+                        <div className="flex items-center gap-2">
+                          {/* Botão de editar */}
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setEditingCategoryName(cat);
+                            }}
+                            className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            title="Editar nome"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          
+                          {/* Botões de ordenação */}
+                          <button
+                            onClick={() => moveCategoryUp(cat)}
+                            disabled={index === 0}
+                            className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Mover para cima"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          
+                          <button
+                            onClick={() => moveCategoryDown(cat)}
+                            disabled={index === tournament.categorias.length - 1}
+                            className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Mover para baixo"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          
+                          {/* Botão de remover */}
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Remover categoria "${cat}"?`)) {
+                                removeCategory(cat);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
