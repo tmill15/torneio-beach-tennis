@@ -28,7 +28,14 @@ export function GameConfigForm({ config, onChange, disabled = false }: GameConfi
         <select
           id="quantidadeSets"
           value={config.quantidadeSets}
-          onChange={(e) => onChange({ ...config, quantidadeSets: Number(e.target.value) as 1 | 3 })}
+          onChange={(e) => {
+            const newQuantidadeSets = Number(e.target.value) as 1 | 3;
+            // Se mudou para 1 set, desmarcar tie-break decisivo (não faz sentido)
+            const updatedConfig = newQuantidadeSets === 1
+              ? { ...config, quantidadeSets: newQuantidadeSets, tieBreakDecisivo: false }
+              : { ...config, quantidadeSets: newQuantidadeSets };
+            onChange(updatedConfig);
+          }}
           disabled={disabled}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
