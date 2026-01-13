@@ -325,17 +325,17 @@ export default function Home() {
               
               <button
                 onClick={() => {
-                  const message = `⚠️ ATENÇÃO: Finalizar o torneio?\n\n` +
+                  const message = `⚠️ ATENÇÃO: Finalizar o torneio da categoria "${selectedCategory}"?\n\n` +
                     `Isso irá:\n` +
-                    `- Apagar TODOS os grupos de TODAS as categorias\n` +
-                    `- Apagar todos os jogos e placares\n` +
-                    `- Retornar TODOS os participantes para a lista de espera\n` +
-                    `- Limpar desempates e classificações\n\n` +
+                    `- Apagar todos os grupos desta categoria\n` +
+                    `- Apagar todos os jogos e placares desta categoria\n` +
+                    `- Retornar todos os participantes desta categoria para a lista de espera\n` +
+                    `- Limpar desempates e classificações desta categoria\n\n` +
                     `Esta ação não pode ser desfeita!\n\n` +
                     `Deseja continuar?`;
                   
                   if (window.confirm(message)) {
-                    finalizeTournament();
+                    finalizeTournament(selectedCategory);
                   }
                 }}
                 className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"

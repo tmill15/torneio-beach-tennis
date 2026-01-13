@@ -825,19 +825,24 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
-   * Finaliza o torneio: limpa todas as categorias e retorna jogadores para lista de espera
+   * Finaliza o torneio: limpa categoria(es) e retorna jogadores para lista de espera
+   * @param categoria - Categoria específica a ser finalizada. Se não fornecida, finaliza todas as categorias
    */
-  const finalizeTournament = useCallback(() => {
+  const finalizeTournament = useCallback((categoria?: string) => {
     updateTournament(prev => {
       let updated = prev;
       
+      // Se categoria for especificada, limpa apenas essa categoria
+      // Caso contrário, limpa todas as categorias
+      const categoriasToClear = categoria ? [categoria] : prev.categorias;
+      
       // Limpar cada categoria uma por uma
-      prev.categorias.forEach(categoria => {
+      categoriasToClear.forEach(cat => {
         // 1. Coletar todos os jogadores de todos os grupos da categoria
         const playersMap = new Map<string, Player>();
         
         updated.grupos
-          .filter(g => g.categoria === categoria)
+          .filter(g => g.categoria === cat)
           .forEach(g => {
             g.players.forEach(p => {
               if (!playersMap.has(p.id)) {
@@ -858,7 +863,7 @@ export function useTournament() {
         // 2. Remover todos os grupos da categoria
         updated = {
           ...updated,
-          grupos: updated.grupos.filter(g => g.categoria !== categoria),
+          grupos: updated.grupos.filter(g => g.categoria !== cat),
         };
 
         // 3. Adicionar jogadores de volta à lista de espera, evitando duplicatas
@@ -870,11 +875,33 @@ export function useTournament() {
         };
       });
 
-      // 4. Limpar completedCategories e crossGroupTiebreaks
+      // 4. Limpar completedCategories e crossGroupTiebreaks da(s) categoria(s)
+      // Para crossGroupTiebreaks, verificamos se ainda há grupos relacionados à categoria
+      let filteredCrossGroupTiebreaks = updated.crossGroupTiebreaks || [];
+      
+      if (categoria) {
+        // Para uma categoria específica, remover tiebreaks relacionados
+        // Verificar se ainda há grupos da categoria (incluindo grupos de desempate) na fase do tiebreak
+        filteredCrossGroupTiebreaks = (updated.crossGroupTiebreaks || []).filter(tiebreak => {
+          // Verificar se ainda há grupos da categoria na fase do tiebreak
+          // Isso inclui grupos normais e grupos de desempate cross-group
+          const hasGroupsInPhase = updated.grupos.some(
+            g => g.categoria === categoria && g.fase === tiebreak.phase
+          );
+          // Se não há mais grupos, remover o tiebreak
+          return hasGroupsInPhase;
+        });
+      } else {
+        // Se finalizando todas as categorias, limpar todos os tiebreaks
+        filteredCrossGroupTiebreaks = [];
+      }
+      
       return {
         ...updated,
-        completedCategories: [],
-        crossGroupTiebreaks: [],
+        completedCategories: categoria
+          ? (updated.completedCategories || []).filter(c => c !== categoria)
+          : [],
+        crossGroupTiebreaks: filteredCrossGroupTiebreaks,
       };
     });
   }, [updateTournament]);
