@@ -9,7 +9,37 @@ import { PLAYERS_PER_GROUP } from '@/types';
 import { createGroups, canFormGroups as checkCanFormGroups } from './groupGenerator';
 
 /**
+ * Verifica se já existe um jogador com o mesmo nome na mesma categoria
+ * (tanto na lista de espera quanto nos grupos do torneio)
+ */
+export function hasDuplicatePlayerName(
+  nome: string,
+  categoria: string,
+  tournament: Tournament
+): boolean {
+  const normalizedName = nome.trim().toLowerCase();
+  
+  // Verifica na lista de espera
+  const inWaitingList = tournament.waitingList.some(
+    p => p.categoria === categoria && p.nome.trim().toLowerCase() === normalizedName
+  );
+  
+  if (inWaitingList) return true;
+  
+  // Verifica nos grupos do torneio
+  const inGroups = tournament.grupos.some(group => 
+    group.categoria === categoria &&
+    group.players.some(
+      p => p.nome.trim().toLowerCase() === normalizedName
+    )
+  );
+  
+  return inGroups;
+}
+
+/**
  * Adiciona um jogador à lista de espera do torneio
+ * Retorna o torneio atualizado ou lança um erro se o nome já existir
  */
 export function addPlayer(
   nome: string,
@@ -17,6 +47,11 @@ export function addPlayer(
   isSeed: boolean,
   tournament: Tournament
 ): Tournament {
+  // Verifica se já existe jogador com o mesmo nome na mesma categoria
+  if (hasDuplicatePlayerName(nome, categoria, tournament)) {
+    throw new Error(`Já existe um participante com o nome "${nome}" na categoria "${categoria}".`);
+  }
+  
   const newPlayer: Player = {
     id: uuidv4(),
     nome,

@@ -74,9 +74,13 @@ export default function ConfigPage() {
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim() && selectedCategory) {
-      addPlayer(newPlayerName.trim(), selectedCategory, isPlayerSeed);
-      setNewPlayerName('');
-      setIsPlayerSeed(false);
+      try {
+        addPlayer(newPlayerName.trim(), selectedCategory, isPlayerSeed);
+        setNewPlayerName('');
+        setIsPlayerSeed(false);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Erro ao adicionar jogador');
+      }
     }
   };
 
@@ -373,6 +377,7 @@ export default function ConfigPage() {
 
       // Adicionar jogadores de uma vez (evita problemas de estado)
       let skippedCount = 0;
+      let duplicateCount = 0;
       
       const playersToAdd = data.players
         .filter((p: any) => {
@@ -381,6 +386,24 @@ export default function ConfigPage() {
             skippedCount++;
             return false;
           }
+          
+          // Verifica duplicatas antes de adicionar
+          const normalizedName = p.nome.trim().toLowerCase();
+          const isDuplicate = tournament.waitingList.some(
+            w => w.categoria === targetCategory && w.nome.trim().toLowerCase() === normalizedName
+          ) || tournament.grupos.some(group => 
+            group.categoria === targetCategory &&
+            group.players.some(
+              player => player.nome.trim().toLowerCase() === normalizedName
+            )
+          );
+          
+          if (isDuplicate) {
+            console.warn(`Jogador duplicado ignorado: "${p.nome}" na categoria "${targetCategory}"`);
+            duplicateCount++;
+            return false;
+          }
+          
           return true;
         })
         .map((p: any) => ({
@@ -396,16 +419,22 @@ export default function ConfigPage() {
       }
 
       const addedCount = playersToAdd.length;
-      console.log(`✅ Importação concluída: ${addedCount} adicionado(s), ${skippedCount} ignorado(s)`);
+      const totalSkipped = skippedCount + duplicateCount;
+      console.log(`✅ Importação concluída: ${addedCount} adicionado(s), ${totalSkipped} ignorado(s) (${skippedCount} sem nome, ${duplicateCount} duplicados)`);
 
       setShowImportModal(false);
       setImportFile(null);
       setImportFileInfo(null);
       setImportOverwrite(false);
       
+      const skippedMessages = [];
+      if (skippedCount > 0) skippedMessages.push(`${skippedCount} sem nome`);
+      if (duplicateCount > 0) skippedMessages.push(`${duplicateCount} duplicado(s)`);
+      const skippedText = skippedMessages.length > 0 ? `\n\n⚠️ ${skippedMessages.join(', ')} ignorado(s).` : '';
+      
       const message = addedCount > 0
-        ? `✅ ${addedCount} jogador(es) importado(s) com sucesso para "${targetCategory}"!${skippedCount > 0 ? `\n\n⚠️ ${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`
-        : `⚠️ Nenhum jogador foi importado.${skippedCount > 0 ? `\n\n${skippedCount} jogador(es) ignorado(s) (sem nome).` : ''}`;
+        ? `✅ ${addedCount} jogador(es) importado(s) com sucesso para "${targetCategory}"!${skippedText}`
+        : `⚠️ Nenhum jogador foi importado.${skippedText}`;
       
       alert(message);
     } catch (err) {
