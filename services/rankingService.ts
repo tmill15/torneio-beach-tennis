@@ -177,20 +177,10 @@ export function updateMatchResult(
   let setsB = 0;
 
   for (const set of sets) {
-    // Se tem tie-break, o vencedor é determinado pelo tie-break
-    if (set.tieBreakA !== undefined && set.tieBreakB !== undefined) {
-      if (set.tieBreakA > set.tieBreakB) {
-        setsA++;
-      } else if (set.tieBreakB > set.tieBreakA) {
-        setsB++;
-      }
-    } else {
-      // Sem tie-break, vencedor é determinado pelos games
-      if (set.gamesA > set.gamesB) {
-        setsA++;
-      } else if (set.gamesB > set.gamesA) {
-        setsB++;
-      }
+    if (set.gamesA > set.gamesB) {
+      setsA++;
+    } else if (set.gamesB > set.gamesA) {
+      setsB++;
     }
   }
 
@@ -312,6 +302,7 @@ export function validateSetScore(
 
 /**
  * Verifica se uma partida pode ser finalizada
+ * Simplificado: apenas verifica se há sets e se há vencedor
  */
 export function canFinalizeMatch(
   match: Match,
@@ -319,26 +310,23 @@ export function canFinalizeMatch(
 ): { canFinalize: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Precisa ter pelo menos 1 set
-  if (match.sets.length === 0) {
-    errors.push('É necessário jogar pelo menos 1 set');
+  // Precisa ter pelo menos 1 set preenchido
+  const hasAnySet = match.sets.some(s => s.gamesA > 0 || s.gamesB > 0);
+  if (!hasAnySet) {
+    errors.push('É necessário preencher pelo menos 1 set');
     return { canFinalize: false, errors };
   }
 
-  // Valida todos os sets
-  for (let i = 0; i < match.sets.length; i++) {
-    const isDecisive = i === gameConfig.quantidadeSets - 1;
-    const validation = validateSetScore(match.sets[i], gameConfig, isDecisive);
-    
-    if (!validation.isValid) {
-      errors.push(`Set ${i + 1}: ${validation.error}`);
-    }
-  }
+  // Verifica se há vencedor (pelo menos um set com diferença)
+  let setsA = 0;
+  let setsB = 0;
+  match.sets.forEach(set => {
+    if (set.gamesA > set.gamesB) setsA++;
+    else if (set.gamesB > set.gamesA) setsB++;
+  });
 
-  // Verifica se há vencedor
-  const winner = determineMatchWinner(match, gameConfig);
-  if (winner === null) {
-    errors.push('Nenhuma dupla atingiu o número de sets necessário para vencer');
+  if (setsA === setsB) {
+    errors.push('É necessário haver um vencedor (pelo menos um set com diferença)');
   }
 
   return {

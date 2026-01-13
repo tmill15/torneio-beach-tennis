@@ -77,8 +77,11 @@ export function generateTournamentPDF(
   // Configurações do jogo
   doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
+  const tieBreakInfo = tournament.gameConfig.tieBreakDecisivo 
+    ? `, tie-break decisivo de ${tournament.gameConfig.pontosTieBreak} pontos`
+    : '';
   doc.text(
-    `Formato: Melhor de ${tournament.gameConfig.quantidadeSets} set(s), ${tournament.gameConfig.gamesPerSet} games por set${tournament.gameConfig.tieBreakDecisivo ? ', tie-break decisivo' : ''}`,
+    `Formato: Melhor de ${tournament.gameConfig.quantidadeSets} set(s), ${tournament.gameConfig.gamesPerSet} games por set${tieBreakInfo}`,
     margin,
     yPosition
   );

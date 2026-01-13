@@ -7,7 +7,6 @@
 
 import { useState } from 'react';
 import type { SetScore, GameConfig } from '@/types';
-import { validateSetScore } from '@/services/rankingService';
 
 interface ScoreInputProps {
   matchId: string;
@@ -39,32 +38,8 @@ export function ScoreInput({
     const numValue = Math.max(0, parseInt(value) || 0);
     const newSets = [...sets];
     const currentSet = newSets[index];
-    
-    // Limitar games baseado na configuração
-    // Para sets normais: máximo é gamesPerSet + 1 (para permitir tie-break)
-    // Para tie-break decisivo: máximo é pontosTieBreak + 2 (para permitir diferença mínima)
-    const isDecisive = index === gameConfig.quantidadeSets - 1;
-    const isTieBreakSet = isDecisive && gameConfig.tieBreakDecisivo;
-    
-    let maxValue: number;
-    if (isTieBreakSet) {
-      // Tie-break decisivo: máximo é pontosTieBreak + 2
-      maxValue = gameConfig.pontosTieBreak + 2;
-    } else {
-      // Set normal: máximo é gamesPerSet + 1 (para permitir 6-6 ou 4-4 e depois tie-break)
-      maxValue = gameConfig.gamesPerSet + 1;
-    }
-    
-    const limitedValue = Math.min(numValue, maxValue);
-    newSets[index] = { ...currentSet, [field]: limitedValue };
+    newSets[index] = { ...currentSet, [field]: numValue };
     setSets(newSets);
-  };
-
-  const isSetValid = (setIndex: number): boolean => {
-    const set = sets[setIndex];
-    const isDecisive = setIndex === gameConfig.quantidadeSets - 1;
-    const validation = validateSetScore(set, gameConfig, isDecisive);
-    return validation.isValid;
   };
 
   const canFinalize = (): boolean => {
@@ -72,14 +47,7 @@ export function ScoreInput({
     const hasAnySet = sets.some(s => s.gamesA > 0 || s.gamesB > 0);
     if (!hasAnySet) return false;
 
-    // Todos os sets preenchidos devem ser válidos
-    for (let i = 0; i < sets.length; i++) {
-      if (sets[i].gamesA > 0 || sets[i].gamesB > 0) {
-        if (!isSetValid(i)) return false;
-      }
-    }
-
-    // Deve haver um vencedor
+    // Deve haver um vencedor (pelo menos um set com diferença)
     let setsA = 0;
     let setsB = 0;
     sets.forEach(set => {
@@ -87,112 +55,43 @@ export function ScoreInput({
       else if (set.gamesB > set.gamesA) setsB++;
     });
 
-    const setsNeeded = Math.ceil(gameConfig.quantidadeSets / 2);
-    return setsA >= setsNeeded || setsB >= setsNeeded;
+    // Precisa ter pelo menos um vencedor
+    return setsA > setsB || setsB > setsA;
   };
 
   return (
     <div className="space-y-4">
       {sets.map((set, index) => {
-        const isDecisive = index === gameConfig.quantidadeSets - 1;
-        const isTieBreakDecisive = isDecisive && gameConfig.tieBreakDecisivo;
-        const isValid = isSetValid(index);
-        const hasData = set.gamesA > 0 || set.gamesB > 0;
-        
-        // Verificar se precisa de tie-break (empate em gamesPerSet)
-        const needsTieBreak = set.gamesA === gameConfig.gamesPerSet && 
-                              set.gamesB === gameConfig.gamesPerSet && 
-                              !isTieBreakDecisive;
-        const hasTieBreak = set.tieBreakA !== undefined && set.tieBreakB !== undefined;
-
         return (
           <div
             key={index}
-            className={`space-y-2 p-4 rounded-lg border ${
-              hasData && !isValid
-                ? 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20'
-                : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
-            }`}
+            className="flex items-center gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           >
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-                Set {index + 1}
-                {isTieBreakDecisive && ' (TB)'}
-                {needsTieBreak && ' (TB)'}
-              </span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+              Set {index + 1}
+            </span>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max={isTieBreakDecisive ? gameConfig.pontosTieBreak + 2 : gameConfig.gamesPerSet + 1}
-                  value={set.gamesA || ''}
-                  onChange={(e) => handleSetChange(index, 'gamesA', e.target.value)}
-                  disabled={disabled}
-                  placeholder="0"
-                  className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-gray-500 dark:text-gray-400 font-medium">×</span>
-                <input
-                  type="number"
-                  min="0"
-                  max={isTieBreakDecisive ? gameConfig.pontosTieBreak + 2 : gameConfig.gamesPerSet + 1}
-                  value={set.gamesB || ''}
-                  onChange={(e) => handleSetChange(index, 'gamesB', e.target.value)}
-                  disabled={disabled}
-                  placeholder="0"
-                  className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {hasData && (
-                <div className="ml-2">
-                  {isValid ? (
-                    <span className="text-green-600 dark:text-green-400 text-xl" title="Válido">✓</span>
-                  ) : (
-                    <span className="text-red-600 dark:text-red-400 text-xl" title="Inválido">⚠️</span>
-                  )}
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                value={set.gamesA || ''}
+                onChange={(e) => handleSetChange(index, 'gamesA', e.target.value)}
+                disabled={disabled}
+                placeholder="0"
+                className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span className="text-gray-500 dark:text-gray-400 font-medium">×</span>
+              <input
+                type="number"
+                min="0"
+                value={set.gamesB || ''}
+                onChange={(e) => handleSetChange(index, 'gamesB', e.target.value)}
+                disabled={disabled}
+                placeholder="0"
+                className="w-16 px-3 py-2 text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              />
             </div>
-
-            {/* Campos de tie-break quando necessário */}
-            {(needsTieBreak || hasTieBreak) && (
-              <div className="flex items-center gap-2 pl-20">
-                <span className="text-xs text-gray-500 dark:text-gray-400">TB:</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={set.tieBreakA || ''}
-                  onChange={(e) => {
-                    const numValue = Math.max(0, parseInt(e.target.value) || 0);
-                    const newSets = [...sets];
-                    newSets[index] = { ...newSets[index], tieBreakA: numValue };
-                    setSets(newSets);
-                  }}
-                  disabled={disabled}
-                  placeholder="0"
-                  className="w-12 px-2 py-1 text-center text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">×</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={set.tieBreakB || ''}
-                  onChange={(e) => {
-                    const numValue = Math.max(0, parseInt(e.target.value) || 0);
-                    const newSets = [...sets];
-                    newSets[index] = { ...newSets[index], tieBreakB: numValue };
-                    setSets(newSets);
-                  }}
-                  disabled={disabled}
-                  placeholder="0"
-                  className="w-12 px-2 py-1 text-center text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            )}
           </div>
         );
       })}
@@ -214,11 +113,6 @@ export function ScoreInput({
         </button>
       </div>
 
-      {!canFinalize() && sets.some(s => s.gamesA > 0 || s.gamesB > 0) && (
-        <p className="text-sm text-red-600 dark:text-red-400 text-center">
-          Verifique os placares - diferença mínima de 2 {gameConfig.tieBreakDecisivo && sets.length > 1 ? 'games/pontos' : 'games'}
-        </p>
-      )}
     </div>
   );
 }
