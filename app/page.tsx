@@ -113,6 +113,15 @@ export default function Home() {
     t => t.phase === selectedPhase
   );
 
+  // Calcular preview de classificação (sempre recalcula no render para garantir atualização)
+  const shouldShowPhaseAdvance = selectedPhase === getMaxPhase(selectedCategory) && 
+    isPhaseComplete(selectedCategory, selectedPhase) && 
+    !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory));
+  
+  const phaseAdvancePreview = shouldShowPhaseAdvance 
+    ? getPhaseAdvancePreview(selectedCategory, selectedPhase)
+    : null;
+
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
     finalizeMatch(groupId, matchId, sets);
   };
@@ -259,12 +268,13 @@ export default function Home() {
         {/* Botão de Concluir Fase / Torneio */}
         {selectedPhase === getMaxPhase(selectedCategory) && 
          isPhaseComplete(selectedCategory, selectedPhase) && 
-         !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory)) && (
-          <div className="mb-6">
+         !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory)) && 
+         phaseAdvancePreview && (
+          <div className="mb-6" key={JSON.stringify(tournament.crossGroupTiebreaks || [])}>
             <PhaseAdvanceCard
               categoria={selectedCategory}
               currentPhase={selectedPhase}
-              preview={getPhaseAdvancePreview(selectedCategory, selectedPhase)}
+              preview={phaseAdvancePreview}
               hasPendingTies={hasPendingTies(selectedCategory, selectedPhase)}
               onAdvance={() => advanceToNextPhase(selectedCategory, selectedPhase)}
               resolveCrossGroupTieManual={resolveCrossGroupTieManual}

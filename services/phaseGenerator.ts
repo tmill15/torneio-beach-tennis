@@ -314,6 +314,74 @@ function getBestAtPosition(
     }
   }
   
+  // Se há desempate cross-group resolvido via partida extra (singles), incluir o vencedor
+  if (tournament?.crossGroupTiebreaks) {
+    const tiebreak = tournament.crossGroupTiebreaks.find(
+      t => t.phase === phase && 
+           t.position === position && 
+           t.method === 'singles' &&
+           t.winnerId && t.winnerId.length > 0
+    );
+    
+    if (tiebreak) {
+      // Encontrar o jogador vencedor no grupo de desempate
+      const tiebreakGroup = groups.find(g => 
+        g.nome.startsWith('DESEMPATE_CROSS_GROUP_') && 
+        g.fase === phase
+      );
+      
+      if (tiebreakGroup) {
+        const winnerPlayer = tiebreakGroup.players.find(p => p.id === tiebreak.winnerId);
+        if (winnerPlayer) {
+          // Verificar se o vencedor já está na lista de candidatos
+          const alreadyIncluded = candidates.some(c => c.qualified.player.id === winnerPlayer.id);
+          
+          if (!alreadyIncluded) {
+            // Buscar as estatísticas do jogador no grupo original (antes do desempate)
+            // Para isso, precisamos encontrar o grupo original do jogador
+            let originalGroup: Group | undefined;
+            let originalStats: RankingEntry | undefined;
+            
+            // Procurar o jogador nos grupos normais da fase para obter suas estatísticas
+            for (const group of groups.filter(g => 
+              g.fase === phase && 
+              !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
+            )) {
+              const ranking = calculateRanking(group);
+              const entry = ranking.find(e => e.player.id === winnerPlayer.id);
+              if (entry && ranking.length > position && ranking[position].player.id === winnerPlayer.id) {
+                originalGroup = group;
+                originalStats = entry;
+                break;
+              }
+            }
+            
+            // Se não encontrou no grupo original, usar as estatísticas do grupo de desempate
+            if (!originalStats && tiebreakGroup) {
+              const tiebreakRanking = calculateRanking(tiebreakGroup);
+              const tiebreakEntry = tiebreakRanking.find(e => e.player.id === winnerPlayer.id);
+              if (tiebreakEntry) {
+                originalStats = tiebreakEntry;
+              }
+            }
+            
+            if (originalStats) {
+              candidates.push({
+                qualified: {
+                  player: winnerPlayer,
+                  type, // Usar o type passado (repechage)
+                  groupOrigin: tiebreakGroup.nome, // Grupo de desempate
+                  position: position + 1
+                },
+                stats: originalStats
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
   // Ordenar considerando desempates entre grupos resolvidos
   candidates.sort((a, b) => compareByRanking(
     a.stats, 
@@ -423,22 +491,52 @@ export function getPhase2ToPhase3Classification(
   phase: number,
   tournament?: Tournament
 ): { direct: QualifiedPlayer[], repechage: QualifiedPlayer[] } {
-  const phaseGroups = groups.filter(g => g.fase === phase);
+  // Filtrar grupos normais (excluir grupos de desempate)
+  const phaseGroups = groups.filter(g => 
+    g.fase === phase && 
+    !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
+  );
   const numGroups = phaseGroups.length;
   const direct: QualifiedPlayer[] = [];
   let repechage: QualifiedPlayer[] = [];
+  
+  // Primeiro, verificar se há desempates cross-group resolvidos via partida extra
+  // e coletar os vencedores para adicionar à repescagem
+  const crossGroupWinners: Set<string> = new Set();
+  if (tournament?.crossGroupTiebreaks) {
+    tournament.crossGroupTiebreaks.forEach(tiebreak => {
+      if (tiebreak.phase === phase && 
+          tiebreak.method === 'singles' &&
+          tiebreak.winnerId && tiebreak.winnerId.length > 0) {
+        crossGroupWinners.add(tiebreak.winnerId);
+      }
+    });
+  }
   
   if (numGroups <= 2) {
     // Top 2 de cada grupo = 2 ou 4 jogadores (OK)
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       ranking.slice(0, 2).forEach((entry, index) => {
-        direct.push({
-          player: entry.player,
-          type: 'direct',
-          groupOrigin: group.nome,
-          position: index + 1
-        });
+        // Verificar se este jogador veio de desempate cross-group via partida extra
+        if (crossGroupWinners.has(entry.player.id)) {
+          // Este jogador veio de desempate cross-group via partida extra
+          // Deve ser classificado como repescagem
+          repechage.push({
+            player: entry.player,
+            type: 'repechage',
+            groupOrigin: `DESEMPATE_CROSS_GROUP_${group.categoria || ''}_FASE${phase}`,
+            position: index + 1
+          });
+        } else {
+          // Jogador normal, classificar como direto
+          direct.push({
+            player: entry.player,
+            type: 'direct',
+            groupOrigin: group.nome,
+            position: index + 1
+          });
+        }
       });
     }
   } else if (numGroups === 3) {
@@ -446,26 +544,58 @@ export function getPhase2ToPhase3Classification(
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       if (ranking.length > 0) {
-        direct.push({
-          player: ranking[0].player,
-          type: 'direct',
-          groupOrigin: group.nome,
-          position: 1
-        });
+        const top1Player = ranking[0].player;
+        
+        // Verificar se este Top 1 veio de desempate cross-group via partida extra
+        if (crossGroupWinners.has(top1Player.id)) {
+          // Este jogador veio de desempate cross-group via partida extra
+          // Deve ser classificado como repescagem
+          repechage.push({
+            player: top1Player,
+            type: 'repechage',
+            groupOrigin: `DESEMPATE_CROSS_GROUP_${group.categoria || ''}_FASE${phase}`,
+            position: 1
+          });
+        } else {
+          // Jogador normal, classificar como direto
+          direct.push({
+            player: top1Player,
+            type: 'direct',
+            groupOrigin: group.nome,
+            position: 1
+          });
+        }
       }
     }
-    repechage = getBestAtPosition(phaseGroups, phase, 1, 1, 'repechage', tournament);
+    // Adicionar melhor 2º lugar (pode ser do desempate cross-group via partida extra)
+    const best2nd = getBestAtPosition(phaseGroups, phase, 1, 1, 'repechage', tournament);
+    repechage = [...repechage, ...best2nd];
   } else if (numGroups === 4) {
     // Top 1 de cada = 4 jogadores (OK)
     for (const group of phaseGroups) {
       const ranking = calculateRanking(group);
       if (ranking.length > 0) {
-        direct.push({
-          player: ranking[0].player,
-          type: 'direct',
-          groupOrigin: group.nome,
-          position: 1
-        });
+        const top1Player = ranking[0].player;
+        
+        // Verificar se este Top 1 veio de desempate cross-group via partida extra
+        if (crossGroupWinners.has(top1Player.id)) {
+          // Este jogador veio de desempate cross-group via partida extra
+          // Deve ser classificado como repescagem
+          repechage.push({
+            player: top1Player,
+            type: 'repechage',
+            groupOrigin: `DESEMPATE_CROSS_GROUP_${group.categoria || ''}_FASE${phase}`,
+            position: 1
+          });
+        } else {
+          // Jogador normal, classificar como direto
+          direct.push({
+            player: top1Player,
+            type: 'direct',
+            groupOrigin: group.nome,
+            position: 1
+          });
+        }
       }
     }
   } else {
@@ -498,8 +628,31 @@ export function getPhase2ToPhase3Classification(
     
     // Pegar apenas os 4 melhores
     // Se houver empate na 4ª posição, o sistema de desempate cross-group será acionado automaticamente
-    top1s.slice(0, 4).forEach(item => {
-      direct.push(item.qualified);
+    const selectedTop1s = top1s.slice(0, 4);
+    
+      // Verificar se algum dos selecionados veio de desempate cross-group via partida extra
+      // Se sim, movê-lo para repescagem
+      selectedTop1s.forEach(item => {
+        // Verificar se este jogador veio de desempate cross-group resolvido via partida extra
+        if (crossGroupWinners.has(item.qualified.player.id)) {
+          // Este jogador veio de desempate cross-group via partida extra
+          // Deve ser classificado como repescagem
+          const tiebreak = tournament?.crossGroupTiebreaks?.find(
+            t => t.phase === phase && 
+                 t.method === 'singles' &&
+                 t.winnerId === item.qualified.player.id
+          );
+          repechage.push({
+            ...item.qualified,
+            type: 'repechage',
+            groupOrigin: tiebreak?.matchId 
+              ? `DESEMPATE_CROSS_GROUP_${phaseGroups[0]?.categoria || ''}_FASE${phase}`
+              : item.qualified.groupOrigin
+          });
+      } else {
+        // Jogador normal, classificar como direto
+        direct.push(item.qualified);
+      }
     });
   }
   
