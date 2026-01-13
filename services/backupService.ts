@@ -108,8 +108,9 @@ export function downloadBackup(tournament: Tournament, categoria?: string): void
 
 /**
  * Importa torneio a partir de string JSON
+ * Retorna o torneio importado e indica se é backup de categoria específica
  */
-export function importTournament(jsonData: string): Tournament {
+export function importTournament(jsonData: string): { tournament: Tournament; isSingleCategory: boolean; category?: string } {
   try {
     const data = JSON.parse(jsonData);
     const backup = tournamentBackupSchema.parse(data);
@@ -119,7 +120,15 @@ export function importTournament(jsonData: string): Tournament {
       throw new Error(`Versão do backup (${backup.version}) não é compatível com a versão atual (${BACKUP_VERSION})`);
     }
 
-    return backup.tournament;
+    // Verifica se é backup de categoria específica (tem apenas 1 categoria)
+    const isSingleCategory = backup.tournament.categorias.length === 1;
+    const category = isSingleCategory ? backup.tournament.categorias[0] : undefined;
+
+    return {
+      tournament: backup.tournament,
+      isSingleCategory,
+      category,
+    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new Error('Estrutura do backup inválida: ' + error.message);

@@ -535,10 +535,78 @@ export function useTournament() {
   }, [tournament.grupos]);
 
   /**
-   * Importa um torneio (substituindo o atual)
+   * Importa um torneio
+   * Se for backup de categoria específica, faz merge apenas dessa categoria
+   * Se for backup completo, substitui tudo
    */
-  const importTournament = useCallback((newTournament: Tournament) => {
-    updateTournament(newTournament);
+  const importTournament = useCallback((importData: { tournament: Tournament; isSingleCategory: boolean; category?: string }) => {
+    if (importData.isSingleCategory && importData.category) {
+      // Backup de categoria específica: fazer merge
+      updateTournament(prev => {
+        const categoria = importData.category!;
+        
+        // 1. Remover dados antigos da categoria
+        const gruposSemCategoria = prev.grupos.filter(g => g.categoria !== categoria);
+        const waitingListSemCategoria = prev.waitingList.filter(p => p.categoria !== categoria);
+        
+        // 2. Adicionar dados novos da categoria importada
+        const novosGrupos = importData.tournament.grupos;
+        const novaWaitingList = importData.tournament.waitingList;
+        
+        // 3. Garantir que a categoria existe no array de categorias
+        const categorias = prev.categorias.includes(categoria)
+          ? prev.categorias
+          : [...prev.categorias, categoria];
+        
+        // 4. Fazer merge de completedCategories
+        const completedCategories = importData.tournament.completedCategories || [];
+        const updatedCompletedCategories = prev.completedCategories || [];
+        const mergedCompletedCategories = completedCategories.includes(categoria)
+          ? [...updatedCompletedCategories.filter(c => c !== categoria), categoria]
+          : updatedCompletedCategories.filter(c => c !== categoria);
+        
+        // 5. Fazer merge de crossGroupTiebreaks (remover da categoria importada e adicionar novos)
+        // Identificar fases que têm grupos da categoria importada (após adicionar os novos grupos)
+        const fasesComGruposCategoria = new Set(
+          novosGrupos.map(g => g.fase)
+        );
+        
+        // Remover tiebreaks que pertencem às fases da categoria importada
+        // Como os tiebreaks não têm categoria direta, verificamos se há grupos da categoria na fase
+        // Se há grupos da categoria na fase, o tiebreak provavelmente pertence à categoria
+        const crossGroupTiebreaksSemCategoria = (prev.crossGroupTiebreaks || []).filter(t => {
+          // Se a fase do tiebreak está nas fases com grupos da categoria importada
+          if (fasesComGruposCategoria.has(t.phase)) {
+            // Verificar se há grupos de outras categorias nesta fase (após remover grupos da categoria importada)
+            // Se há grupos de outras categorias, o tiebreak pode ser de outra categoria, manter
+            const temGruposOutrasCategorias = gruposSemCategoria.some(
+              g => g.categoria !== categoria && g.fase === t.phase
+            );
+            // Se não há grupos de outras categorias nesta fase, remover o tiebreak (provavelmente é da categoria importada)
+            return temGruposOutrasCategorias;
+          }
+          // Se a fase não está nas fases importadas, manter o tiebreak
+          return true;
+        });
+        
+        const novosCrossGroupTiebreaks = importData.tournament.crossGroupTiebreaks || [];
+        
+        return {
+          ...prev,
+          nome: importData.tournament.nome || prev.nome, // Manter nome atual ou usar do backup
+          categorias,
+          grupos: [...gruposSemCategoria, ...novosGrupos],
+          waitingList: [...waitingListSemCategoria, ...novaWaitingList],
+          completedCategories: mergedCompletedCategories,
+          crossGroupTiebreaks: [...crossGroupTiebreaksSemCategoria, ...novosCrossGroupTiebreaks],
+          // Manter gameConfig atual (não sobrescrever)
+          gameConfig: prev.gameConfig,
+        };
+      });
+    } else {
+      // Backup completo: substituir tudo
+      updateTournament(importData.tournament);
+    }
   }, [updateTournament]);
 
   /**

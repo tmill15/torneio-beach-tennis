@@ -11,7 +11,7 @@ import { downloadBackup, importTournament, validateBackup, getBackupMetadata } f
 
 interface BackupPanelProps {
   tournament: Tournament;
-  onImport: (tournament: Tournament) => void;
+  onImport: (importData: { tournament: Tournament; isSingleCategory: boolean; category?: string }) => void;
 }
 
 export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
@@ -58,18 +58,32 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         return;
       }
 
-      // Confirmação antes de sobrescrever
-      const message = `Você está prestes a substituir todos os dados atuais.\n\n` +
+      // Detectar se é backup de categoria específica
+      const importResult = importTournament(json);
+      const isSingleCategory = importResult.isSingleCategory;
+      const category = importResult.category;
+      
+      // Confirmação antes de importar
+      const actionText = isSingleCategory 
+        ? `restaurar dados da categoria "${category}"`
+        : `substituir todos os dados atuais`;
+      
+      const warningText = isSingleCategory
+        ? `\n⚠️ Dados de outras categorias serão preservados.\nDados da categoria "${category}" serão substituídos.`
+        : `\n⚠️ Todos os dados atuais serão substituídos!`;
+      
+      const message = `Você está prestes a ${actionText}.\n\n` +
         `Dados do backup:\n` +
         `- Torneio: ${metadata.tournamentName}\n` +
         `- Data: ${new Date(metadata.exportDate).toLocaleString('pt-BR')}\n` +
+        `- Categorias: ${metadata.categorias.join(', ')}\n` +
         `- Grupos: ${metadata.totalGroups}\n` +
-        `- Jogadores: ${metadata.totalPlayers}\n\n` +
-        `Deseja continuar?`;
+        `- Jogadores: ${metadata.totalPlayers}` +
+        warningText +
+        `\n\nDeseja continuar?`;
 
       if (window.confirm(message)) {
-        const importedTournament = importTournament(json);
-        onImport(importedTournament);
+        onImport(importResult);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao importar backup');
@@ -168,10 +182,10 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
 
       <div className="border-t border-gray-200 dark:border-gray-700" />
 
-      {/* Importar Torneio Completo */}
+      {/* Importar Backup */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Importar Torneio Completo
+          Importar Backup
         </h4>
         
         <label
