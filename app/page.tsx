@@ -305,7 +305,7 @@ export default function Home() {
                     generateTournamentPDF(tournament, selectedCategory, getGroupRanking);
                   });
                 }}
-                className="px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>📄</span>
                 <span>Gerar PDF do Torneio</span>
@@ -317,7 +317,7 @@ export default function Home() {
                     downloadBackup(tournament, selectedCategory);
                   });
                 }}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>💾</span>
                 <span>Realizar Backup</span>
@@ -338,7 +338,7 @@ export default function Home() {
                     finalizeTournament(selectedCategory);
                   }
                 }}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>🏁</span>
                 <span>Finalizar Torneio</span>

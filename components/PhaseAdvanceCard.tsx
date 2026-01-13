@@ -82,6 +82,14 @@ export function PhaseAdvanceCard({
   const hasCrossGroupTies = crossGroupTies.length > 1;
   const canComplete = !hasPendingTies && !hasCrossGroupTies;
 
+  // Função para encurtar o nome do grupo quando for desempate cross group
+  const formatGroupOrigin = (groupOrigin: string) => {
+    if (groupOrigin.startsWith('DESEMPATE_CROSS_GROUP_')) {
+      return 'Desempate';
+    }
+    return groupOrigin;
+  };
+
   return (
     <div className={`border-2 rounded-lg p-6 ${
       canComplete 
@@ -241,7 +249,7 @@ export function PhaseAdvanceCard({
               {preview.direct.map(q => (
                 <div key={q.player.id} className="text-xs bg-white dark:bg-gray-800 p-2 rounded">
                   <div className="font-medium">{q.player.nome}</div>
-                  <div className="text-gray-500">({q.groupOrigin} - {q.position}º)</div>
+                  <div className="text-gray-500">({formatGroupOrigin(q.groupOrigin)} - {q.position}º)</div>
                   {q.tiebreakCriteria && (
                     <div className="text-green-700 dark:text-green-300 font-medium mt-1">
                       Critério: {q.tiebreakCriteria}
@@ -262,7 +270,7 @@ export function PhaseAdvanceCard({
                 {preview.repechage.map(q => (
                   <div key={q.player.id} className="text-xs bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded border border-yellow-300">
                     <div className="font-medium">{q.player.nome}</div>
-                    <div className="text-gray-500">({q.groupOrigin} - {q.position}º)</div>
+                    <div className="text-gray-500">({formatGroupOrigin(q.groupOrigin)} - {q.position}º)</div>
                     {q.tiebreakCriteria && (
                       <div className="text-yellow-700 dark:text-yellow-300 font-medium mt-1">
                         Critério: {q.tiebreakCriteria}

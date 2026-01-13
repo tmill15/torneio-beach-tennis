@@ -812,7 +812,8 @@ export default function ConfigPage() {
                               {stats.total} jogador{stats.total !== 1 ? 'es' : ''}
                             </span>
                             {stats.total > 0 && (
-                              <div className="relative group self-start sm:self-auto">
+                              <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
+                                <div className="relative group flex-1 sm:flex-none">
                               {(() => {
                                 const existingPhase1Groups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === 1);
                                 const isFirstFormation = existingPhase1Groups.length === 0;
@@ -825,7 +826,7 @@ export default function ConfigPage() {
                                     <button
                                       onClick={() => handleFormGroups(categoria)}
                                       disabled={isDisabled}
-                                      className={`px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                                      className={`w-full sm:w-auto px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
                                         isDisabled
                                           ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
                                           : 'bg-green-600 hover:bg-green-700'
@@ -858,15 +859,14 @@ export default function ConfigPage() {
                                 );
                               })()}
                               </div>
-                            )}
-                            {stats.total > 0 && (
                               <button
                                 onClick={() => handleClearWaitingList(categoria)}
-                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium transition-colors whitespace-nowrap self-start sm:self-auto"
+                                className="flex-1 sm:flex-none px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium transition-colors whitespace-nowrap"
                                 title="Remover todos os jogadores da lista de espera"
                               >
                                 Limpar Tudo
                               </button>
+                              </div>
                             )}
                           </div>
                         </div>

@@ -1250,6 +1250,23 @@ export function useTournament() {
         updatedGroups = prev.grupos.map(group => {
           // Remover a partida de desempate
           const matches = group.matches.filter(m => m.id !== tiebreak.matchId);
+          
+          // Se o método era 'singles' (partida extra), limpar tiebreakMethod e tiebreakOrder dos jogadores
+          if (tiebreak.method === 'singles') {
+            const updatedPlayers = group.players.map(player => {
+              if (tiebreak.tiedPlayerIds.includes(player.id)) {
+                const { tiebreakMethod, tiebreakOrder, ...playerWithoutTiebreak } = player;
+                return playerWithoutTiebreak;
+              }
+              return player;
+            });
+            return {
+              ...group,
+              matches,
+              players: updatedPlayers
+            };
+          }
+          
           return {
             ...group,
             matches
