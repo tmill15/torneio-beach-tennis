@@ -7,7 +7,7 @@ App PWA para gestão completa de torneios de Beach Tennis em modo Round Robin.
 - ✅ **Progressive Web App (PWA)** - Instalável e funciona offline
 - 🎯 **Round Robin Automático** - Gera partidas "todos contra todos"
 - 📊 **Ranking em Tempo Real** - Atualização automática após cada jogo
-- ⚙️ **Configurações Flexíveis** - Sets, games e tie-break personalizáveis
+- ⚙️ **Configurações Simplificadas** - 1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos
 - 💾 **Backup/Restore** - Export/Import completo em JSON
 - 📱 **Mobile-First** - Design otimizado para dispositivos móveis
 - 🌙 **Dark Mode** - Suporte a tema escuro
@@ -44,9 +44,9 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 2. Digite o nome do torneio
 3. Adicione categorias (ex: Iniciante, Avançado)
 4. Configure as regras do jogo:
-   - Quantidade de sets (1, 3 ou 5)
-   - Games por set (padrão: 6)
-   - Set decisivo em tie-break (opcional)
+   - Quantidade de sets: Melhor de 1 ou 3 sets
+   - Games por set: 4 ou 6 games
+   - Set decisivo em tie-break (opcional): 7 ou 10 pontos
 
 ### 2. Adicionar Jogadores
 
@@ -126,10 +126,12 @@ Critérios de classificação (nesta ordem):
 3. **Saldo de Games** (games ganhos - perdidos)
 4. **Empate Técnico** (decisão manual)
 
-### Validação de Placares
-- Set normal: Diferença mínima de 2 games (ex: 6-4, 7-5, 8-6)
-- Tie-break: Diferença mínima de 2 pontos (ex: 10-8, 11-9)
-- Impede finalização com placares inválidos
+### Configuração de Jogos
+- **Sets:** Melhor de 1 ou 3 sets
+- **Games por set:** 4 ou 6 games (seguindo regras do tênis)
+- **Tie-break decisivo:** Opcional, de 7 ou 10 pontos
+- **Flexibilidade:** Sistema permite preencher quantos sets quiser, sem validações rígidas
+- **Referência:** Configurações são usadas para referência e exibição no PDF
 
 ## 🔧 Tecnologias
 
@@ -177,6 +179,17 @@ npm start
 # Lighthouse audit
 lighthouse http://localhost:3000 --view
 ```
+
+## 🔄 Versionamento
+
+A versão do projeto é gerenciada **automaticamente** via GitHub Actions baseado em [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` → Bump Minor (0.2.3 → 0.3.0)
+- `fix:` → Bump Patch (0.2.3 → 0.2.4)
+- `BREAKING CHANGE:` → Bump Major (0.2.3 → 1.0.0)
+- `chore/docs/refactor:` → Sem bump (não cria release)
+
+**⚠️ Não altere a versão manualmente no `package.json`** - O GitHub Actions cuida disso automaticamente!
 
 ## 📦 Build e Deploy
 
@@ -232,7 +245,9 @@ Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
 
 ---
 
-**Versão Atual:** 0.1.0  
+**Versão Atual:** 0.2.3  
 **Última Atualização:** 10/01/2026  
 
-Desenvolvido com ❤️ para a comunidade de Beach Tennis
+Desenvolvido por Thiago Milhomem para a comunidade de Beach Tennis
+
+**Nota:** A versão é gerenciada automaticamente via GitHub Actions baseado em Conventional Commits.

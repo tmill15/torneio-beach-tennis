@@ -26,10 +26,10 @@ export interface Player {
 // ============================================
 
 export interface GameConfig {
-  quantidadeSets: number;           // Ex: 1, 3, 5 (melhor de X)
-  gamesPerSet: number;              // Ex: 6 (primeiro a 6 games)
-  tieBreakDecisivo: boolean;        // Set decisivo é tie-break?
-  pontosTieBreak: number;           // Ex: 7, 9, 10 (pontos do tie-break)
+  quantidadeSets: 1 | 3;             // Melhor de 1 ou 3 sets
+  gamesPerSet: 4 | 6;                // 4 ou 6 games por set (regras do tênis: diferença mínima de 2)
+  tieBreakDecisivo: boolean;         // Set decisivo é tie-break?
+  pontosTieBreak: 7 | 10;            // 7 ou 10 pontos no tie-break (diferença mínima de 2)
 }
 
 // ============================================
