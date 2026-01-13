@@ -16,8 +16,8 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Separação por categorias
 - [x] Configuração de nome do torneio
 - [x] PWA configurado (instalável, offline-ready)
-- [x] Versionamento SemVer (v0.1.0)
-- [x] Footer com versão visível
+- [x] Versionamento SemVer automático via CI/CD
+- [x] Footer com versão visível (sincronizada automaticamente)
 
 ### ✅ Inscrição e Grupos - COMPLETO
 - [x] Sistema de inscrição individual com lista de espera
@@ -115,6 +115,39 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Design responsivo implementado
 - [x] Dark mode suportado
 - [x] Documentação completa (README.md)
+
+### Fase 9: CI/CD e Versionamento Automático ✅
+- [x] GitHub Actions workflow para auto-release
+- [x] Versionamento automático baseado em Conventional Commits
+- [x] Exposição de versão via variável de ambiente Next.js
+- [x] Footer atualizado para usar versão do build
+- [x] Integração com Vercel para deploy automático
+
+**Detalhes da Implementação:**
+- **Workflow:** `.github/workflows/release.yml`
+  - Disparado automaticamente em push para `main`
+  - Usa `mathieudutour/github-tag-action` para calcular bump de versão
+  - Atualiza `package.json` automaticamente
+  - Cria GitHub Release com changelog automático
+  - Commit do bump inclui `[skip ci]` para evitar loops
+
+- **Versionamento:**
+  - `feat:` → Bump Minor (0.14.4 → 0.15.0)
+  - `fix:` → Bump Patch (0.14.4 → 0.14.5)
+  - `BREAKING CHANGE:` → Bump Major (0.14.4 → 1.0.0)
+  - `chore/docs/refactor:` → Sem bump (não cria release)
+
+- **Exposição de Versão:**
+  - Variável `NEXT_PUBLIC_APP_VERSION` exposta no build
+  - Lida automaticamente do `package.json` no `next.config.mjs`
+  - Footer usa `process.env.NEXT_PUBLIC_APP_VERSION`
+  - Versão sempre sincronizada com o `package.json`
+
+- **Deploy Vercel:**
+  - Deploy automático na branch `main`
+  - Build Command: `npm run build`
+  - Output Directory: `.next`
+  - Versão exposta automaticamente no build
 
 ## 📊 Checklist de Funcionalidades
 
@@ -1929,8 +1962,10 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 - Mobile-first design
 - PWA para funcionar offline
 - LocalStorage para persistência (MVP)
-- Versionamento semântico (SemVer)
-- Footer exibe versão do package.json
+- Versionamento semântico (SemVer) automático via CI/CD
+- Footer exibe versão via variável de ambiente (NEXT_PUBLIC_APP_VERSION)
+- GitHub Actions para releases automáticos baseados em Conventional Commits
+- Deploy automático na Vercel
 
 ### Melhorias Futuras
 - [ ] Backend com API REST

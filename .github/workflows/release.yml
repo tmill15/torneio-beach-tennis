@@ -1,0 +1,112 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Calculate Version and Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Calculate version bump
+        id: version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: minor
+          release_branches: main
+          custom_release_rules: |
+            feat:minor
+            fix:patch
+            chore:skip
+            docs:skip
+            refactor:skip
+            style:skip
+            test:skip
+            perf:minor
+            ci:skip
+            build:skip
+
+      - name: Check if version was bumped
+        id: check_version
+        run: |
+          if [ "${{ steps.version.outputs.new_version }}" != "" ]; then
+            echo "bumped=true" >> $GITHUB_OUTPUT
+            echo "Version bumped to ${{ steps.version.outputs.new_version }}"
+          else
+            echo "bumped=false" >> $GITHUB_OUTPUT
+            echo "No version bump needed"
+          fi
+
+      - name: Update package.json version
+        if: steps.check_version.outputs.bumped == 'true'
+        run: |
+          npm version ${{ steps.version.outputs.new_version }} --no-git-tag-version
+          echo "Updated package.json to version ${{ steps.version.outputs.new_version }}"
+
+      - name: Commit version bump
+        if: steps.check_version.outputs.bumped == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+
+      - name: Generate changelog
+        if: steps.check_version.outputs.bumped == 'true'
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Nenhuma mudança documentada"
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.check_version.outputs.bumped == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: Release v${{ steps.version.outputs.new_version }}
+          body: |
+            ## 🚀 Release v${{ steps.version.outputs.new_version }}
+
+            ### 📝 Changelog
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+            *Esta release foi criada automaticamente pelo GitHub Actions baseado em Conventional Commits.*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
