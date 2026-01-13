@@ -17,12 +17,16 @@ interface BackupPanelProps {
 export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCategory, setExportCategory] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
     try {
-      downloadBackup(tournament);
+      const categoria = exportCategory === 'all' ? undefined : exportCategory;
+      downloadBackup(tournament, categoria);
       setError(null);
+      setShowExportModal(false);
     } catch (err) {
       setError('Erro ao criar backup');
       console.error(err);
@@ -91,22 +95,76 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         </div>
       )}
 
-      {/* Exportar Torneio Completo */}
+      {/* Exportar Torneio */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Exportar Torneio Completo
+          Exportar Backup
         </h4>
         <button
-          onClick={handleExport}
+          onClick={() => setShowExportModal(true)}
           className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
         >
           <span>📥</span>
-          Baixar Backup Completo (.json)
+          Baixar Backup (.json)
         </button>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Salva o arquivo JSON com todos os dados: grupos, jogos, placares e ranking
         </p>
       </div>
+
+      {/* Modal de Seleção de Categoria para Export */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              📥 Exportar Backup
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Selecionar Categoria
+                </label>
+                <select
+                  value={exportCategory}
+                  onChange={(e) => setExportCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                >
+                  <option value="all">Todas as Categorias</option>
+                  {tournament.categorias.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {exportCategory === 'all' 
+                    ? 'O backup incluirá dados de todas as categorias'
+                    : `O backup incluirá apenas dados da categoria "${exportCategory}"`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportCategory('all');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Exportar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-gray-200 dark:border-gray-700" />
 

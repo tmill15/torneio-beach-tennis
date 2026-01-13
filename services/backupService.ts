@@ -32,32 +32,69 @@ const tournamentBackupSchema = z.object({
 });
 
 /**
- * Exporta torneio para string JSON
+ * Exporta torneio para string JSON (completo ou filtrado por categoria)
  */
-export function exportTournament(tournament: Tournament): string {
+export function exportTournament(tournament: Tournament, categoria?: string): string {
+  let filteredTournament: Tournament = tournament;
+  
+  // Se categoria for especificada, filtrar apenas dados dessa categoria
+  if (categoria) {
+    filteredTournament = {
+      ...tournament,
+      grupos: tournament.grupos.filter(g => g.categoria === categoria),
+      waitingList: tournament.waitingList.filter(p => p.categoria === categoria),
+      categorias: [categoria], // Manter apenas a categoria selecionada
+    };
+  }
+  
   const backup: TournamentBackup = {
     version: BACKUP_VERSION,
     exportDate: new Date().toISOString(),
-    tournament,
+    tournament: filteredTournament,
   };
 
   return JSON.stringify(backup, null, 2);
 }
 
 /**
- * Gera e faz download do arquivo de backup
+ * Gera nome do arquivo de backup
  */
-export function downloadBackup(tournament: Tournament): void {
-  const json = exportTournament(tournament);
+function generateBackupFilename(tournament: Tournament, categoria?: string): string {
+  const date = new Date();
+  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+  
+  // Sanitiza nome do torneio (remove caracteres especiais)
+  const tournamentName = tournament.nome
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase()
+    .substring(0, 30);
+  
+  // Sanitiza nome da categoria (se houver)
+  const categoryName = categoria
+    ? categoria
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .toLowerCase()
+        .substring(0, 20)
+    : 'todas';
+  
+  return `backup-${tournamentName}-${categoryName}-${dateStr}-${timeStr}.json`;
+}
+
+/**
+ * Gera e faz download do arquivo de backup
+ * @param tournament - Torneio completo
+ * @param categoria - Categoria específica (opcional). Se não informada, faz backup de todas as categorias
+ */
+export function downloadBackup(tournament: Tournament, categoria?: string): void {
+  const json = exportTournament(tournament, categoria);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
-  // Gera nome do arquivo com timestamp
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, '-')
-    .slice(0, 19);
-  const filename = `beachtennis-backup-${timestamp}.json`;
+  // Gera nome do arquivo com nome do torneio, categoria e data
+  const filename = generateBackupFilename(tournament, categoria);
 
   // Cria link temporário e aciona download
   const link = document.createElement('a');

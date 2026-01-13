@@ -314,7 +314,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   import('@/services/backupService').then(({ downloadBackup }) => {
-                    downloadBackup(tournament);
+                    downloadBackup(tournament, selectedCategory);
                   });
                 }}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
