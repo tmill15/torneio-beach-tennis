@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_TOKEN_WITH_BYPASS || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -66,15 +66,6 @@ jobs:
           npm version ${{ steps.version.outputs.new_version }} --no-git-tag-version
           echo "Updated package.json to version ${{ steps.version.outputs.new_version }}"
 
-      - name: Commit version bump
-        if: steps.check_version.outputs.bumped == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
-          git push
-
       - name: Generate changelog
         if: steps.check_version.outputs.bumped == 'true'
         id: changelog
@@ -91,6 +82,19 @@ jobs:
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit and push version bump
+        if: steps.check_version.outputs.bumped == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          # Usa PAT se disponível, senão usa GITHUB_TOKEN padrão
+          if [ -n "${{ secrets.GH_TOKEN_WITH_BYPASS }}" ]; then
+            git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN_WITH_BYPASS }}@github.com/${{ github.repository }}.git
+          fi
+          git push origin main
 
       - name: Create GitHub Release
         if: steps.check_version.outputs.bumped == 'true'
