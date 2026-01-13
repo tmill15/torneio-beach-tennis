@@ -1,0 +1,4 @@
+{
+  "buildCommand": "npm run build",
+  "ignoreCommand": "COMMIT_MSG=$(git log -1 --pretty=%B); if [[ \"$COMMIT_MSG\" == *\"chore: bump version\"* ]]; then exit 1; elif [[ \"$COMMIT_MSG\" == *\"Merge pull request\"* ]] || [[ \"$COMMIT_MSG\" == *\"Merge branch\"* ]]; then exit 0; else exit 1; fi"
+}
