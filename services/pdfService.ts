@@ -35,9 +35,9 @@ export function generateTournamentPDF(
   // CABEÇALHO
   // ============================================
   // Fundo com gradiente (simulado com retângulos)
-  doc.setFillColor(...primaryColorDark);
+  doc.setFillColor(primaryColorDark[0], primaryColorDark[1], primaryColorDark[2]);
   doc.rect(0, 0, pageWidth, 45, 'F');
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, pageWidth, 40, 'F');
   
   // Linha decorativa inferior
@@ -68,7 +68,7 @@ export function generateTournamentPDF(
     minute: '2-digit'
   });
 
-  doc.setTextColor(...darkGray);
+  doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Data de geração: ${dateStr}`, margin, yPosition);
@@ -182,7 +182,7 @@ export function generateTournamentPDF(
       // Reescrever título na nova página
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...darkGray);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
       doc.text('PARTICIPANTES', margin, margin + 8);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -220,7 +220,7 @@ export function generateTournamentPDF(
     }
 
     // Título da fase com fundo colorido
-    doc.setFillColor(...primaryColor);
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(margin, yPosition - 5, pageWidth - 2 * margin, 8, 'F');
     
     doc.setFontSize(13);
@@ -240,7 +240,7 @@ export function generateTournamentPDF(
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...darkGray);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
       doc.text(`Grupo ${group.nome}`, margin, yPosition);
       yPosition += 6;
 
@@ -248,7 +248,7 @@ export function generateTournamentPDF(
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       // Fundo com gradiente sutil
-      doc.setFillColor(...primaryColor);
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.rect(margin, yPosition - 4, pageWidth - 2 * margin, 6, 'F');
       
       doc.setTextColor(255, 255, 255);
@@ -273,12 +273,12 @@ export function generateTournamentPDF(
         
         // Fundo alternado para melhor legibilidade (exceto campeão)
         if (!isChampion && index % 2 === 1) {
-          doc.setFillColor(...lightGray);
+          doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
           doc.rect(margin, yPosition - 4, pageWidth - 2 * margin, 5, 'F');
         }
 
         if (isChampion) {
-          doc.setFillColor(...primaryColor);
+          doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
           doc.rect(margin, yPosition - 4, pageWidth - 2 * margin, 5, 'F');
           doc.setTextColor(255, 255, 255);
         } else {
@@ -336,11 +336,11 @@ export function generateTournamentPDF(
         } else {
           // Outras fases: cores específicas
           if (statusText === 'CLASSIFICADO') {
-            doc.setTextColor(...successColor);
+            doc.setTextColor(successColor[0], successColor[1], successColor[2]);
           } else if (statusText === 'REPESCAGEM') {
             doc.setTextColor(255, 215, 0); // Amarelo
           } else if (statusText === 'ELIMINADO') {
-            doc.setTextColor(...dangerColor);
+            doc.setTextColor(dangerColor[0], dangerColor[1], dangerColor[2]);
           } else {
             doc.setTextColor(0, 0, 0);
           }
@@ -400,7 +400,7 @@ export function generateTournamentPDF(
     }
 
     // Título da seção de jogos com estilo
-    doc.setFillColor(...primaryColor);
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(margin, yPosition - 3, pageWidth - 2 * margin, 6, 'F');
     
     doc.setFontSize(12);
@@ -446,11 +446,11 @@ export function generateTournamentPDF(
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...primaryColor);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text(`Grupo ${group.nome}`, margin, yPosition);
       
       // Linha decorativa
-      doc.setDrawColor(...primaryColor);
+      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setLineWidth(0.5);
       doc.line(margin, yPosition + 2, margin + 30, yPosition + 2);
       
@@ -507,7 +507,7 @@ export function generateTournamentPDF(
       // Título da seção
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...primaryColor);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text(`DESEMPATES ENTRE GRUPOS - FASE ${phase}${phase === 3 ? ' (FINAL)' : ''}`, margin, yPosition);
       yPosition += 8;
 
@@ -596,7 +596,7 @@ export function generateTournamentPDF(
         // Participantes
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...darkGray);
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
         doc.text('Participantes:', margin + 5, yPosition);
         yPosition += 6;
 
@@ -617,7 +617,7 @@ export function generateTournamentPDF(
         // Método de desempate
         yPosition += 3;
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...darkGray);
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
         doc.text(`Método: ${getMethodLabel()}`, margin + 5, yPosition);
         yPosition += 6;
 
@@ -681,7 +681,7 @@ export function generateTournamentPDF(
         
         // Box destacado para o campeão
         // Fundo laranja simples
-        doc.setFillColor(...primaryColor);
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
         doc.rect(margin, yPosition - 5, pageWidth - 2 * margin, 33, 'F');
         
         doc.setFontSize(18);
