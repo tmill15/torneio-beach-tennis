@@ -825,6 +825,61 @@ export function useTournament() {
   }, [updateTournament]);
 
   /**
+   * Finaliza o torneio: limpa todas as categorias e retorna jogadores para lista de espera
+   */
+  const finalizeTournament = useCallback(() => {
+    updateTournament(prev => {
+      let updated = prev;
+      
+      // Limpar cada categoria uma por uma
+      prev.categorias.forEach(categoria => {
+        // 1. Coletar todos os jogadores de todos os grupos da categoria
+        const playersMap = new Map<string, Player>();
+        
+        updated.grupos
+          .filter(g => g.categoria === categoria)
+          .forEach(g => {
+            g.players.forEach(p => {
+              if (!playersMap.has(p.id)) {
+                playersMap.set(p.id, {
+                  ...p,
+                  status: 'waiting' as const,
+                  tiebreakOrder: undefined,
+                  tiebreakMethod: undefined,
+                  eliminatedInPhase: undefined,
+                  qualificationType: undefined
+                });
+              }
+            });
+          });
+
+        const allPlayers = Array.from(playersMap.values());
+
+        // 2. Remover todos os grupos da categoria
+        updated = {
+          ...updated,
+          grupos: updated.grupos.filter(g => g.categoria !== categoria),
+        };
+
+        // 3. Adicionar jogadores de volta à lista de espera, evitando duplicatas
+        const existingPlayerIds = new Set(updated.waitingList.map(p => p.id));
+        const newPlayers = allPlayers.filter(p => !existingPlayerIds.has(p.id));
+        updated = {
+          ...updated,
+          waitingList: [...updated.waitingList, ...newPlayers],
+        };
+      });
+
+      // 4. Limpar completedCategories e crossGroupTiebreaks
+      return {
+        ...updated,
+        completedCategories: [],
+        crossGroupTiebreaks: [],
+      };
+    });
+  }, [updateTournament]);
+
+  /**
    * Desfazer desempate manual (remove tiebreakOrder, tiebreakMethod e partidas de simples)
    */
   const undoTiebreak = useCallback((groupId: string, playerIds: string[]) => {
@@ -1204,6 +1259,7 @@ export function useTournament() {
     resetAndRedrawGroups,
     redrawGroupsInPlace,
     clearCategory,
+    finalizeTournament,
     resolveTieManual,
     resolveTieManualOrder,
     resolveTieRandom,

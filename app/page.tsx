@@ -38,6 +38,7 @@ export default function Home() {
     hasPendingTies,
     getMaxPhase,
     isFinalPhase,
+    finalizeTournament,
   } = useTournament();
 
   useEffect(() => {
@@ -297,17 +298,52 @@ export default function Home() {
                 return '???';
               })()}
             </div>
-            <button
-              onClick={() => {
-                import('@/services/pdfService').then(({ generateTournamentPDF }) => {
-                  generateTournamentPDF(tournament, selectedCategory, getGroupRanking);
-                });
-              }}
-              className="px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2 mx-auto"
-            >
-              <span>📄</span>
-              <span>Gerar PDF do Torneio</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <button
+                onClick={() => {
+                  import('@/services/pdfService').then(({ generateTournamentPDF }) => {
+                    generateTournamentPDF(tournament, selectedCategory, getGroupRanking);
+                  });
+                }}
+                className="px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+              >
+                <span>📄</span>
+                <span>Gerar PDF do Torneio</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  import('@/services/backupService').then(({ downloadBackup }) => {
+                    downloadBackup(tournament);
+                  });
+                }}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+              >
+                <span>💾</span>
+                <span>Realizar Backup</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  const message = `⚠️ ATENÇÃO: Finalizar o torneio?\n\n` +
+                    `Isso irá:\n` +
+                    `- Apagar TODOS os grupos de TODAS as categorias\n` +
+                    `- Apagar todos os jogos e placares\n` +
+                    `- Retornar TODOS os participantes para a lista de espera\n` +
+                    `- Limpar desempates e classificações\n\n` +
+                    `Esta ação não pode ser desfeita!\n\n` +
+                    `Deseja continuar?`;
+                  
+                  if (window.confirm(message)) {
+                    finalizeTournament();
+                  }
+                }}
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+              >
+                <span>🏁</span>
+                <span>Finalizar Torneio</span>
+              </button>
+            </div>
           </div>
         ) : null}
 
