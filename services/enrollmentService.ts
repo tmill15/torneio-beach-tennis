@@ -162,7 +162,13 @@ export function getWaitingListStats(tournament: Tournament) {
     remaining: number;
   }> = {};
 
-  for (const categoria of tournament.categorias) {
+  // Coletar todas as categorias únicas da lista de espera (pode haver categorias antigas)
+  const allCategoriesInWaitingList = new Set(tournament.waitingList.map(p => p.categoria));
+  
+  // Combinar categorias do torneio com categorias encontradas na lista de espera
+  const allCategoriesArray = Array.from(new Set([...tournament.categorias, ...Array.from(allCategoriesInWaitingList)]));
+
+  for (const categoria of allCategoriesArray) {
     const players = tournament.waitingList.filter(p => p.categoria === categoria);
     const total = players.length;
     const seeds = players.filter(p => p.isSeed).length;

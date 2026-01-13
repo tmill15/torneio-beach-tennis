@@ -898,9 +898,11 @@ export function useTournament() {
         .forEach(g => {
           g.players.forEach(p => {
             // Se o jogador ainda não foi adicionado, adiciona com status limpo
+            // IMPORTANTE: Garantir que a categoria do jogador seja a mesma da categoria sendo limpa
             if (!playersMap.has(p.id)) {
               playersMap.set(p.id, {
                 ...p,
+                categoria: categoria, // Garantir que a categoria está correta
                 status: 'waiting' as const,
                 tiebreakOrder: undefined,
                 tiebreakMethod: undefined,
