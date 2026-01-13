@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { CrossGroupTiebreak, Tournament, Match, SetScore, GameConfig } from '@/types';
 import { MatchList } from './MatchList';
 
@@ -32,8 +32,6 @@ export function CrossGroupTiebreakerCard({
   onReopenMatch,
   onUndoTiebreak,
 }: CrossGroupTiebreakerCardProps) {
-  const [viewMode, setViewMode] = useState<'info' | 'match'>('info');
-
   // Encontrar os jogadores envolvidos (garantir unicidade por ID)
   const categoryGroups = tournament.grupos.filter(
     g => g.categoria === categoria && g.fase === tiebreak.phase
@@ -62,6 +60,21 @@ export function CrossGroupTiebreakerCard({
       }
     }
   }
+
+  // Inicializar viewMode: se for partida extra e a partida não estiver finalizada, começar na aba "Partida"
+  const [viewMode, setViewMode] = useState<'info' | 'match'>(() => {
+    if (tiebreak.method === 'singles' && tiebreakMatch && !tiebreakMatch.isFinished) {
+      return 'match';
+    }
+    return 'info';
+  });
+
+  // Quando a partida for finalizada, mudar para a aba "Informações"
+  useEffect(() => {
+    if (tiebreakMatch?.isFinished && viewMode === 'match') {
+      setViewMode('info');
+    }
+  }, [tiebreakMatch?.isFinished, viewMode]);
 
   // Encontrar o vencedor
   const winner = players.find(p => p.id === tiebreak.winnerId);

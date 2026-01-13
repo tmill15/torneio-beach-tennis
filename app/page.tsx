@@ -113,6 +113,15 @@ export default function Home() {
     t => t.phase === selectedPhase
   );
 
+  // Calcular preview de classificação (sempre recalcula no render para garantir atualização)
+  const shouldShowPhaseAdvance = selectedPhase === getMaxPhase(selectedCategory) && 
+    isPhaseComplete(selectedCategory, selectedPhase) && 
+    !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory));
+  
+  const phaseAdvancePreview = shouldShowPhaseAdvance 
+    ? getPhaseAdvancePreview(selectedCategory, selectedPhase)
+    : null;
+
   const handleFinalizeMatch = (groupId: string, matchId: string, sets: typeof tournament.grupos[0]['matches'][0]['sets']) => {
     finalizeMatch(groupId, matchId, sets);
   };
@@ -259,12 +268,13 @@ export default function Home() {
         {/* Botão de Concluir Fase / Torneio */}
         {selectedPhase === getMaxPhase(selectedCategory) && 
          isPhaseComplete(selectedCategory, selectedPhase) && 
-         !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory)) && (
-          <div className="mb-6">
+         !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory)) && 
+         phaseAdvancePreview && (
+          <div className="mb-6" key={JSON.stringify(tournament.crossGroupTiebreaks || [])}>
             <PhaseAdvanceCard
               categoria={selectedCategory}
               currentPhase={selectedPhase}
-              preview={getPhaseAdvancePreview(selectedCategory, selectedPhase)}
+              preview={phaseAdvancePreview}
               hasPendingTies={hasPendingTies(selectedCategory, selectedPhase)}
               onAdvance={() => advanceToNextPhase(selectedCategory, selectedPhase)}
               resolveCrossGroupTieManual={resolveCrossGroupTieManual}
@@ -305,7 +315,7 @@ export default function Home() {
                     generateTournamentPDF(tournament, selectedCategory, getGroupRanking);
                   });
                 }}
-                className="px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-gray-100 text-orange-600 font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>📄</span>
                 <span>Gerar PDF do Torneio</span>
@@ -317,7 +327,7 @@ export default function Home() {
                     downloadBackup(tournament, selectedCategory);
                   });
                 }}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>💾</span>
                 <span>Realizar Backup</span>
@@ -338,7 +348,7 @@ export default function Home() {
                     finalizeTournament(selectedCategory);
                   }
                 }}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 <span>🏁</span>
                 <span>Finalizar Torneio</span>

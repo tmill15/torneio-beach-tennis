@@ -1244,11 +1244,24 @@ export function useTournament() {
                t.tiedPlayerIds.every(id => tiebreak.tiedPlayerIds.includes(id)))
       );
 
-      // Se há partida de desempate, removê-la do grupo
+      // Se o método era 'singles' (partida extra), remover o grupo especial de desempate inteiro
       let updatedGroups = prev.grupos;
-      if (tiebreak.matchId) {
+      if (tiebreak.method === 'singles' && tiebreak.matchId) {
+        // Encontrar o grupo de desempate cross-group
+        const tiebreakGroup = prev.grupos.find(group => {
+          // Verificar se é um grupo de desempate cross-group
+          if (!group.nome.startsWith('DESEMPATE_CROSS_GROUP_')) return false;
+          // Verificar se contém a partida de desempate
+          return group.matches.some(m => m.id === tiebreak.matchId);
+        });
+        
+        if (tiebreakGroup) {
+          // Remover o grupo inteiro
+          updatedGroups = prev.grupos.filter(group => group.id !== tiebreakGroup.id);
+        }
+      } else if (tiebreak.matchId) {
+        // Para outros métodos, apenas remover a partida (se houver)
         updatedGroups = prev.grupos.map(group => {
-          // Remover a partida de desempate
           const matches = group.matches.filter(m => m.id !== tiebreak.matchId);
           return {
             ...group,
@@ -1326,8 +1339,9 @@ export function useTournament() {
 
   /**
    * Preview de classificados antes de avançar
+   * Não usa useCallback para garantir que sempre usa o tournament mais atualizado
    */
-  const getPhaseAdvancePreview = useCallback((categoria: string, phase: number) => {
+  const getPhaseAdvancePreview = (categoria: string, phase: number) => {
     const categoryGroups = tournament.grupos.filter(
       g => g.categoria === categoria && g.fase === phase
     );
@@ -1368,7 +1382,7 @@ export function useTournament() {
       total: direct.length + repechage.length,
       rule
     };
-  }, [tournament.grupos]);
+  };
 
   /**
    * Reseta o torneio para estado inicial
