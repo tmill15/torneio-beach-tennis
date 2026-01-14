@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { generateTournamentShare } from '@/hooks/useTournamentSync';
+import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
@@ -21,6 +21,7 @@ interface ShareTournamentProps {
 export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentProps) {
   const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -55,6 +56,28 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
       console.error('Erro ao copiar link:', error);
     }
   };
+
+  // Verificar se compartilhamento está ativo
+  if (!sharingEnabled) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+            Compartilhamento Desativado
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Para compartilhar o torneio, ative o compartilhamento nas configurações primeiro.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!shareLink) {
     return null;

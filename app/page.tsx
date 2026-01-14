@@ -12,19 +12,19 @@ import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
-import { ShareTournament } from '@/components/ShareTournament';
 import { SyncStatus } from '@/components/SyncStatus';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
   
   const {
     tournament,
@@ -174,27 +174,25 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {tournament.nome}
-              </h1>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {tournament.nome}
+                </h1>
+                {/* Indicador de compartilhamento */}
+                {sharingEnabled && (
+                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center gap-1">
+                    <span>🔗</span>
+                    <span>Compartilhado</span>
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Painel do Torneio
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Status de sincronização (apenas admin) */}
-              {isAdmin && <SyncStatus status={syncStatus} />}
-              
-              {/* Botão compartilhar (apenas admin) */}
-              {isAdmin && (
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <span>🔗</span>
-                  <span className="hidden sm:inline">Compartilhar</span>
-                </button>
-              )}
+              {/* Status de sincronização (apenas admin e se compartilhamento ativo) */}
+              {isAdmin && sharingEnabled && <SyncStatus status={syncStatus} />}
               
               <Link
                 href="/config"
@@ -541,15 +539,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Modal de Compartilhamento */}
-      {showShareModal && (
-        <ShareTournament
-          onClose={() => setShowShareModal(false)}
-          onShareGenerated={(id) => {
-            // Tournament ID já é gerenciado pelo ShareTournament via localStorage
-          }}
-        />
-      )}
     </main>
   );
 }

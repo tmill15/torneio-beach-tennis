@@ -12,6 +12,7 @@ import type { Tournament } from '@/types';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled';
 
 interface UseTournamentSyncOptions {
   tournament: Tournament;
@@ -46,6 +47,10 @@ export function useTournamentSync({
     ADMIN_TOKEN_KEY,
     null
   );
+  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(
+    SHARING_ENABLED_KEY,
+    false
+  );
 
   const lastSyncedData = useRef<string | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -74,8 +79,9 @@ export function useTournamentSync({
   }, [isAdmin, viewerData, onTournamentUpdate]);
 
   // Modo Admin: sincronizar com debounce e dirty checking
+  // Só sincroniza se compartilhamento estiver ativo
   useEffect(() => {
-    if (!isAdmin || !tournamentId || !storedAdminToken) {
+    if (!isAdmin || !tournamentId || !storedAdminToken || !sharingEnabled) {
       return;
     }
 
@@ -146,7 +152,7 @@ export function useTournamentSync({
         clearTimeout(debounceTimer.current);
       }
     };
-  }, [isAdmin, tournamentId, storedAdminToken, tournament]);
+  }, [isAdmin, tournamentId, storedAdminToken, tournament, sharingEnabled]);
 
   // Gerar link de compartilhamento
   const shareLink = tournamentId
