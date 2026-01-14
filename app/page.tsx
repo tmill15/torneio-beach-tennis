@@ -8,16 +8,29 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
+import { SyncStatus } from '@/components/SyncStatus';
+import { ShareTournament } from '@/components/ShareTournament';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
+const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
+  const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
   
   const {
     tournament,
+    updateTournament,
     updateMatchScore,
     finalizeMatch,
     reopenMatch,
@@ -40,6 +53,17 @@ export default function Home() {
     isFinalPhase,
     finalizeTournament,
   } = useTournament();
+
+  // Sincronização (modo admin)
+  const isAdmin = !!adminToken;
+  const { syncStatus, shareLink } = useTournamentSync({
+    tournament,
+    tournamentId: tournamentId || undefined,
+    isAdmin,
+    onTournamentUpdate: (updatedTournament) => {
+      updateTournament(() => updatedTournament);
+    },
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -152,19 +176,49 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {tournament.nome}
-              </h1>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {tournament.nome}
+                </h1>
+                {/* Indicador de compartilhamento (desktop) */}
+                {sharingEnabled && (
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="hidden sm:inline-flex px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full items-center gap-1 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-pointer"
+                  >
+                    <span>🔗</span>
+                    <span>Compartilhado</span>
+                  </button>
+                )}
+              </div>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Painel do Torneio
               </p>
             </div>
-            <Link
-              href="/config"
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              ⚙️ Configurações
-            </Link>
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {/* Status de sincronização (apenas admin e se compartilhamento ativo) */}
+                {isAdmin && sharingEnabled && <SyncStatus status={syncStatus} />}
+                
+                <Link
+                  href="/config"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center"
+                >
+                  ⚙️ Configurações
+                </Link>
+              </div>
+              
+              {/* Indicador de compartilhamento (mobile, embaixo do botão) */}
+              {sharingEnabled && (
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="sm:hidden px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center justify-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors w-full"
+                >
+                  <span>🔗</span>
+                  <span>Compartilhado</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Seletor de Categoria */}
@@ -322,10 +376,9 @@ export default function Home() {
               </button>
               
               <button
-                onClick={() => {
-                  import('@/services/backupService').then(({ downloadBackup }) => {
-                    downloadBackup(tournament, selectedCategory);
-                  });
+                onClick={async () => {
+                  const { downloadBackup } = await import('@/services/backupService');
+                  await downloadBackup(tournament, selectedCategory);
                 }}
                 className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >
@@ -345,7 +398,7 @@ export default function Home() {
                     `Deseja continuar?`;
                   
                   if (window.confirm(message)) {
-                    finalizeTournament(selectedCategory);
+                    finalizeTournament(selectedCategory).catch(console.error);
                   }
                 }}
                 className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
@@ -423,6 +476,7 @@ export default function Home() {
               const ranking = getGroupRanking(group.id);
               const maxPhase = getMaxPhase(selectedCategory);
               const isReadOnly = selectedPhase < maxPhase; // Fase anterior = read-only
+              const groupPhaseComplete = isReadOnly ? isPhaseComplete(selectedCategory, selectedPhase) : false;
 
               return (
                 <GroupCard
@@ -432,6 +486,7 @@ export default function Home() {
                   gameConfig={tournament.gameConfig}
                   viewMode={viewMode}
                   isReadOnly={isReadOnly}
+                  isPhaseComplete={groupPhaseComplete}
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                   onReopenMatch={reopenMatch}
@@ -501,6 +556,16 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Modal de Compartilhamento (mobile) */}
+      {showShareModal && sharingEnabled && (
+        <ShareTournament
+          onClose={() => setShowShareModal(false)}
+          onShareGenerated={(id) => {
+            // Tournament ID já é gerenciado pelo ShareTournament via localStorage
+          }}
+        />
+      )}
     </main>
   );
 }

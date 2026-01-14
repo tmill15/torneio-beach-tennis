@@ -130,6 +130,15 @@ export interface TournamentBackup {
   version: string;                   // Versão do backup (SemVer)
   exportDate: string;                // Data da exportação (ISO 8601)
   tournament: Tournament;            // Dados completos do torneio
+  isFullBackup: boolean;             // Indica se é backup completo (true) ou de categoria específica (false)
+  // Credenciais criptografadas (apenas em backup completo)
+  syncCredentials?: {
+    encrypted: string;                 // Credenciais criptografadas (JSON com tournamentId e adminToken)
+    salt: string;                      // Salt usado na criptografia (base64)
+    iv: string;                        // IV usado na criptografia (base64)
+  };
+  // Estado de compartilhamento (apenas em backup completo)
+  sharingEnabled?: boolean;            // Estado do toggle de compartilhamento
 }
 
 // ============================================

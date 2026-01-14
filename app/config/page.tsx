@@ -6,15 +6,54 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
 import { GameConfigForm } from '@/components/GameConfigForm';
 import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
 import { validateThreePhaseTournament } from '@/services/phaseValidation';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { ShareTournament } from '@/components/ShareTournament';
+
+const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 
 export default function ConfigPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
+  const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
+  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  
+  // Gerar adminToken automaticamente se não existir (primeira vez)
+  useEffect(() => {
+    if (isMounted && !adminToken) {
+      // Gerar novo token e tournamentId se não existirem
+      const { tournamentId: newTournamentId, adminToken: newAdminToken } = generateTournamentShare();
+      setAdminToken(newAdminToken);
+      if (!tournamentId) {
+        setTournamentId(newTournamentId);
+      }
+    }
+  }, [isMounted, adminToken, tournamentId, setAdminToken, setTournamentId]);
+
+  // Handler para toggle de compartilhamento
+  const handleToggleSharing = (enabled: boolean) => {
+    if (enabled) {
+      // Ativar: gerar credenciais se não existirem
+      if (!tournamentId || !adminToken) {
+        const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
+        setTournamentId(newId);
+        setAdminToken(newToken);
+      }
+    }
+    // Desativar: apenas salvar estado (mantém credenciais)
+    setSharingEnabled(enabled);
+  };
   
   const {
     tournament,
@@ -476,7 +515,8 @@ export default function ConfigPage() {
   const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
 
   // Evita erro de hydration - só renderiza após montar no cliente
-  if (!isMounted) {
+  // Também aguarda geração do adminToken se necessário
+  if (!isMounted || !adminToken) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -1032,6 +1072,66 @@ export default function ConfigPage() {
               )}
             </div>
 
+            {/* Compartilhamento */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                🔗 Compartilhamento
+              </h3>
+
+              <div className="space-y-4">
+                {/* Toggle de Compartilhamento */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Compartilhar Torneio
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Permite que espectadores visualizem o torneio em tempo real através de um link público
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleSharing(!sharingEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      sharingEnabled
+                        ? 'bg-blue-600'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        sharingEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Botão Compartilhar (só aparece se ativo) */}
+                {sharingEnabled && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>🔗</span>
+                      <span>Compartilhar Torneio</span>
+                    </button>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Gere um link público e QR Code para compartilhar com espectadores
+                    </p>
+                  </div>
+                )}
+
+                {/* Aviso quando desativado */}
+                {!sharingEnabled && (
+                  <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      O compartilhamento está desativado. Ative para permitir que espectadores visualizem o torneio.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Backup & Restauração */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <BackupPanel 
@@ -1042,6 +1142,16 @@ export default function ConfigPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Compartilhamento */}
+      {showShareModal && sharingEnabled && (
+        <ShareTournament
+          onClose={() => setShowShareModal(false)}
+          onShareGenerated={(id) => {
+            // Tournament ID já é gerenciado pelo ShareTournament via localStorage
+          }}
+        />
+      )}
 
       {/* Modal de Exportação */}
       {showExportModal && (

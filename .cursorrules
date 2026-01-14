@@ -55,7 +55,15 @@ Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construin
 - **Não use letras maiúsculas no início da mensagem.**
 - **Seja direto e descreva a mudança técnica.**
 
-# 3. Instruções para o Cursor
+# 3. Sincronização & Performance (Vercel KV + SWR)
+- **Modo Espectador:** Use a biblioteca `swr`. Configure `refreshInterval: 60000` (1 min) e `revalidateOnFocus: true`.
+- **Modo Admin (Escrita Otimizada):** - Implementar "Dirty Checking": Só enviar dados ao KV se houver mudança real.
+  - Implementar "Debounce": Aguardar 2 segundos após a última alteração antes de disparar o POST para `/api/save`.
+  - Exibir status de sincronização na UI (Salvando/Salvo).
+- **Segurança:** Apenas usuários com uma `adminToken` no localStorage podem realizar POST para a API de save.
+
+# 4. Instruções para o Cursor
 - Sempre verifique `PROJECT_STATUS.md`.
+- Mantenha atualizado `PROJECT_STATUS.md`.
 - Na UI do Grupo, mostre claramente: "Jogos Pendentes" e "Jogos Concluídos".
 - Use Functional Components e Hooks.

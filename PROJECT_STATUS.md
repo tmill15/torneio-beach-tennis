@@ -41,8 +41,24 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Export/Import contextual de jogadores por categoria
 - [x] Validação de backups
 - [x] Metadata de backup
+- [x] Campo `isFullBackup` explícito para identificar backup completo vs categoria específica
+- [x] Backup completo inclui credenciais criptografadas (com senha) e estado de compartilhamento
 - [x] PWA instalável (Android, iOS, Desktop)
 - [x] Funciona offline completamente
+
+### ✅ Sincronização Multi-Dispositivo - COMPLETO
+- [x] Sincronização em tempo real com Vercel KV (produção) e Redis (desenvolvimento)
+- [x] Modo Admin com debounce (2s) e dirty checking para otimização
+- [x] Modo Viewer com SWR (refresh automático a cada 1 minuto)
+- [x] Controle de acesso com adminToken (hash SHA-256)
+- [x] Compartilhamento de torneio com link público e QR Code
+- [x] Página pública de visualização (/torneio/[id])
+- [x] Status de sincronização na UI (Salvando/Salvo/Erro)
+- [x] Retry automático com backoff exponencial
+- [x] TTL de 90 dias para dados no KV
+- [x] Seleção automática de categoria na página pública
+- [x] Mensagens contextuais no modo espectador (fase em andamento vs concluída)
+- [x] Geração automática de adminToken na primeira vez
 
 ### ✅ Interface - COMPLETO
 - [x] Interface de configuração completa
@@ -54,11 +70,16 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
-**Última atualização:** 10/01/2026  
-**Versão:** v0.2.3  
-**Status:** ✅ Pronto para uso
+**Última atualização:** 14/01/2026  
+**Versão:** v0.4.0  
+**Status:** ✅ Pronto para uso com sincronização em tempo real
 
-Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas!
+Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas e sincronização multi-dispositivo em tempo real!
+
+**Melhorias Recentes:**
+- ✅ Campo `isFullBackup` explícito no formato de backup para detecção precisa
+- ✅ Correção de tipos TypeScript no serviço de backup (compatibilidade com Web Crypto API)
+- ✅ Lógica de detecção de backup completo vs categoria específica aprimorada
 
 ## 📦 Status dos Módulos
 
@@ -89,6 +110,7 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 ### Fase 4: Hooks ✅
 - [x] useLocalStorage
 - [x] useTournament
+- [x] useTournamentSync (sincronização com KV/Redis)
 
 ### Fase 5: Componentes UI ✅
 - [x] GameConfigForm
@@ -97,11 +119,14 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Footer (com versão)
 - [x] GroupCard
 - [x] MatchList
+- [x] ShareTournament (compartilhamento com QR Code)
+- [x] SyncStatus (indicador de sincronização)
 
 ### Fase 6: Páginas ✅
 - [x] Tela de Configuração
 - [x] Dashboard Principal
 - [x] Layout com Footer
+- [x] Página pública de visualização (/torneio/[id])
 
 ### Fase 7: Testes e Integração ✅
 - [x] Documentação de testes (TESTING.md)
@@ -123,6 +148,21 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Footer atualizado para usar versão do build
 - [x] Integração com Vercel para deploy automático
 
+### Fase 10: Sincronização Multi-Dispositivo ✅
+- [x] APIs REST para save/load de torneios
+- [x] Integração com Vercel KV (produção) e Redis local (dev)
+- [x] Hook useTournamentSync com SWR para viewers
+- [x] Debounce e dirty checking para otimização de writes
+- [x] Sistema de autenticação com adminToken
+- [x] Compartilhamento de torneio com link e QR Code
+- [x] Página pública read-only para visualização
+- [x] Status de sincronização em tempo real
+- [x] Retry automático com backoff exponencial
+- [x] Seleção automática de categoria na página pública
+- [x] Mensagens contextuais no modo espectador
+- [x] Geração automática de adminToken na primeira vez
+- [x] Proteção robusta contra dados incompletos (arrays sempre válidos)
+
 **Detalhes da Implementação:**
 - **Workflow:** `.github/workflows/release.yml`
   - Disparado automaticamente em push para `main`
@@ -134,11 +174,11 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - **Versionamento Automático:**
   - Versão é gerenciada **exclusivamente** via GitHub Actions
   - **NÃO altere a versão manualmente** no `package.json`
-  - Versão atual: **0.2.3** (conforme `package.json`)
+  - Versão atual: **0.4.0** (conforme `package.json`)
   - Regras de bump:
-    - `feat:` → Bump Minor (0.2.3 → 0.3.0)
-    - `fix:` → Bump Patch (0.2.3 → 0.2.4)
-    - `BREAKING CHANGE:` → Bump Major (0.2.3 → 1.0.0)
+    - `feat:` → Bump Minor (0.4.0 → 0.5.0)
+    - `fix:` → Bump Patch (0.4.0 → 0.4.1)
+    - `BREAKING CHANGE:` → Bump Major (0.4.0 → 1.0.0)
     - `chore/docs/refactor:` → Sem bump (não cria release)
   - `package.json` é atualizado automaticamente pelo workflow
   - Versão sempre sincronizada entre `package.json` e GitHub Releases
@@ -192,6 +232,128 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.1 - Correções: Modo Espectador e Proteção de Dados ✅
+**Data:** 14/01/2026
+
+**Corrigido:**
+- 🐛 **Erro `groups.filter is not a function` na página pública:** Adicionada proteção para garantir que `tournament.grupos` seja sempre um array antes de usar métodos de array
+- 🐛 **Categoria não selecionada automaticamente:** Ao acessar link de compartilhamento, a primeira categoria agora é selecionada automaticamente
+- 🐛 **Mensagem incorreta no rodapé do card:** Mensagem agora diferencia entre fase em andamento e fase concluída no modo espectador
+- 🐛 **Acesso bloqueado à página de configuração:** Sistema agora gera automaticamente `adminToken` e `tournamentId` na primeira vez
+
+**Modificado:**
+- 🔄 `app/torneio/[id]/page.tsx`:
+  - Adicionado `useEffect` para selecionar automaticamente primeira categoria
+  - Proteção `tournament.grupos || []` em todos os lugares
+  - Correção de chamadas de funções (getMaxPhase, isPhaseComplete, hasPendingTies)
+  - Reimplementação de `getPhaseAdvancePreview` com proteção
+  - Passa `isPhaseComplete` para GroupCard
+- 🔄 `app/config/page.tsx`:
+  - Geração automática de `adminToken` e `tournamentId` se não existirem
+  - Removida tela de "Acesso Negado"
+- 🔄 `components/GroupCard.tsx`:
+  - Adicionada prop `isPhaseComplete` para mensagem contextual
+  - Mensagem dinâmica: "Acompanhando em tempo real" vs "Esta fase já foi concluída"
+- 🔄 `services/phaseGenerator.ts`:
+  - Proteção `Array.isArray(groups)` em `getMaxPhase`, `isPhaseComplete` e `hasPendingTies`
+- 🔄 `app/page.tsx`:
+  - Passa `isPhaseComplete` para GroupCard
+
+**Benefícios:**
+- ✅ **Robustez:** Sistema não quebra quando dados estão incompletos
+- ✅ **UX melhorada:** Categoria selecionada automaticamente
+- ✅ **Clareza:** Mensagens contextuais no modo espectador
+- ✅ **Acesso facilitado:** Geração automática de tokens na primeira vez
+
+---
+
+### v0.4.0 - Sistema de Sincronização Multi-Dispositivo ✅
+**Data:** 14/01/2026
+
+**Adicionado:**
+- ✅ **Sincronização em tempo real:** Sistema completo de sincronização entre dispositivos usando Vercel KV (produção) e Redis local (desenvolvimento)
+- ✅ **Modo Admin otimizado:**
+  - Debounce de 2 segundos antes de salvar
+  - Dirty checking para evitar saves desnecessários
+  - Status de sincronização na UI (Salvando/Salvo/Erro)
+  - Retry automático com backoff exponencial (2s, 4s, 8s)
+- ✅ **Modo Viewer (Espectador):**
+  - Atualização automática a cada 1 minuto usando SWR
+  - Revalidação ao focar na aba ou reconectar
+  - Visualização read-only sem necessidade de autenticação
+- ✅ **Sistema de compartilhamento:**
+  - Geração de link público único por torneio
+  - QR Code para compartilhamento rápido
+  - Modal de compartilhamento integrado
+- ✅ **Controle de acesso:**
+  - AdminToken armazenado no localStorage
+  - Hash SHA-256 para segurança
+  - Validação de token nas APIs de escrita
+- ✅ **Página pública de visualização:**
+  - Rota `/torneio/[id]` para visualização read-only
+  - Interface otimizada para espectadores
+  - Sincronização automática de dados
+- ✅ **APIs REST:**
+  - `POST /api/save` - Salvar torneio (requer adminToken)
+  - `GET /api/load` - Carregar torneio público
+  - `GET /api/tournament/[id]` - Informações do torneio
+- ✅ **Infraestrutura:**
+  - Docker Compose para Redis local em desenvolvimento
+  - Suporte automático a Vercel KV em produção
+  - TTL de 90 dias para dados no KV
+
+**Modificado:**
+- 🔄 `hooks/useTournamentSync.ts` (NOVO):
+  - Hook completo para gerenciar sincronização
+  - Lógica de debounce e dirty checking
+  - Integração com SWR para modo viewer
+- 🔄 `lib/kv.ts` (NOVO):
+  - Utilitários para operações com KV/Redis
+  - Detecção automática de ambiente (dev/prod)
+  - Funções de hash para tokens
+- 🔄 `components/ShareTournament.tsx` (NOVO):
+  - Modal de compartilhamento com QR Code
+  - Geração automática de links
+- 🔄 `components/SyncStatus.tsx` (NOVO):
+  - Indicador visual de status de sincronização
+- 🔄 `app/torneio/[id]/page.tsx` (NOVO):
+  - Página pública para visualização de torneios
+  - Interface read-only otimizada
+- 🔄 `app/page.tsx`:
+  - Integração com useTournamentSync
+  - Botão de compartilhamento
+  - Status de sincronização
+- 🔄 `app/config/page.tsx`:
+  - Integração com sistema de sincronização
+  - Geração de tournamentId e adminToken
+
+**Arquivos Criados:**
+- `app/api/load/route.ts` - API de carregamento
+- `app/api/save/route.ts` - API de salvamento
+- `app/api/tournament/[id]/route.ts` - API de informações
+- `hooks/useTournamentSync.ts` - Hook de sincronização
+- `lib/kv.ts` - Utilitários KV/Redis
+- `components/ShareTournament.tsx` - Componente de compartilhamento
+- `components/SyncStatus.tsx` - Componente de status
+- `app/torneio/[id]/page.tsx` - Página pública
+- `docker-compose.yml` - Configuração Redis local
+
+**Benefícios:**
+- ✅ **Multi-dispositivo:** Torneios sincronizados entre vários dispositivos
+- ✅ **Tempo real:** Espectadores veem atualizações automaticamente
+- ✅ **Performance:** Otimizações de debounce e dirty checking
+- ✅ **Segurança:** Controle de acesso com tokens hashados
+- ✅ **Compartilhamento:** Fácil compartilhamento com link e QR Code
+- ✅ **Desenvolvimento:** Redis local para testes sem dependência externa
+
+**Como usar:**
+1. Admin: Cria torneio e clica em "Compartilhar" para gerar link
+2. Espectador: Acessa link público e vê atualizações em tempo real
+3. Admin: Alterações são salvas automaticamente após 2 segundos
+4. Espectador: Dados atualizam automaticamente a cada 1 minuto
+
+---
 
 ### v0.15.0 - Simplificação e Melhorias na Configuração de Jogos ✅
 **Data:** 10/01/2026
@@ -2029,39 +2191,41 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 - **Linguagem:** TypeScript
 - **Estilização:** Tailwind CSS
 - **Estado:** React Hooks + Context API
-- **Persistência:** LocalStorage
+- **Persistência:** LocalStorage + Vercel KV (produção) / Redis (dev)
+- **Sincronização:** SWR para viewers, debounce para admins
 - **Validação:** Zod
-- **PWA:** next-pwa (a configurar)
+- **PWA:** next-pwa
+- **Cache/DB:** Vercel KV (produção), Redis 7 (desenvolvimento)
 
 ### Decisões Técnicas
 - Mobile-first design
 - PWA para funcionar offline
-- LocalStorage para persistência (MVP)
+- LocalStorage para persistência local + Vercel KV para sincronização
+- Sincronização otimizada: debounce (2s) e dirty checking para admins
+- SWR para atualização automática de viewers (1 minuto)
 - Versionamento semântico (SemVer) automático via CI/CD
 - Footer exibe versão via variável de ambiente (NEXT_PUBLIC_APP_VERSION)
 - GitHub Actions para releases automáticos baseados em Conventional Commits
 - Deploy automático na Vercel
+- Redis local via Docker Compose para desenvolvimento
 
 ### Melhorias Futuras
-- [ ] Backend com API REST
-- [ ] Banco de dados (PostgreSQL/MongoDB)
 - [ ] Autenticação de usuários
 - [ ] Múltiplos torneios simultâneos
 - [ ] Histórico de torneios passados
-- [ ] Exportação de relatórios (PDF)
-- [ ] Compartilhamento de torneios
 - [ ] Notificações push
-- [ ] Sincronização multi-dispositivo
+- [ ] Melhorias de performance (cache, otimizações)
+- [ ] Analytics e estatísticas avançadas
 
 ---
 
-**Última atualização:** 10/01/2026  
-**Versão atual:** v0.2.3 (gerenciada automaticamente via GitHub Actions)  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos), interface de placares flexível sem validações rígidas, e todas as funcionalidades anteriores mantidas!
+**Última atualização:** 14/01/2026  
+**Versão atual:** v0.4.0 (gerenciada automaticamente via GitHub Actions)  
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com sincronização multi-dispositivo em tempo real, validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos), interface de placares flexível sem validações rígidas, compartilhamento com link e QR Code, página pública de visualização com seleção automática de categoria e mensagens contextuais, geração automática de tokens na primeira vez, e todas as funcionalidades anteriores mantidas!
 
 **⚠️ Importante sobre Versionamento:**
 - A versão é gerenciada **automaticamente** via GitHub Actions
 - **NÃO altere manualmente** a versão no `package.json`
-- Versão atual: **0.2.3** (conforme `package.json`)
+- Versão atual: **0.4.0** (conforme `package.json`)
 - O workflow atualiza o `package.json` e cria GitHub Releases automaticamente
 - Consulte a seção "Fase 9: CI/CD e Versionamento Automático" para detalhes
