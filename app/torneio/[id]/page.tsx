@@ -9,7 +9,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
-import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import type { Tournament } from '@/types';
 import { createEmptyTournament } from '@/services/backupService';
@@ -17,8 +16,6 @@ import {
   getMaxPhase as getMaxPhaseService,
   isPhaseComplete as isPhaseCompleteService,
   hasPendingTies as hasPendingTiesService,
-  getPhase1ToPhase2Classification,
-  getPhase2ToPhase3Classification,
 } from '@/services/phaseGenerator';
 import { calculateRanking } from '@/services/rankingService';
 
@@ -48,8 +45,11 @@ export default function TournamentViewerPage() {
 
   // Selecionar primeira categoria automaticamente quando torneio for carregado
   useEffect(() => {
-    if (Array.isArray(tournament.categorias) && tournament.categorias.length > 0 && !selectedCategory) {
-      setSelectedCategory(tournament.categorias[0]);
+    const categorias = tournament.categorias || [];
+    
+    // Se há categorias disponíveis e nenhuma está selecionada, seleciona a primeira
+    if (categorias.length > 0 && (!selectedCategory || !categorias.includes(selectedCategory))) {
+      setSelectedCategory(categorias[0]);
     }
   }, [tournament.categorias, selectedCategory]);
 
@@ -79,47 +79,6 @@ export default function TournamentViewerPage() {
     );
   };
 
-  const getPhaseAdvancePreview = (categoria: string, phase: number) => {
-    const categoryGroups = (tournament.grupos || []).filter(
-      g => g.categoria === categoria && g.fase === phase
-    );
-    
-    let direct, repechage;
-    if (phase === 1) {
-      ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, phase));
-    } else if (phase === 2) {
-      ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, phase, tournament));
-    } else {
-      return { direct: [], repechage: [], total: 0, rule: '' };
-    }
-    
-    // Descrição da regra
-    const numGroups = categoryGroups.length;
-    let rule = '';
-    if (phase === 1) {
-      rule = `Top 2 de cada grupo`;
-      if (repechage.length > 0) {
-        rule += ` + ${repechage.length} melhores 3º lugares`;
-      }
-    } else if (phase === 2) {
-      if (numGroups <= 2) {
-        rule = 'Top 2 de cada grupo';
-      } else if (numGroups === 3) {
-        rule = 'Top 1 de cada grupo + melhor 2º colocado';
-      } else if (numGroups === 4) {
-        rule = 'Top 1 de cada grupo';
-      } else {
-        rule = '4 melhores entre os Top 1 de cada grupo';
-      }
-    }
-      
-    return {
-      direct,
-      repechage,
-      total: direct.length + repechage.length,
-      rule
-    };
-  };
 
   // Filtra e ordena grupos pela fase
   // Proteção: garantir que grupos seja sempre um array
@@ -137,14 +96,6 @@ export default function TournamentViewerPage() {
     t => t.phase === selectedPhase
   );
 
-  // Calcular preview de classificação
-  const shouldShowPhaseAdvance = selectedPhase === getMaxPhase(selectedCategory) &&
-    isPhaseComplete(selectedCategory, selectedPhase) &&
-    !(selectedPhase === 3 && tournament.completedCategories?.includes(selectedCategory));
-
-  const phaseAdvancePreview = shouldShowPhaseAdvance
-    ? getPhaseAdvancePreview(selectedCategory, selectedPhase)
-    : null;
 
   // Evita erro de hydration
   if (!isMounted) {
@@ -297,23 +248,6 @@ export default function TournamentViewerPage() {
             </div>
           )}
         </div>
-
-        {/* Botão de Concluir Fase (somente visualização, desabilitado) */}
-        {shouldShowPhaseAdvance && phaseAdvancePreview && (
-          <div className="mb-6">
-            <PhaseAdvanceCard
-              categoria={selectedCategory}
-              currentPhase={selectedPhase}
-              preview={phaseAdvancePreview}
-              hasPendingTies={hasPendingTies(selectedCategory, selectedPhase)}
-              onAdvance={() => {}} // Desabilitado no modo viewer
-              resolveCrossGroupTieManual={() => {}} // Desabilitado
-              resolveCrossGroupTieRandom={() => {}} // Desabilitado
-              generateCrossGroupSinglesMatch={() => {}} // Desabilitado
-              tournament={tournament}
-            />
-          </div>
-        )}
 
         {/* Mostrar campeão se fase 3 está completa */}
         {selectedPhase === 3 &&
