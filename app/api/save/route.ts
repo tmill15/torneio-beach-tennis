@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashToken, saveTournament, isValidUUID, getTournament } from '@/lib/kv';
 import { isValidTournamentStructure } from '@/services/backupService';
 
+// Forçar renderização dinâmica (não pode ser estática)
+export const dynamic = 'force-dynamic';
+
 const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
 
 export async function POST(req: NextRequest) {

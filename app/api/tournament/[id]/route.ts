@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashToken, deleteTournament, getTournament, isValidUUID } from '@/lib/kv';
 
+// Forçar renderização dinâmica (não pode ser estática)
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTournament, isValidUUID } from '@/lib/kv';
 
+// Forçar renderização dinâmica (não pode ser estática)
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
