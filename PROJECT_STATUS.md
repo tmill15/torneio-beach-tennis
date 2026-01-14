@@ -41,6 +41,8 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Export/Import contextual de jogadores por categoria
 - [x] Validação de backups
 - [x] Metadata de backup
+- [x] Campo `isFullBackup` explícito para identificar backup completo vs categoria específica
+- [x] Backup completo inclui credenciais criptografadas (com senha) e estado de compartilhamento
 - [x] PWA instalável (Android, iOS, Desktop)
 - [x] Funciona offline completamente
 
@@ -73,6 +75,11 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 **Status:** ✅ Pronto para uso com sincronização em tempo real
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas e sincronização multi-dispositivo em tempo real!
+
+**Melhorias Recentes:**
+- ✅ Campo `isFullBackup` explícito no formato de backup para detecção precisa
+- ✅ Correção de tipos TypeScript no serviço de backup (compatibilidade com Web Crypto API)
+- ✅ Lógica de detecção de backup completo vs categoria específica aprimorada
 
 ## 📦 Status dos Módulos
 

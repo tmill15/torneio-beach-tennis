@@ -88,6 +88,8 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 1. Em Configurações → Backup & Restauração
 2. Clique em "Baixar Backup (.json)"
 3. Para restaurar, selecione o arquivo JSON
+4. **Backup Completo:** Inclui credenciais de sincronização (criptografadas com senha) e estado de compartilhamento
+5. **Backup de Categoria:** Exporta apenas uma categoria específica (sem credenciais)
 
 ## 🏗️ Estrutura do Projeto
 
@@ -248,6 +250,41 @@ Ou via CLI:
 npm install -g vercel
 vercel
 ```
+
+### Configuração para Produção (Vercel)
+
+Para que a sincronização funcione em produção, você precisa configurar:
+
+1. **Upstash Redis (via Vercel Marketplace):**
+   - Acesse o dashboard da Vercel: https://vercel.com/dashboard
+   - Vá em **Marketplace** (menu lateral)
+   - Procure por **"Upstash Redis"** ou **"Upstash"**
+   - Clique em **"Add Integration"** ou **"Install"**
+   - Selecione seu projeto
+   - Crie um novo banco Redis ou use um existente
+   - A Vercel automaticamente injeta as variáveis de ambiente necessárias:
+     - `UPSTASH_REDIS_URL` (preferencial - URL Redis tradicional)
+     - OU `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (fallback)
+   - ✅ **Não precisa configurar manualmente** - as variáveis são injetadas automaticamente após conectar o banco ao projeto
+
+2. **Variável de Ambiente (Opcional):**
+   - `NEXT_PUBLIC_APP_URL`: URL base da aplicação (ex: `https://seu-app.vercel.app`)
+   - Usado para gerar links de compartilhamento
+   - Se não configurado, usa `window.location.origin` automaticamente
+   - **Configuração:**
+     - Vercel Dashboard → Seu Projeto → **Settings** → **Environment Variables**
+     - Adicione: `NEXT_PUBLIC_APP_URL` = `https://seu-dominio.vercel.app`
+
+3. **Verificar Deploy:**
+   - Após o deploy, teste criando um torneio
+   - Ative o compartilhamento nas configurações
+   - Gere um link de compartilhamento
+   - Acesse o link em outro navegador/dispositivo para testar a sincronização
+
+**Nota:** 
+- O Redis local (via Docker) é usado apenas em desenvolvimento
+- Em produção, o sistema usa **Upstash Redis** via Vercel Marketplace
+- O código detecta automaticamente o ambiente e usa a configuração apropriada
 
 ## 📄 Licença
 
