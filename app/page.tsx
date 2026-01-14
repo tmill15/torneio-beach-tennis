@@ -8,16 +8,27 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
+import { ShareTournament } from '@/components/ShareTournament';
+import { SyncStatus } from '@/components/SyncStatus';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
+const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
+  const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   
   const {
     tournament,
+    updateTournament,
     updateMatchScore,
     finalizeMatch,
     reopenMatch,
@@ -40,6 +51,17 @@ export default function Home() {
     isFinalPhase,
     finalizeTournament,
   } = useTournament();
+
+  // Sincronização (modo admin)
+  const isAdmin = !!adminToken;
+  const { syncStatus, shareLink } = useTournamentSync({
+    tournament,
+    tournamentId: tournamentId || undefined,
+    isAdmin,
+    onTournamentUpdate: (updatedTournament) => {
+      updateTournament(() => updatedTournament);
+    },
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -159,12 +181,28 @@ export default function Home() {
                 Painel do Torneio
               </p>
             </div>
-            <Link
-              href="/config"
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              ⚙️ Configurações
-            </Link>
+            <div className="flex items-center gap-3">
+              {/* Status de sincronização (apenas admin) */}
+              {isAdmin && <SyncStatus status={syncStatus} />}
+              
+              {/* Botão compartilhar (apenas admin) */}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <span>🔗</span>
+                  <span className="hidden sm:inline">Compartilhar</span>
+                </button>
+              )}
+              
+              <Link
+                href="/config"
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+              >
+                ⚙️ Configurações
+              </Link>
+            </div>
           </div>
 
           {/* Seletor de Categoria */}
@@ -345,7 +383,7 @@ export default function Home() {
                     `Deseja continuar?`;
                   
                   if (window.confirm(message)) {
-                    finalizeTournament(selectedCategory);
+                    finalizeTournament(selectedCategory).catch(console.error);
                   }
                 }}
                 className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
@@ -501,6 +539,16 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Modal de Compartilhamento */}
+      {showShareModal && (
+        <ShareTournament
+          onClose={() => setShowShareModal(false)}
+          onShareGenerated={(id) => {
+            // Tournament ID já é gerenciado pelo ShareTournament via localStorage
+          }}
+        />
+      )}
     </main>
   );
 }

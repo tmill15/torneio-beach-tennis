@@ -940,7 +940,39 @@ export function useTournament() {
    * Finaliza o torneio: limpa categoria(es) e retorna jogadores para lista de espera
    * @param categoria - Categoria específica a ser finalizada. Se não fornecida, finaliza todas as categorias
    */
-  const finalizeTournament = useCallback((categoria?: string) => {
+  const finalizeTournament = useCallback(async (categoria?: string) => {
+    // Verificar se há tournamentId e adminToken para deletar do KV
+    const tournamentId = typeof window !== 'undefined' 
+      ? localStorage.getItem('beachtennis-tournament-id')
+      : null;
+    const adminToken = typeof window !== 'undefined'
+      ? localStorage.getItem('beachtennis-admin-token')
+      : null;
+
+    // Se finalizando todas as categorias e há tournamentId, deletar do KV
+    if (!categoria && tournamentId && adminToken) {
+      try {
+        const response = await fetch(`/api/tournament/${tournamentId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          // Limpar localStorage após remoção bem-sucedida (opcional)
+          // localStorage.removeItem('beachtennis-tournament-id');
+          // localStorage.removeItem('beachtennis-admin-token');
+        } else {
+          console.error('Erro ao remover torneio do KV:', await response.text());
+        }
+      } catch (error) {
+        console.error('Erro ao deletar torneio do KV:', error);
+        // Não bloquear a finalização local mesmo se falhar a remoção do KV
+      }
+    }
+
     updateTournament(prev => {
       let updated = prev;
       
