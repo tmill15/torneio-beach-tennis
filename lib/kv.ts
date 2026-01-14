@@ -1,9 +1,12 @@
 /**
  * Utilitário para operações com KV/Redis
  * Suporta Upstash Redis (produção via Vercel Marketplace) e Redis local (desenvolvimento)
+ * 
+ * Usa biblioteca 'redis' oficial (recomendada pela Vercel/Upstash)
+ * Funciona tanto em desenvolvimento (Redis local) quanto em produção (Upstash)
  */
 
-import Redis from 'ioredis';
+import { createClient } from 'redis';
 
 // Detectar ambiente
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -18,121 +21,105 @@ const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 const REDIS_URL_LOCAL = 'redis://localhost:6379';
 
-// Cliente Redis (funciona tanto para Upstash quanto para Redis local)
-let redisClient: Redis | null = null;
+// Cliente Redis (usando biblioteca oficial)
+let redisClient: ReturnType<typeof createClient> | null = null;
 
 // Inicializar cliente Redis
-// Nota: Durante build, o Next.js pode tentar inicializar, mas não conectamos até runtime
 if (isDevelopment) {
   // Desenvolvimento: Redis local
   console.log('🔧 Modo desenvolvimento: usando Redis local');
-  redisClient = new Redis(REDIS_URL_LOCAL);
-} else if (REDIS_URL_ENV) {
-  // Produção: Upstash Redis via REDIS_URL (fornecido pela Vercel quando conectado)
-  // IMPORTANTE: Upstash SEMPRE requer TLS (rediss://)
-  // A Vercel geralmente fornece rediss://, mas garantimos TLS de qualquer forma
-  console.log('✅ Upstash Redis: usando REDIS_URL (Vercel Marketplace)');
-  
-  // Garantir que a URL usa rediss:// (TLS) - Upstash SEMPRE requer TLS
-  // A Vercel geralmente fornece rediss://, mas garantimos conversão se necessário
-  let redisUrl = REDIS_URL_ENV;
-  if (redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
-    // Converter redis:// para rediss:// para forçar TLS
-    redisUrl = redisUrl.replace('redis://', 'rediss://');
-    console.log('🔒 Convertendo redis:// para rediss:// (TLS obrigatório no Upstash)');
-  }
-  
-  // Verificar se está usando TLS
-  if (!redisUrl.startsWith('rediss://')) {
-    console.error('❌ ERRO: URL Redis não usa TLS (rediss://). Upstash sempre requer TLS!');
-    console.error('URL recebida:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Mascarar senha
-  } else {
-    console.log('🔒 TLS confirmado: URL usa rediss:// (Redis Secure)');
-  }
-  
-  // Configuração do Redis com TLS OBRIGATÓRIO (Upstash sempre requer)
-  const redisOptions: any = {
-    // TLS é OBRIGATÓRIO no Upstash - sempre habilitar
-    tls: {
-      rejectUnauthorized: false, // Upstash usa certificados válidos
-    },
-    // Configurações para evitar erros durante build
-    enableReadyCheck: false,
-    maxRetriesPerRequest: null,
-    lazyConnect: true, // Conectar apenas quando necessário (não durante build)
-    connectTimeout: 10000,
-    retryStrategy: () => null, // Não tentar reconectar automaticamente
-  };
-  
-  redisClient = new Redis(redisUrl, redisOptions);
-  
-  // Tratar erros de conexão silenciosamente durante build
-  redisClient.on('error', (err) => {
-    // Durante build, ignorar erros completamente (não quebrar o build)
-    // O erro será tratado quando realmente tentar usar o Redis em runtime
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-      return; // Silenciar durante build
-    }
-    console.error('❌ Erro na conexão Redis:', err.message);
-  });
-  
-  // Com lazyConnect: true, a conexão só acontece quando realmente usamos o Redis
-  // Não precisamos chamar connect() manualmente
-} else if (UPSTASH_REDIS_URL) {
-  // Produção: Upstash Redis com URL tradicional (alternativa)
-  // Formato: redis://default:TOKEN@HOST:PORT
-  console.log('✅ Upstash Redis: usando UPSTASH_REDIS_URL');
-  redisClient = new Redis(UPSTASH_REDIS_URL, {
-    tls: {
-      rejectUnauthorized: false, // Upstash requer TLS
-    },
-  });
-} else if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-  // Produção: Upstash Redis via REST API
-  // IMPORTANTE: Upstash REST API não funciona diretamente com ioredis
-  // A Vercel Marketplace deve fornecer UPSTASH_REDIS_URL (não REST_URL)
-  // Se só temos REST_URL, precisamos usar a biblioteca @upstash/redis
-  console.warn('⚠️ Upstash REST API detectado, mas ioredis não suporta REST API diretamente');
-  console.warn('⚠️ Verifique se a Vercel injetou UPSTASH_REDIS_URL (não REST_URL)');
-  console.warn('⚠️ Se não tiver UPSTASH_REDIS_URL, instale @upstash/redis e atualize o código');
-  
-  // Tentar construir URL Redis (pode não funcionar)
   try {
-    const restUrl = new URL(UPSTASH_REDIS_REST_URL);
-    const host = restUrl.hostname.replace('.upstash.io', '');
-    // Upstash pode usar porta 6379 ou 6380, tentar 6379 primeiro
-    const redisUrl = `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${host}.upstash.io:6379`;
-    console.log('🔄 Tentando conectar com URL construída:', redisUrl.replace(UPSTASH_REDIS_REST_TOKEN, '***'));
-    redisClient = new Redis(redisUrl, {
-      tls: {
-        rejectUnauthorized: false,
-      },
-      connectTimeout: 5000,
-      retryStrategy: (times) => {
-        if (times > 3) {
-          console.error('❌ Falha ao conectar após 3 tentativas');
-          return null; // Para de tentar
-        }
-        return Math.min(times * 200, 2000);
-      },
+    redisClient = createClient({ url: REDIS_URL_LOCAL });
+    
+    redisClient.on('error', (err) => {
+      console.error('❌ Erro na conexão Redis local:', err.message);
     });
     
-    // Testar conexão
+    redisClient.on('connect', () => {
+      console.log('✅ Conectado ao Redis local com sucesso');
+    });
+    
+    // Conectar (lazy - só conecta quando necessário)
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      redisClient.connect().catch((err) => {
+        console.warn('⚠️ Erro ao conectar ao Redis local (será reconectado quando necessário):', err.message);
+      });
+    }
+  } catch (error) {
+    console.error('❌ Erro ao criar cliente Redis local:', error);
+  }
+} else if (REDIS_URL_ENV) {
+  // Produção: Upstash Redis via REDIS_URL (fornecido pela Vercel quando conectado)
+  // Usar biblioteca 'redis' oficial (recomendada pela Vercel/Upstash)
+  console.log('✅ Upstash Redis: usando REDIS_URL (Vercel Marketplace)');
+  
+  // Usar a URL exatamente como fornecida pela Vercel
+  // A biblioteca 'redis' oficial lida automaticamente com TLS se necessário
+  const redisUrl = REDIS_URL_ENV;
+  
+  // Log da URL (mascarando senha) para debug
+  const maskedUrl = redisUrl.replace(/:[^:@]+@/, ':***@');
+  console.log('🔗 URL Redis:', maskedUrl);
+  console.log('🔒 Protocolo:', redisUrl.startsWith('rediss://') ? 'TLS (rediss://)' : 'Não-TLS (redis://)');
+  
+  // Usar biblioteca 'redis' oficial (recomendada pela Vercel)
+  try {
+    redisClient = createClient({ url: redisUrl });
+    
+    // Tratar erros de conexão
     redisClient.on('error', (err) => {
-      console.error('❌ Erro na conexão Redis:', err);
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return; // Silenciar durante build
+      }
+      console.error('❌ Erro na conexão Redis:', err.message);
     });
     
     redisClient.on('connect', () => {
       console.log('✅ Conectado ao Redis com sucesso');
     });
+    
+    redisClient.on('ready', () => {
+      console.log('✅ Redis está pronto para uso');
+    });
+    
+    // Conectar (lazy - só conecta quando necessário)
+    // Não conectamos durante build
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      redisClient.connect().catch((err) => {
+        // Ignorar erros de conexão inicial (será reconectado quando necessário)
+        if (process.env.NEXT_PHASE !== 'phase-production-build') {
+          console.warn('⚠️ Erro ao conectar inicialmente (será reconectado quando necessário):', err.message);
+        }
+      });
+    }
   } catch (error) {
-    console.error('❌ Erro ao construir URL Redis:', error);
+    console.error('❌ Erro ao criar cliente Redis:', error);
   }
+} else if (UPSTASH_REDIS_URL) {
+  // Produção: Upstash Redis com URL tradicional (alternativa)
+  console.log('✅ Upstash Redis: usando UPSTASH_REDIS_URL');
+  try {
+    // Usar URL exatamente como fornecida
+    const url = UPSTASH_REDIS_URL;
+    const maskedUrl = url.replace(/:[^:@]+@/, ':***@');
+    console.log('🔗 URL Redis:', maskedUrl);
+    redisClient = createClient({ url });
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      redisClient.connect().catch(() => {});
+    }
+  } catch (error) {
+    console.error('❌ Erro ao criar cliente Redis:', error);
+  }
+} else if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+  // Produção: Upstash Redis via REST API
+  console.warn('⚠️ Upstash REST API detectado');
+  console.warn('⚠️ Para REST API, considere usar @upstash/redis');
+  // Não podemos usar REST API com biblioteca redis padrão
 } else {
   console.error('❌ Redis não configurado!');
   console.error('Variáveis disponíveis:', {
     NODE_ENV: process.env.NODE_ENV,
-    hasREDIS_URL: !!REDIS_URL_ENV, // Esta é a principal quando conectado via Vercel
+    hasREDIS_URL: !!REDIS_URL_ENV,
     hasUPSTASH_REDIS_URL: !!UPSTASH_REDIS_URL,
     hasUPSTASH_REDIS_REST_URL: !!UPSTASH_REDIS_REST_URL,
     hasUPSTASH_REDIS_REST_TOKEN: !!UPSTASH_REDIS_REST_TOKEN,
@@ -180,16 +167,26 @@ export interface TournamentData {
  */
 export async function getTournament(id: string): Promise<TournamentData | null> {
   try {
-    if (!redisClient) {
-      console.error('Redis client não inicializado');
+    const key = `tournament:${id}`;
+    let result: string | null = null;
+
+    if (redisClient) {
+      // Garantir que está conectado
+      if (!redisClient.isOpen) {
+        await redisClient.connect();
+      }
+      result = await redisClient.get(key);
+    } else {
+      console.error('❌ Redis client não inicializado');
       return null;
     }
 
-    const key = `tournament:${id}`;
-    const result = await redisClient.get(key);
     return result ? JSON.parse(result) : null;
   } catch (error) {
-    console.error('Erro ao buscar torneio:', error);
+    console.error('❌ Erro ao buscar torneio:', error);
+    if (error instanceof Error) {
+      console.error('Mensagem:', error.message);
+    }
     return null;
   }
 }
@@ -203,16 +200,22 @@ export async function saveTournament(
   ttlSeconds: number = 7776000 // 90 dias padrão
 ): Promise<boolean> {
   try {
-    if (!redisClient) {
+    const key = `tournament:${id}`;
+    const value = JSON.stringify(data);
+    console.log(`💾 Salvando torneio ${id} no Redis...`);
+
+    if (redisClient) {
+      // Garantir que está conectado
+      if (!redisClient.isOpen) {
+        await redisClient.connect();
+      }
+      await redisClient.setEx(key, ttlSeconds, value);
+    } else {
       console.error('❌ Redis client não inicializado');
       console.error('Verifique se Upstash Redis está configurado no Vercel Marketplace');
       return false;
     }
 
-    const key = `tournament:${id}`;
-    const value = JSON.stringify(data);
-    console.log(`💾 Salvando torneio ${id} no Redis...`);
-    await redisClient.setex(key, ttlSeconds, value);
     console.log(`✅ Torneio ${id} salvo com sucesso`);
     return true;
   } catch (error) {
@@ -230,13 +233,18 @@ export async function saveTournament(
  */
 export async function deleteTournament(id: string): Promise<boolean> {
   try {
-    if (!redisClient) {
+    const key = `tournament:${id}`;
+
+    if (redisClient) {
+      if (!redisClient.isOpen) {
+        await redisClient.connect();
+      }
+      await redisClient.del(key);
+    } else {
       console.error('Redis client não inicializado');
       return false;
     }
 
-    const key = `tournament:${id}`;
-    await redisClient.del(key);
     return true;
   } catch (error) {
     console.error('Erro ao deletar torneio:', error);
@@ -249,14 +257,21 @@ export async function deleteTournament(id: string): Promise<boolean> {
  */
 export async function existsTournament(id: string): Promise<boolean> {
   try {
-    if (!redisClient) {
+    const key = `tournament:${id}`;
+    let exists = false;
+
+    if (redisClient) {
+      if (!redisClient.isOpen) {
+        await redisClient.connect();
+      }
+      const result = await redisClient.exists(key);
+      exists = result === 1;
+    } else {
       console.error('Redis client não inicializado');
       return false;
     }
 
-    const key = `tournament:${id}`;
-    const exists = await redisClient.exists(key);
-    return exists === 1;
+    return exists;
   } catch (error) {
     console.error('Erro ao verificar existência do torneio:', error);
     return false;
