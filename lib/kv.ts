@@ -29,21 +29,32 @@ if (isDevelopment) {
   redisClient = new Redis(REDIS_URL_LOCAL);
 } else if (REDIS_URL_ENV) {
   // Produção: Upstash Redis via REDIS_URL (fornecido pela Vercel quando conectado)
-  // Formato: rediss://default:TOKEN@HOST:PORT (rediss = Redis Secure/TLS)
+  // IMPORTANTE: Upstash SEMPRE requer TLS (rediss://)
+  // A Vercel geralmente fornece rediss://, mas garantimos TLS de qualquer forma
   console.log('✅ Upstash Redis: usando REDIS_URL (Vercel Marketplace)');
   
-  // Garantir que a URL usa rediss:// (TLS) se não especificado
+  // Garantir que a URL usa rediss:// (TLS) - Upstash SEMPRE requer TLS
+  // A Vercel geralmente fornece rediss://, mas garantimos conversão se necessário
   let redisUrl = REDIS_URL_ENV;
   if (redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
     // Converter redis:// para rediss:// para forçar TLS
     redisUrl = redisUrl.replace('redis://', 'rediss://');
-    console.log('🔒 Convertendo redis:// para rediss:// (TLS)');
+    console.log('🔒 Convertendo redis:// para rediss:// (TLS obrigatório no Upstash)');
   }
   
-  // Configuração do Redis com TLS
+  // Verificar se está usando TLS
+  if (!redisUrl.startsWith('rediss://')) {
+    console.error('❌ ERRO: URL Redis não usa TLS (rediss://). Upstash sempre requer TLS!');
+    console.error('URL recebida:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Mascarar senha
+  } else {
+    console.log('🔒 TLS confirmado: URL usa rediss:// (Redis Secure)');
+  }
+  
+  // Configuração do Redis com TLS OBRIGATÓRIO (Upstash sempre requer)
   const redisOptions: any = {
+    // TLS é OBRIGATÓRIO no Upstash - sempre habilitar
     tls: {
-      rejectUnauthorized: false, // Upstash requer TLS
+      rejectUnauthorized: false, // Upstash usa certificados válidos
     },
     // Configurações para evitar erros durante build
     enableReadyCheck: false,
