@@ -1439,6 +1439,7 @@ export function useTournament() {
 
   return {
     tournament,
+    updateTournament,
     updateTournamentName,
     addCategory,
     removeCategory,
