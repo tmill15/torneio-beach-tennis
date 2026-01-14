@@ -11,10 +11,10 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // URLs de conexão
 // Produção: Upstash Redis via variáveis de ambiente da Vercel
 // Desenvolvimento: Redis local
-const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-// Upstash também pode fornecer uma URL Redis tradicional
-const UPSTASH_REDIS_URL = process.env.UPSTASH_REDIS_URL;
+// A Vercel pode usar diferentes nomes de variáveis dependendo da integração
+const UPSTASH_REDIS_URL = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 // Cliente Redis (funciona tanto para Upstash quanto para Redis local)
@@ -82,7 +82,16 @@ if (isDevelopment) {
     hasUPSTASH_REDIS_URL: !!UPSTASH_REDIS_URL,
     hasUPSTASH_REDIS_REST_URL: !!UPSTASH_REDIS_REST_URL,
     hasUPSTASH_REDIS_REST_TOKEN: !!UPSTASH_REDIS_REST_TOKEN,
+    hasKV_REST_API_URL: !!process.env.KV_REST_API_URL,
+    hasKV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
+    hasREDIS_URL: !!process.env.REDIS_URL,
   });
+  console.error('📋 INSTRUÇÕES:');
+  console.error('1. Vercel Dashboard → Seu Projeto → Settings → Environment Variables');
+  console.error('2. Verifique se o Upstash está conectado: Storage → Integrations');
+  console.error('3. Se conectado, as variáveis devem aparecer automaticamente');
+  console.error('4. Se não aparecerem, reconecte o Upstash ao projeto');
+  console.error('5. Após conectar, faça um novo deploy');
 }
 
 /**
