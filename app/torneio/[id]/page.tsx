@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
+import { ShareTournament } from '@/components/ShareTournament';
 import { GroupCard } from '@/components/GroupCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import type { Tournament } from '@/types';
@@ -28,6 +29,7 @@ export default function TournamentViewerPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [viewMode, setViewMode] = useState<'classificacao' | 'jogos'>('classificacao');
   const [selectedPhase, setSelectedPhase] = useState<number>(1);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Usar SWR para buscar dados (modo viewer)
   const { syncStatus } = useTournamentSync({
@@ -144,9 +146,14 @@ export default function TournamentViewerPage() {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   {tournament.nome}
                 </h1>
-                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full">
-                  Modo Espectador
-                </span>
+                {/* Badge Espectador com ícone de compartilhar clicável */}
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-pointer"
+                >
+                  <span>🔗</span>
+                  <span>Espectador</span>
+                </button>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Visualização em tempo real
@@ -393,6 +400,14 @@ export default function TournamentViewerPage() {
           </div>
         )}
       </div>
+      {/* Modal de Compartilhamento (espectador) */}
+      {showShareModal && (
+        <ShareTournament
+          onClose={() => setShowShareModal(false)}
+          tournamentId={tournamentId}
+          isViewer={true}
+        />
+      )}
     </main>
   );
 }

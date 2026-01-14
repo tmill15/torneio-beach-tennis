@@ -13,6 +13,7 @@ import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import { SyncStatus } from '@/components/SyncStatus';
+import { ShareTournament } from '@/components/ShareTournament';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
@@ -22,6 +23,7 @@ const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
@@ -178,28 +180,44 @@ export default function Home() {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   {tournament.nome}
                 </h1>
-                {/* Indicador de compartilhamento */}
+                {/* Indicador de compartilhamento (desktop) */}
                 {sharingEnabled && (
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center gap-1">
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="hidden sm:inline-flex px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full items-center gap-1 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-pointer"
+                  >
                     <span>🔗</span>
                     <span>Compartilhado</span>
-                  </span>
+                  </button>
                 )}
               </div>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Painel do Torneio
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Status de sincronização (apenas admin e se compartilhamento ativo) */}
-              {isAdmin && sharingEnabled && <SyncStatus status={syncStatus} />}
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {/* Status de sincronização (apenas admin e se compartilhamento ativo) */}
+                {isAdmin && sharingEnabled && <SyncStatus status={syncStatus} />}
+                
+                <Link
+                  href="/config"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center"
+                >
+                  ⚙️ Configurações
+                </Link>
+              </div>
               
-              <Link
-                href="/config"
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-              >
-                ⚙️ Configurações
-              </Link>
+              {/* Indicador de compartilhamento (mobile, embaixo do botão) */}
+              {sharingEnabled && (
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="sm:hidden px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center justify-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors w-full"
+                >
+                  <span>🔗</span>
+                  <span>Compartilhado</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -539,6 +557,15 @@ export default function Home() {
         )}
       </div>
 
+      {/* Modal de Compartilhamento (mobile) */}
+      {showShareModal && sharingEnabled && (
+        <ShareTournament
+          onClose={() => setShowShareModal(false)}
+          onShareGenerated={(id) => {
+            // Tournament ID já é gerenciado pelo ShareTournament via localStorage
+          }}
+        />
+      )}
     </main>
   );
 }

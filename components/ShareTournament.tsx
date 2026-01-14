@@ -16,9 +16,11 @@ const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 interface ShareTournamentProps {
   onClose: () => void;
   onShareGenerated?: (tournamentId: string) => void;
+  tournamentId?: string; // Para modo espectador, passar o ID diretamente
+  isViewer?: boolean; // Indica se é modo espectador
 }
 
-export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentProps) {
+export function ShareTournament({ onClose, onShareGenerated, tournamentId: externalTournamentId, isViewer = false }: ShareTournamentProps) {
   const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
@@ -26,8 +28,21 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Se não há tournamentId, gerar novo
-    if (!tournamentId || !adminToken) {
+    // Modo espectador: usar tournamentId externo (da URL)
+    if (isViewer && externalTournamentId) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      setShareLink(`${baseUrl}/torneio/${externalTournamentId}`);
+      return;
+    }
+
+    // Modo admin: verificar se compartilhamento está ativo
+    if (!isViewer && !sharingEnabled) {
+      return;
+    }
+
+    // Modo admin: usar tournamentId do localStorage ou gerar novo
+    const currentTournamentId = externalTournamentId || tournamentId;
+    if (!currentTournamentId || !adminToken) {
       const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
       setTournamentId(newId);
       setAdminToken(newToken);
@@ -41,9 +56,9 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
       }
     } else {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      setShareLink(`${baseUrl}/torneio/${tournamentId}`);
+      setShareLink(`${baseUrl}/torneio/${currentTournamentId}`);
     }
-  }, [tournamentId, adminToken, setTournamentId, setAdminToken, onShareGenerated]);
+  }, [tournamentId, adminToken, setTournamentId, setAdminToken, onShareGenerated, externalTournamentId, isViewer, sharingEnabled]);
 
   const handleCopyLink = async () => {
     if (!shareLink) return;
@@ -57,11 +72,11 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
     }
   };
 
-  // Verificar se compartilhamento está ativo
-  if (!sharingEnabled) {
+  // Verificar se compartilhamento está ativo (apenas para modo admin)
+  if (!isViewer && !sharingEnabled) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl my-4">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Compartilhamento Desativado
           </h3>
@@ -84,11 +99,20 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          Compartilhar Torneio
-        </h3>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl my-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            Compartilhar Torneio
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
 
         <div className="space-y-4">
           {/* Link compartilhável */}
@@ -134,16 +158,6 @@ export function ShareTournament({ onClose, onShareGenerated }: ShareTournamentPr
               Eles poderão visualizar o torneio em tempo real, mas não poderão editar.
             </p>
           </div>
-        </div>
-
-        {/* Botão fechar */}
-        <div className="mt-6">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors"
-          >
-            Fechar
-          </button>
         </div>
       </div>
     </div>
