@@ -17,7 +17,8 @@ import {
   getMaxPhase as getMaxPhaseService,
   isPhaseComplete as isPhaseCompleteService,
   hasPendingTies as hasPendingTiesService,
-  getPhaseAdvancePreview as getPhaseAdvancePreviewService,
+  getPhase1ToPhase2Classification,
+  getPhase2ToPhase3Classification,
 } from '@/services/phaseGenerator';
 import { calculateRanking } from '@/services/rankingService';
 
@@ -51,29 +52,75 @@ export default function TournamentViewerPage() {
 
   // Funções auxiliares para compatibilidade com componentes
   const getGroupRanking = (groupId: string) => {
-    const group = tournament.grupos.find(g => g.id === groupId);
+    const group = (tournament.grupos || []).find(g => g.id === groupId);
     if (!group) return [];
     return calculateRanking(group, tournament.gameConfig);
   };
 
   const getMaxPhase = (categoria: string) => {
-    return getMaxPhaseService(tournament, categoria);
+    return getMaxPhaseService(tournament.grupos || [], categoria);
   };
 
   const isPhaseComplete = (categoria: string, phase: number) => {
-    return isPhaseCompleteService(tournament, categoria, phase);
+    const categoryGroups = (tournament.grupos || []).filter(g => g.categoria === categoria);
+    return isPhaseCompleteService(categoryGroups, phase);
   };
 
   const hasPendingTies = (categoria: string, phase: number) => {
-    return hasPendingTiesService(tournament, categoria, phase);
+    const categoryGroups = (tournament.grupos || []).filter(g => g.categoria === categoria);
+    return hasPendingTiesService(
+      categoryGroups,
+      phase,
+      (group) => getGroupRanking(group.id),
+      tournament
+    );
   };
 
   const getPhaseAdvancePreview = (categoria: string, phase: number) => {
-    return getPhaseAdvancePreviewService(tournament, categoria, phase);
+    const categoryGroups = (tournament.grupos || []).filter(
+      g => g.categoria === categoria && g.fase === phase
+    );
+    
+    let direct, repechage;
+    if (phase === 1) {
+      ({ direct, repechage } = getPhase1ToPhase2Classification(categoryGroups, phase));
+    } else if (phase === 2) {
+      ({ direct, repechage } = getPhase2ToPhase3Classification(categoryGroups, phase, tournament));
+    } else {
+      return { direct: [], repechage: [], total: 0, rule: '' };
+    }
+    
+    // Descrição da regra
+    const numGroups = categoryGroups.length;
+    let rule = '';
+    if (phase === 1) {
+      rule = `Top 2 de cada grupo`;
+      if (repechage.length > 0) {
+        rule += ` + ${repechage.length} melhores 3º lugares`;
+      }
+    } else if (phase === 2) {
+      if (numGroups <= 2) {
+        rule = 'Top 2 de cada grupo';
+      } else if (numGroups === 3) {
+        rule = 'Top 1 de cada grupo + melhor 2º colocado';
+      } else if (numGroups === 4) {
+        rule = 'Top 1 de cada grupo';
+      } else {
+        rule = '4 melhores entre os Top 1 de cada grupo';
+      }
+    }
+      
+    return {
+      direct,
+      repechage,
+      total: direct.length + repechage.length,
+      rule
+    };
   };
 
   // Filtra e ordena grupos pela fase
-  const groupsInCategory = tournament.grupos
+  // Proteção: garantir que grupos seja sempre um array
+  const groupsInCategory = (tournament.grupos || [])
     .filter((g) => g.categoria === selectedCategory)
     .sort((a, b) => a.fase - b.fase);
 
@@ -111,7 +158,7 @@ export default function TournamentViewerPage() {
   }
 
   // Se não há torneio carregado ainda
-  if (!tournament || tournament.categorias.length === 0) {
+  if (!tournament || !Array.isArray(tournament.categorias) || tournament.categorias.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -132,7 +179,7 @@ export default function TournamentViewerPage() {
   }
 
   // Atualizar categoria selecionada se necessário
-  if (!selectedCategory && tournament.categorias.length > 0) {
+  if (!selectedCategory && Array.isArray(tournament.categorias) && tournament.categorias.length > 0) {
     setSelectedCategory(tournament.categorias[0]);
   }
 
@@ -158,10 +205,10 @@ export default function TournamentViewerPage() {
           </div>
 
           {/* Seletor de Categoria */}
-          {tournament.categorias.length > 0 && (
+          {Array.isArray(tournament.categorias) && tournament.categorias.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-2">
               {tournament.categorias.map((cat) => {
-                const groupCount = tournament.grupos.filter(
+                const groupCount = (tournament.grupos || []).filter(
                   (g) => g.categoria === cat
                 ).length;
 
@@ -303,7 +350,7 @@ export default function TournamentViewerPage() {
             </h2>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
               {crossGroupTiebreaks.map((tiebreak, index) => {
-                const tiebreakGroup = tournament.grupos.find(
+                const tiebreakGroup = (tournament.grupos || []).find(
                   g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') &&
                     g.categoria === selectedCategory &&
                     g.fase === tiebreak.phase

@@ -14,22 +14,29 @@ import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
 import { validateThreePhaseTournament } from '@/services/phaseValidation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { generateTournamentShare } from '@/hooks/useTournamentSync';
 
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 
 export default function ConfigPage() {
   const router = useRouter();
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
-  const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   
-  // Verificar se está em modo viewer (sem adminToken)
+  // Gerar adminToken automaticamente se não existir (primeira vez)
   useEffect(() => {
     if (isMounted && !adminToken) {
-      // Se não há adminToken, redirecionar para home
-      router.push('/');
+      // Gerar novo token e tournamentId se não existirem
+      const { tournamentId: newTournamentId, adminToken: newAdminToken } = generateTournamentShare();
+      setAdminToken(newAdminToken);
+      if (!tournamentId) {
+        setTournamentId(newTournamentId);
+      }
     }
-  }, [isMounted, adminToken, router]);
+  }, [isMounted, adminToken, tournamentId, setAdminToken, setTournamentId]);
   
   const {
     tournament,
@@ -491,40 +498,14 @@ export default function ConfigPage() {
   const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
 
   // Evita erro de hydration - só renderiza após montar no cliente
-  if (!isMounted) {
+  // Também aguarda geração do adminToken se necessário
+  if (!isMounted || !adminToken) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não há adminToken, não mostrar conteúdo (será redirecionado)
-  if (!adminToken) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="text-6xl mb-4">🔒</div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Acesso Negado
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Esta página é apenas para administradores do torneio.
-              </p>
-              <Link
-                href="/"
-                className="inline-block px-6 py-3 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
-              >
-                Voltar ao Dashboard
-              </Link>
-            </div>
           </div>
         </div>
       </div>

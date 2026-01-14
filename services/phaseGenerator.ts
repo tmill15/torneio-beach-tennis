@@ -18,7 +18,9 @@ export interface QualifiedPlayer {
  * Verifica se todos os jogos de uma fase estão concluídos
  */
 export function isPhaseComplete(groups: Group[], phase: number): boolean {
-  const phaseGroups = groups.filter(g => g.fase === phase);
+  // Proteção: garantir que groups seja sempre um array
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const phaseGroups = safeGroups.filter(g => g.fase === phase);
   if (phaseGroups.length === 0) return false;
   
   return phaseGroups.every(group => 
@@ -36,7 +38,9 @@ export function hasPendingTies(
   calculateRanking: (group: Group) => any[],
   tournament?: Tournament
 ): boolean {
-  const phaseGroups = groups.filter(g => g.fase === phase);
+  // Proteção: garantir que groups seja sempre um array
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const phaseGroups = safeGroups.filter(g => g.fase === phase);
   if (phaseGroups.length === 0) return false;
   
   // Importar detectTies dinamicamente para evitar dependência circular
@@ -833,7 +837,9 @@ export function generateNextPhase(
  * Obtém o número da fase mais alta de uma categoria
  */
 export function getMaxPhase(groups: Group[], categoria: string): number {
-  const categoryGroups = groups.filter(g => g.categoria === categoria);
+  // Proteção: garantir que groups seja sempre um array
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const categoryGroups = safeGroups.filter(g => g.categoria === categoria);
   if (categoryGroups.length === 0) return 0;
   return Math.max(...categoryGroups.map(g => g.fase));
 }
