@@ -11,7 +11,8 @@ App PWA para gestão completa de torneios de Beach Tennis em modo Round Robin.
 - 💾 **Backup/Restore** - Export/Import completo em JSON
 - 📱 **Mobile-First** - Design otimizado para dispositivos móveis
 - 🌙 **Dark Mode** - Suporte a tema escuro
-- 🔄 **LocalStorage** - Persistência automática dos dados
+- 🔄 **Sincronização Multi-Dispositivo** - Compartilhe torneios e sincronize em tempo real
+- 🔗 **Compartilhamento** - Link público e QR Code para espectadores
 
 ## 🚀 Início Rápido
 
@@ -30,11 +31,23 @@ cd torneio-beach-tennis
 # Instale as dependências
 npm install
 
-# Execute em modo desenvolvimento
+# Execute em modo desenvolvimento (com Redis)
+npm run dev:full
+```
+
+**Ou manualmente:**
+
+```bash
+# 1. Subir Redis (necessário para sincronização)
+npm run dev:redis
+
+# 2. Iniciar Next.js
 npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000) no navegador.
+
+**Nota:** O Redis é necessário para o sistema de sincronização funcionar. Em desenvolvimento, ele roda localmente via Docker. Em produção, usa Vercel KV.
 
 ## 📖 Como Usar
 
@@ -63,7 +76,14 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 4. Clique em "Finalizar Jogo"
 5. O ranking atualiza automaticamente
 
-### 4. Backup dos Dados
+### 4. Compartilhar Torneio
+
+1. No Dashboard, clique em "Compartilhar Torneio"
+2. Copie o link ou escaneie o QR Code
+3. Espectadores podem acessar o link para ver atualizações em tempo real
+4. Alterações são sincronizadas automaticamente
+
+### 5. Backup dos Dados
 
 1. Em Configurações → Backup & Restauração
 2. Clique em "Baixar Backup (.json)"
@@ -74,7 +94,13 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 ```
 torneio-beach-tennis/
 ├── app/                    # Páginas Next.js (App Router)
+│   ├── api/               # APIs REST
+│   │   ├── load/         # Carregar torneio
+│   │   ├── save/         # Salvar torneio
+│   │   └── tournament/   # Info do torneio
 │   ├── config/            # Tela de configuração
+│   ├── torneio/           # Páginas públicas
+│   │   └── [id]/         # Visualização pública
 │   ├── layout.tsx         # Layout principal com PWA meta tags
 │   └── page.tsx           # Dashboard principal
 ├── components/            # Componentes React
@@ -83,10 +109,13 @@ torneio-beach-tennis/
 │   ├── GameConfigForm.tsx # Config de jogo
 │   ├── GroupCard.tsx     # Card de grupo
 │   ├── MatchList.tsx     # Lista de jogos
-│   └── ScoreInput.tsx    # Input de placar
+│   ├── ScoreInput.tsx    # Input de placar
+│   ├── ShareTournament.tsx # Compartilhamento
+│   └── SyncStatus.tsx    # Status de sincronização
 ├── hooks/                 # Custom Hooks
 │   ├── useLocalStorage.ts
-│   └── useTournament.ts
+│   ├── useTournament.ts
+│   └── useTournamentSync.ts # Sincronização
 ├── services/              # Lógica de negócio
 │   ├── backupService.ts
 │   ├── enrollmentService.ts
@@ -95,8 +124,11 @@ torneio-beach-tennis/
 │   └── rankingService.ts
 ├── types/                 # Interfaces TypeScript
 │   └── index.ts
+├── lib/                   # Utilitários
+│   └── kv.ts             # Operações KV/Redis
 ├── public/                # Assets PWA
 │   └── manifest.json
+├── docker-compose.yml     # Redis local (dev)
 ├── PROJECT_STATUS.md      # Status do desenvolvimento
 └── TESTING.md            # Guia de testes
 
@@ -139,9 +171,11 @@ Critérios de classificação (nesta ordem):
 - **Linguagem:** TypeScript
 - **Estilização:** Tailwind CSS
 - **Estado:** React Hooks + Context API
-- **Persistência:** LocalStorage
+- **Persistência:** LocalStorage + Vercel KV (produção) / Redis (dev)
+- **Sincronização:** SWR para viewers, debounce para admins
 - **Validação:** Zod
 - **PWA:** next-pwa
+- **Cache/DB:** Vercel KV (produção), Redis 7 (desenvolvimento)
 - **Versionamento:** Semantic Versioning (SemVer)
 
 ## 📱 PWA - Progressive Web App
@@ -163,7 +197,13 @@ Critérios de classificação (nesta ordem):
 
 ### Funciona Offline!
 Após a primeira visita, a aplicação funciona completamente offline.
-Dados são salvos automaticamente no dispositivo.
+Dados são salvos automaticamente no dispositivo e sincronizados quando online.
+
+### Sincronização Multi-Dispositivo
+- **Admin:** Alterações são salvas automaticamente após 2 segundos
+- **Espectador:** Dados atualizam automaticamente a cada 1 minuto
+- **Compartilhamento:** Gere um link público ou QR Code para compartilhar
+- **Segurança:** Apenas admins podem editar (controle via token)
 
 ## 🧪 Testes
 
@@ -245,8 +285,8 @@ Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
 
 ---
 
-**Versão Atual:** 0.2.3  
-**Última Atualização:** 10/01/2026  
+**Versão Atual:** 0.4.0  
+**Última Atualização:** 14/01/2026  
 
 Desenvolvido por Thiago Milhomem para a comunidade de Beach Tennis
 

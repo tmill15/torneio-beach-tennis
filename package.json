@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "dev:redis": "docker-compose up -d",
+    "dev:redis": "docker compose up -d",
     "dev:full": "npm run dev:redis && npm run dev"
   },
   "dependencies": {
