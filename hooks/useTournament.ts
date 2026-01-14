@@ -646,10 +646,24 @@ export function useTournament() {
         };
       });
     } else {
-      // Backup completo: substituir tudo
-      updateTournament(importData.tournament);
+      // Backup completo: substituir tudo completamente
+      // Criar um novo objeto Tournament completo, ignorando qualquer estado anterior
+      const newTournament: Tournament = {
+        version: importData.tournament.version || '0.4.0',
+        nome: importData.tournament.nome,
+        categorias: importData.tournament.categorias || [],
+        gameConfig: importData.tournament.gameConfig,
+        grupos: importData.tournament.grupos || [],
+        waitingList: importData.tournament.waitingList || [],
+        completedCategories: importData.tournament.completedCategories || [],
+        crossGroupTiebreaks: importData.tournament.crossGroupTiebreaks || [],
+      };
+      
+      // Substituir completamente usando setRawTournament diretamente para garantir que não haja merge
+      setRawTournament(newTournament);
+      setTournament(newTournament);
     }
-  }, [updateTournament]);
+  }, [setRawTournament, setTournament]);
 
   /**
    * Reseta e resorteia grupos de uma categoria

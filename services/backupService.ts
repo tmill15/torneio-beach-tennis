@@ -15,9 +15,10 @@ import { z } from 'zod';
  */
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const encoder = new TextEncoder();
+  const passwordData = encoder.encode(password);
   const passwordKey = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(password),
+    passwordData.buffer as ArrayBuffer,
     'PBKDF2',
     false,
     ['deriveBits', 'deriveKey']
@@ -26,7 +27,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt.buffer as ArrayBuffer,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -50,17 +51,22 @@ async function encryptData(data: string, password: string): Promise<{ encrypted:
 
   // Criptografar dados
   const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv },
     key,
-    encoder.encode(data)
+    dataBuffer.buffer as ArrayBuffer
   );
 
   // Converter para base64 para armazenamento
+  const encryptedArray = new Uint8Array(encrypted);
+  const saltArray = Array.from(salt);
+  const ivArray = Array.from(iv);
+  
   return {
-    encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-    salt: btoa(String.fromCharCode(...salt)),
-    iv: btoa(String.fromCharCode(...iv)),
+    encrypted: btoa(String.fromCharCode.apply(null, Array.from(encryptedArray))),
+    salt: btoa(String.fromCharCode.apply(null, saltArray)),
+    iv: btoa(String.fromCharCode.apply(null, ivArray)),
   };
 }
 
@@ -80,7 +86,7 @@ async function decryptData(encrypted: string, password: string, salt: string, iv
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: ivData },
     key,
-    encryptedData
+    encryptedData.buffer as ArrayBuffer
   );
 
   const decoder = new TextDecoder();
@@ -110,6 +116,7 @@ const tournamentBackupSchema = z.object({
     grupos: z.array(z.any()), // Simplified for now
     waitingList: z.array(z.any()), // Simplified for now
   }),
+  isFullBackup: z.boolean().optional(), // Campo opcional para compatibilidade com backups antigos
   syncCredentials: z.object({
     encrypted: z.string(),
     salt: z.string(),
@@ -141,17 +148,20 @@ export async function exportTournament(
     };
   }
   
+  const isFullBackup = !categoria; // Backup completo se não há categoria específica
+  
   const backup: TournamentBackup = {
     version: BACKUP_VERSION,
     exportDate: new Date().toISOString(),
     tournament: filteredTournament,
+    isFullBackup, // Indica explicitamente se é backup completo ou de categoria
   };
 
   // Incluir credenciais criptografadas e estado de compartilhamento apenas se:
   // 1. É backup completo (sem categoria específica)
   // 2. Senha foi fornecida
   // 3. Estamos no navegador (localStorage disponível)
-  if (!categoria && password && typeof window !== 'undefined') {
+  if (isFullBackup && password && typeof window !== 'undefined') {
     const tournamentId = localStorage.getItem('beachtennis-tournament-id');
     const adminToken = localStorage.getItem('beachtennis-admin-token');
     const sharingEnabled = localStorage.getItem('beachtennis-sharing-enabled') === 'true';
@@ -301,8 +311,17 @@ export async function importTournament(
       gameConfig: normalizeGameConfig(backup.tournament.gameConfig),
     };
 
-    // Verifica se é backup de categoria específica (tem apenas 1 categoria)
-    const isSingleCategory = normalizedTournament.categorias.length === 1;
+    // Verifica se é backup de categoria específica
+    // Usa o campo isFullBackup se existir, caso contrário usa lógica de fallback para compatibilidade
+    let isSingleCategory: boolean;
+    if (backup.isFullBackup !== undefined) {
+      // Novo formato: usa campo explícito
+      isSingleCategory = !backup.isFullBackup;
+    } else {
+      // Fallback para backups antigos: se tem credenciais, é completo; senão, verifica número de categorias
+      const hasCredentials = !!backup.syncCredentials || backup.sharingEnabled !== undefined;
+      isSingleCategory = !hasCredentials && normalizedTournament.categorias.length === 1;
+    }
     const category = isSingleCategory ? normalizedTournament.categorias[0] : undefined;
 
     // Descriptografar credenciais se existirem

@@ -124,11 +124,11 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
       // Confirmação antes de importar
       const actionText = isSingleCategory 
         ? `restaurar dados da categoria "${category}"`
-        : `substituir todos os dados atuais`;
+        : `substituir completamente todos os dados atuais`;
       
       const warningText = isSingleCategory
         ? `\n⚠️ Dados de outras categorias serão preservados.\nDados da categoria "${category}" serão substituídos.`
-        : `\n⚠️ Todos os dados atuais serão substituídos!`;
+        : `\n⚠️ ATENÇÃO: Todos os dados atuais serão completamente substituídos!\n- Todas as categorias serão substituídas\n- Todos os grupos serão substituídos\n- Toda a lista de espera será substituída\n- Todas as configurações serão substituídas`;
       
       const credentialsText = importResult.credentials
         ? `\n✅ Credenciais de sincronização serão restauradas.`
