@@ -39,10 +39,6 @@ export default function TournamentViewerPage() {
     isAdmin: false,
     onTournamentUpdate: (updatedTournament) => {
       setTournament(updatedTournament);
-      // Atualizar categoria selecionada se necessário
-      if (!selectedCategory && updatedTournament.categorias.length > 0) {
-        setSelectedCategory(updatedTournament.categorias[0]);
-      }
     },
   });
 
@@ -50,11 +46,18 @@ export default function TournamentViewerPage() {
     setIsMounted(true);
   }, []);
 
+  // Selecionar primeira categoria automaticamente quando torneio for carregado
+  useEffect(() => {
+    if (Array.isArray(tournament.categorias) && tournament.categorias.length > 0 && !selectedCategory) {
+      setSelectedCategory(tournament.categorias[0]);
+    }
+  }, [tournament.categorias, selectedCategory]);
+
   // Funções auxiliares para compatibilidade com componentes
   const getGroupRanking = (groupId: string) => {
     const group = (tournament.grupos || []).find(g => g.id === groupId);
     if (!group) return [];
-    return calculateRanking(group, tournament.gameConfig);
+    return calculateRanking(group);
   };
 
   const getMaxPhase = (categoria: string) => {
@@ -178,10 +181,6 @@ export default function TournamentViewerPage() {
     );
   }
 
-  // Atualizar categoria selecionada se necessário
-  if (!selectedCategory && Array.isArray(tournament.categorias) && tournament.categorias.length > 0) {
-    setSelectedCategory(tournament.categorias[0]);
-  }
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -380,6 +379,13 @@ export default function TournamentViewerPage() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
+              // Verificar se a fase está completa: todos os grupos da fase devem ter todos os jogos finalizados
+              const phaseGroups = (tournament.grupos || []).filter(
+                g => g.categoria === selectedCategory && g.fase === selectedPhase
+              );
+              const groupPhaseComplete = phaseGroups.length > 0 && phaseGroups.every(g => 
+                g.matches.every(m => m.isFinished)
+              );
 
               return (
                 <GroupCard
@@ -389,6 +395,7 @@ export default function TournamentViewerPage() {
                   gameConfig={tournament.gameConfig}
                   viewMode={viewMode}
                   isReadOnly={true} // Sempre read-only no modo viewer
+                  isPhaseComplete={groupPhaseComplete} // Indica se a fase está completa
                   onUpdateScore={() => {}} // Desabilitado
                   onFinalizeMatch={() => {}} // Desabilitado
                   onReopenMatch={() => {}} // Desabilitado

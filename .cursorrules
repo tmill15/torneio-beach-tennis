@@ -64,5 +64,6 @@ Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construin
 
 # 4. Instruções para o Cursor
 - Sempre verifique `PROJECT_STATUS.md`.
+- Mantenha atualizado `PROJECT_STATUS.md`.
 - Na UI do Grupo, mostre claramente: "Jogos Pendentes" e "Jogos Concluídos".
 - Use Functional Components e Hooks.

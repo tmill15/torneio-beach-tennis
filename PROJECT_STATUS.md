@@ -54,6 +54,9 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 - [x] Status de sincronização na UI (Salvando/Salvo/Erro)
 - [x] Retry automático com backoff exponencial
 - [x] TTL de 90 dias para dados no KV
+- [x] Seleção automática de categoria na página pública
+- [x] Mensagens contextuais no modo espectador (fase em andamento vs concluída)
+- [x] Geração automática de adminToken na primeira vez
 
 ### ✅ Interface - COMPLETO
 - [x] Interface de configuração completa
@@ -69,7 +72,7 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 **Versão:** v0.4.0  
 **Status:** ✅ Pronto para uso com sincronização em tempo real
 
-Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas e sincronização multi-dispositivo!
+Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas e sincronização multi-dispositivo em tempo real!
 
 ## 📦 Status dos Módulos
 
@@ -148,6 +151,10 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Página pública read-only para visualização
 - [x] Status de sincronização em tempo real
 - [x] Retry automático com backoff exponencial
+- [x] Seleção automática de categoria na página pública
+- [x] Mensagens contextuais no modo espectador
+- [x] Geração automática de adminToken na primeira vez
+- [x] Proteção robusta contra dados incompletos (arrays sempre válidos)
 
 **Detalhes da Implementação:**
 - **Workflow:** `.github/workflows/release.yml`
@@ -160,11 +167,11 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - **Versionamento Automático:**
   - Versão é gerenciada **exclusivamente** via GitHub Actions
   - **NÃO altere a versão manualmente** no `package.json`
-  - Versão atual: **0.2.3** (conforme `package.json`)
+  - Versão atual: **0.4.0** (conforme `package.json`)
   - Regras de bump:
-    - `feat:` → Bump Minor (0.2.3 → 0.3.0)
-    - `fix:` → Bump Patch (0.2.3 → 0.2.4)
-    - `BREAKING CHANGE:` → Bump Major (0.2.3 → 1.0.0)
+    - `feat:` → Bump Minor (0.4.0 → 0.5.0)
+    - `fix:` → Bump Patch (0.4.0 → 0.4.1)
+    - `BREAKING CHANGE:` → Bump Major (0.4.0 → 1.0.0)
     - `chore/docs/refactor:` → Sem bump (não cria release)
   - `package.json` é atualizado automaticamente pelo workflow
   - Versão sempre sincronizada entre `package.json` e GitHub Releases
@@ -218,6 +225,41 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.4.1 - Correções: Modo Espectador e Proteção de Dados ✅
+**Data:** 14/01/2026
+
+**Corrigido:**
+- 🐛 **Erro `groups.filter is not a function` na página pública:** Adicionada proteção para garantir que `tournament.grupos` seja sempre um array antes de usar métodos de array
+- 🐛 **Categoria não selecionada automaticamente:** Ao acessar link de compartilhamento, a primeira categoria agora é selecionada automaticamente
+- 🐛 **Mensagem incorreta no rodapé do card:** Mensagem agora diferencia entre fase em andamento e fase concluída no modo espectador
+- 🐛 **Acesso bloqueado à página de configuração:** Sistema agora gera automaticamente `adminToken` e `tournamentId` na primeira vez
+
+**Modificado:**
+- 🔄 `app/torneio/[id]/page.tsx`:
+  - Adicionado `useEffect` para selecionar automaticamente primeira categoria
+  - Proteção `tournament.grupos || []` em todos os lugares
+  - Correção de chamadas de funções (getMaxPhase, isPhaseComplete, hasPendingTies)
+  - Reimplementação de `getPhaseAdvancePreview` com proteção
+  - Passa `isPhaseComplete` para GroupCard
+- 🔄 `app/config/page.tsx`:
+  - Geração automática de `adminToken` e `tournamentId` se não existirem
+  - Removida tela de "Acesso Negado"
+- 🔄 `components/GroupCard.tsx`:
+  - Adicionada prop `isPhaseComplete` para mensagem contextual
+  - Mensagem dinâmica: "Acompanhando em tempo real" vs "Esta fase já foi concluída"
+- 🔄 `services/phaseGenerator.ts`:
+  - Proteção `Array.isArray(groups)` em `getMaxPhase`, `isPhaseComplete` e `hasPendingTies`
+- 🔄 `app/page.tsx`:
+  - Passa `isPhaseComplete` para GroupCard
+
+**Benefícios:**
+- ✅ **Robustez:** Sistema não quebra quando dados estão incompletos
+- ✅ **UX melhorada:** Categoria selecionada automaticamente
+- ✅ **Clareza:** Mensagens contextuais no modo espectador
+- ✅ **Acesso facilitado:** Geração automática de tokens na primeira vez
+
+---
 
 ### v0.4.0 - Sistema de Sincronização Multi-Dispositivo ✅
 **Data:** 14/01/2026
@@ -2172,11 +2214,11 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 
 **Última atualização:** 14/01/2026  
 **Versão atual:** v0.4.0 (gerenciada automaticamente via GitHub Actions)  
-**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com sincronização multi-dispositivo em tempo real, validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos), interface de placares flexível sem validações rígidas, compartilhamento com link e QR Code, página pública de visualização, e todas as funcionalidades anteriores mantidas!
+**Status:** ✅ ATIVO - Sistema completo de 3 fases progressivas com sincronização multi-dispositivo em tempo real, validação automática, classificação dinâmica, repescagem inteligente, navegação por fases fixas, badges de status, preview de classificados, banner de campeão, export/import avançado com modais (todas categorias ou específica, com sobrescrita), adição incremental de grupos, remoção em massa protegida, resorteio inteligente corrigido que preserva vagas, grupos com letras identificadoras (A, B, C...), formação de grupos ágil sem pop-ups, UX profissional otimizada, proteção integral contra perda de dados, configurações de jogo simplificadas (1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos), interface de placares flexível sem validações rígidas, compartilhamento com link e QR Code, página pública de visualização com seleção automática de categoria e mensagens contextuais, geração automática de tokens na primeira vez, e todas as funcionalidades anteriores mantidas!
 
 **⚠️ Importante sobre Versionamento:**
 - A versão é gerenciada **automaticamente** via GitHub Actions
 - **NÃO altere manualmente** a versão no `package.json`
-- Versão atual: **0.2.3** (conforme `package.json`)
+- Versão atual: **0.4.0** (conforme `package.json`)
 - O workflow atualiza o `package.json` e cria GitHub Releases automaticamente
 - Consulte a seção "Fase 9: CI/CD e Versionamento Automático" para detalhes

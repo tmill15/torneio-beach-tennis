@@ -461,6 +461,7 @@ export default function Home() {
               const ranking = getGroupRanking(group.id);
               const maxPhase = getMaxPhase(selectedCategory);
               const isReadOnly = selectedPhase < maxPhase; // Fase anterior = read-only
+              const groupPhaseComplete = isReadOnly ? isPhaseComplete(selectedCategory, selectedPhase) : false;
 
               return (
                 <GroupCard
@@ -470,6 +471,7 @@ export default function Home() {
                   gameConfig={tournament.gameConfig}
                   viewMode={viewMode}
                   isReadOnly={isReadOnly}
+                  isPhaseComplete={groupPhaseComplete}
                   onUpdateScore={updateMatchScore}
                   onFinalizeMatch={handleFinalizeMatch}
                   onReopenMatch={reopenMatch}

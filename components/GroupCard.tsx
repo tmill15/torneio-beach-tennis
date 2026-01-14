@@ -17,6 +17,7 @@ interface GroupCardProps {
   gameConfig: GameConfig;
   viewMode: 'classificacao' | 'jogos';
   isReadOnly?: boolean; // Indica se a fase é anterior (somente visualização)
+  isPhaseComplete?: boolean; // Indica se a fase está completa (para mensagem no rodapé)
   onUpdateScore: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onFinalizeMatch: (groupId: string, matchId: string, sets: SetScore[]) => void;
   onReopenMatch: (groupId: string, matchId: string) => void;
@@ -35,6 +36,7 @@ export function GroupCard({
   gameConfig,
   viewMode,
   isReadOnly = false,
+  isPhaseComplete = false,
   onUpdateScore,
   onFinalizeMatch,
   onReopenMatch,
@@ -314,7 +316,9 @@ export function GroupCard({
       {isReadOnly && (
         <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700">
           <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
-            📋 Modo visualização - Esta fase já foi concluída
+            {isPhaseComplete
+              ? '📋 Modo visualização - Esta fase já foi concluída'
+              : '👁️ Modo visualização - Acompanhando em tempo real'}
           </p>
         </div>
       )}
