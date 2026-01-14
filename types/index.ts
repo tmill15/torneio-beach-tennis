@@ -136,6 +136,8 @@ export interface TournamentBackup {
     salt: string;                      // Salt usado na criptografia (base64)
     iv: string;                        // IV usado na criptografia (base64)
   };
+  // Estado de compartilhamento (apenas em backup completo)
+  sharingEnabled?: boolean;            // Estado do toggle de compartilhamento
 }
 
 // ============================================

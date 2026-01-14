@@ -115,6 +115,7 @@ const tournamentBackupSchema = z.object({
     salt: z.string(),
     iv: z.string(),
   }).optional(),
+  sharingEnabled: z.boolean().optional(),
 });
 
 /**
@@ -146,13 +147,14 @@ export async function exportTournament(
     tournament: filteredTournament,
   };
 
-  // Incluir credenciais criptografadas apenas se:
+  // Incluir credenciais criptografadas e estado de compartilhamento apenas se:
   // 1. É backup completo (sem categoria específica)
   // 2. Senha foi fornecida
   // 3. Estamos no navegador (localStorage disponível)
   if (!categoria && password && typeof window !== 'undefined') {
     const tournamentId = localStorage.getItem('beachtennis-tournament-id');
     const adminToken = localStorage.getItem('beachtennis-admin-token');
+    const sharingEnabled = localStorage.getItem('beachtennis-sharing-enabled') === 'true';
 
     if (tournamentId && adminToken) {
       // Criptografar credenciais
@@ -164,6 +166,9 @@ export async function exportTournament(
         salt: encrypted.salt,
         iv: encrypted.iv,
       };
+      
+      // Incluir estado de compartilhamento
+      backup.sharingEnabled = sharingEnabled;
     }
   }
 
@@ -279,6 +284,7 @@ export async function importTournament(
   isSingleCategory: boolean; 
   category?: string;
   credentials?: { tournamentId: string; adminToken: string };
+  sharingEnabled?: boolean;
 }> {
   try {
     const data = JSON.parse(jsonData);
@@ -329,6 +335,7 @@ export async function importTournament(
       isSingleCategory,
       category,
       credentials,
+      sharingEnabled: backup.sharingEnabled,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {

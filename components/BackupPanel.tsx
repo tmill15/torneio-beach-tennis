@@ -8,6 +8,7 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import type { Tournament } from '@/types';
 import { downloadBackup, importTournament, validateBackup, getBackupMetadata } from '@/services/backupService';
+import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 
 interface BackupPanelProps {
   tournament: Tournament;
@@ -115,6 +116,11 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         localStorage.setItem(ADMIN_TOKEN_KEY, importResult.credentials.adminToken);
       }
       
+      // Se tem estado de compartilhamento, restaurar no localStorage
+      if (importResult.sharingEnabled !== undefined) {
+        localStorage.setItem(SHARING_ENABLED_KEY, String(importResult.sharingEnabled));
+      }
+      
       // Confirmação antes de importar
       const actionText = isSingleCategory 
         ? `restaurar dados da categoria "${category}"`
@@ -128,6 +134,10 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         ? `\n✅ Credenciais de sincronização serão restauradas.`
         : '';
       
+      const sharingText = importResult.sharingEnabled !== undefined
+        ? `\n${importResult.sharingEnabled ? '✅' : '⚪'} Estado de compartilhamento será restaurado (${importResult.sharingEnabled ? 'ativado' : 'desativado'}).`
+        : '';
+      
       const message = `Você está prestes a ${actionText}.\n\n` +
         `Dados do backup:\n` +
         `- Torneio: ${importResult.tournament.nome}\n` +
@@ -136,6 +146,7 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         `- Jogadores: ${importResult.tournament.waitingList.length + importResult.tournament.grupos.reduce((sum, g) => sum + (g.players?.length || 0), 0)}` +
         warningText +
         credentialsText +
+        sharingText +
         `\n\nDeseja continuar?`;
 
       if (window.confirm(message)) {
