@@ -23,31 +23,66 @@ let redisClient: Redis | null = null;
 // Inicializar cliente Redis
 if (isDevelopment) {
   // Desenvolvimento: Redis local
+  console.log('🔧 Modo desenvolvimento: usando Redis local');
   redisClient = new Redis(REDIS_URL);
 } else if (UPSTASH_REDIS_URL) {
   // Produção: Upstash Redis com URL tradicional (preferencial)
   // Formato: redis://default:TOKEN@HOST:PORT
+  console.log('✅ Upstash Redis: usando UPSTASH_REDIS_URL');
   redisClient = new Redis(UPSTASH_REDIS_URL, {
     tls: {
       rejectUnauthorized: false, // Upstash requer TLS
     },
   });
 } else if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-  // Produção: Upstash Redis via REST API (fallback)
-  // Constrói URL Redis a partir da REST URL
-  // REST URL: https://HOST.upstash.io
-  // Redis URL: redis://default:TOKEN@HOST:PORT
-  const restUrl = new URL(UPSTASH_REDIS_REST_URL);
-  const host = restUrl.hostname.replace('.upstash.io', '');
-  // Upstash Redis geralmente usa porta 6379 ou 6380
-  const redisUrl = `redis://default:${UPSTASH_REDIS_REST_TOKEN}@${host}.upstash.io:6379`;
-  redisClient = new Redis(redisUrl, {
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+  // Produção: Upstash Redis via REST API
+  // IMPORTANTE: Upstash REST API não funciona diretamente com ioredis
+  // A Vercel Marketplace deve fornecer UPSTASH_REDIS_URL (não REST_URL)
+  // Se só temos REST_URL, precisamos usar a biblioteca @upstash/redis
+  console.warn('⚠️ Upstash REST API detectado, mas ioredis não suporta REST API diretamente');
+  console.warn('⚠️ Verifique se a Vercel injetou UPSTASH_REDIS_URL (não REST_URL)');
+  console.warn('⚠️ Se não tiver UPSTASH_REDIS_URL, instale @upstash/redis e atualize o código');
+  
+  // Tentar construir URL Redis (pode não funcionar)
+  try {
+    const restUrl = new URL(UPSTASH_REDIS_REST_URL);
+    const host = restUrl.hostname.replace('.upstash.io', '');
+    // Upstash pode usar porta 6379 ou 6380, tentar 6379 primeiro
+    const redisUrl = `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${host}.upstash.io:6379`;
+    console.log('🔄 Tentando conectar com URL construída:', redisUrl.replace(UPSTASH_REDIS_REST_TOKEN, '***'));
+    redisClient = new Redis(redisUrl, {
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectTimeout: 5000,
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.error('❌ Falha ao conectar após 3 tentativas');
+          return null; // Para de tentar
+        }
+        return Math.min(times * 200, 2000);
+      },
+    });
+    
+    // Testar conexão
+    redisClient.on('error', (err) => {
+      console.error('❌ Erro na conexão Redis:', err);
+    });
+    
+    redisClient.on('connect', () => {
+      console.log('✅ Conectado ao Redis com sucesso');
+    });
+  } catch (error) {
+    console.error('❌ Erro ao construir URL Redis:', error);
+  }
 } else {
-  console.warn('⚠️ Redis não configurado. Configure Upstash Redis via Vercel Marketplace.');
+  console.error('❌ Redis não configurado!');
+  console.error('Variáveis disponíveis:', {
+    NODE_ENV: process.env.NODE_ENV,
+    hasUPSTASH_REDIS_URL: !!UPSTASH_REDIS_URL,
+    hasUPSTASH_REDIS_REST_URL: !!UPSTASH_REDIS_REST_URL,
+    hasUPSTASH_REDIS_REST_TOKEN: !!UPSTASH_REDIS_REST_TOKEN,
+  });
 }
 
 /**
@@ -107,16 +142,23 @@ export async function saveTournament(
 ): Promise<boolean> {
   try {
     if (!redisClient) {
-      console.error('Redis client não inicializado');
+      console.error('❌ Redis client não inicializado');
+      console.error('Verifique se Upstash Redis está configurado no Vercel Marketplace');
       return false;
     }
 
     const key = `tournament:${id}`;
     const value = JSON.stringify(data);
+    console.log(`💾 Salvando torneio ${id} no Redis...`);
     await redisClient.setex(key, ttlSeconds, value);
+    console.log(`✅ Torneio ${id} salvo com sucesso`);
     return true;
   } catch (error) {
-    console.error('Erro ao salvar torneio:', error);
+    console.error('❌ Erro ao salvar torneio:', error);
+    if (error instanceof Error) {
+      console.error('Mensagem:', error.message);
+      console.error('Stack:', error.stack);
+    }
     return false;
   }
 }

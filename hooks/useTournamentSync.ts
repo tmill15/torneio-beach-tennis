@@ -116,7 +116,15 @@ export function useTournamentSync({
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Erro ao salvar');
+          const errorMessage = errorData.error || `Erro HTTP ${response.status}`;
+          const errorDetails = errorData.details || '';
+          console.error('❌ Erro na resposta do servidor:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorMessage,
+            details: errorDetails,
+          });
+          throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
         }
 
         // Sucesso: atualizar referência e status

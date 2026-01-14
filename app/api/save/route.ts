@@ -76,20 +76,33 @@ export async function POST(req: NextRequest) {
     };
 
     // Salvar no KV com TTL de 90 dias (7.776.000 segundos)
+    console.log(`📤 Tentando salvar torneio ${tournamentId}...`);
     const saved = await saveTournament(tournamentId, tournamentData, 7776000);
 
     if (!saved) {
+      console.error(`❌ Falha ao salvar torneio ${tournamentId}`);
       return NextResponse.json(
-        { error: 'Erro ao salvar torneio.' },
+        { 
+          error: 'Erro ao salvar torneio.',
+          details: 'Verifique os logs do servidor para mais informações.'
+        },
         { status: 500 }
       );
     }
 
+    console.log(`✅ Torneio ${tournamentId} salvo com sucesso`);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Erro ao salvar torneio:', error);
+    console.error('❌ Erro ao salvar torneio:', error);
+    if (error instanceof Error) {
+      console.error('Mensagem:', error.message);
+      console.error('Stack:', error.stack);
+    }
     return NextResponse.json(
-      { error: 'Erro interno do servidor.' },
+      { 
+        error: 'Erro interno do servidor.',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
+      },
       { status: 500 }
     );
   }
