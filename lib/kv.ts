@@ -11,11 +11,12 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // URLs de conexão
 // Produção: Upstash Redis via variáveis de ambiente da Vercel
 // Desenvolvimento: Redis local
-// A Vercel pode usar diferentes nomes de variáveis dependendo da integração
-const UPSTASH_REDIS_URL = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
+// A Vercel/Upstash fornece REDIS_URL quando conectado via Marketplace
+const REDIS_URL_ENV = process.env.REDIS_URL; // Fornecido pela Vercel quando Upstash está conectado
+const UPSTASH_REDIS_URL = process.env.UPSTASH_REDIS_URL;
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL_LOCAL = 'redis://localhost:6379';
 
 // Cliente Redis (funciona tanto para Upstash quanto para Redis local)
 let redisClient: Redis | null = null;
@@ -24,9 +25,18 @@ let redisClient: Redis | null = null;
 if (isDevelopment) {
   // Desenvolvimento: Redis local
   console.log('🔧 Modo desenvolvimento: usando Redis local');
-  redisClient = new Redis(REDIS_URL);
+  redisClient = new Redis(REDIS_URL_LOCAL);
+} else if (REDIS_URL_ENV) {
+  // Produção: Upstash Redis via REDIS_URL (fornecido pela Vercel quando conectado)
+  // Formato: rediss://default:TOKEN@HOST:PORT (rediss = Redis Secure/TLS)
+  console.log('✅ Upstash Redis: usando REDIS_URL (Vercel Marketplace)');
+  redisClient = new Redis(REDIS_URL_ENV, {
+    tls: {
+      rejectUnauthorized: false, // Upstash requer TLS
+    },
+  });
 } else if (UPSTASH_REDIS_URL) {
-  // Produção: Upstash Redis com URL tradicional (preferencial)
+  // Produção: Upstash Redis com URL tradicional (alternativa)
   // Formato: redis://default:TOKEN@HOST:PORT
   console.log('✅ Upstash Redis: usando UPSTASH_REDIS_URL');
   redisClient = new Redis(UPSTASH_REDIS_URL, {
@@ -79,12 +89,12 @@ if (isDevelopment) {
   console.error('❌ Redis não configurado!');
   console.error('Variáveis disponíveis:', {
     NODE_ENV: process.env.NODE_ENV,
+    hasREDIS_URL: !!REDIS_URL_ENV, // Esta é a principal quando conectado via Vercel
     hasUPSTASH_REDIS_URL: !!UPSTASH_REDIS_URL,
     hasUPSTASH_REDIS_REST_URL: !!UPSTASH_REDIS_REST_URL,
     hasUPSTASH_REDIS_REST_TOKEN: !!UPSTASH_REDIS_REST_TOKEN,
     hasKV_REST_API_URL: !!process.env.KV_REST_API_URL,
     hasKV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
-    hasREDIS_URL: !!process.env.REDIS_URL,
   });
   console.error('📋 INSTRUÇÕES:');
   console.error('1. Vercel Dashboard → Seu Projeto → Settings → Environment Variables');
