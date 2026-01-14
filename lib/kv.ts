@@ -22,6 +22,7 @@ const REDIS_URL_LOCAL = 'redis://localhost:6379';
 let redisClient: Redis | null = null;
 
 // Inicializar cliente Redis
+// Nota: Durante build, o Next.js pode tentar inicializar, mas não conectamos até runtime
 if (isDevelopment) {
   // Desenvolvimento: Redis local
   console.log('🔧 Modo desenvolvimento: usando Redis local');
@@ -30,11 +31,42 @@ if (isDevelopment) {
   // Produção: Upstash Redis via REDIS_URL (fornecido pela Vercel quando conectado)
   // Formato: rediss://default:TOKEN@HOST:PORT (rediss = Redis Secure/TLS)
   console.log('✅ Upstash Redis: usando REDIS_URL (Vercel Marketplace)');
-  redisClient = new Redis(REDIS_URL_ENV, {
+  
+  // Garantir que a URL usa rediss:// (TLS) se não especificado
+  let redisUrl = REDIS_URL_ENV;
+  if (redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+    // Converter redis:// para rediss:// para forçar TLS
+    redisUrl = redisUrl.replace('redis://', 'rediss://');
+    console.log('🔒 Convertendo redis:// para rediss:// (TLS)');
+  }
+  
+  // Configuração do Redis com TLS
+  const redisOptions: any = {
     tls: {
       rejectUnauthorized: false, // Upstash requer TLS
     },
+    // Configurações para evitar erros durante build
+    enableReadyCheck: false,
+    maxRetriesPerRequest: null,
+    lazyConnect: true, // Conectar apenas quando necessário (não durante build)
+    connectTimeout: 10000,
+    retryStrategy: () => null, // Não tentar reconectar automaticamente
+  };
+  
+  redisClient = new Redis(redisUrl, redisOptions);
+  
+  // Tratar erros de conexão silenciosamente durante build
+  redisClient.on('error', (err) => {
+    // Durante build, ignorar erros completamente (não quebrar o build)
+    // O erro será tratado quando realmente tentar usar o Redis em runtime
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return; // Silenciar durante build
+    }
+    console.error('❌ Erro na conexão Redis:', err.message);
   });
+  
+  // Com lazyConnect: true, a conexão só acontece quando realmente usamos o Redis
+  // Não precisamos chamar connect() manualmente
 } else if (UPSTASH_REDIS_URL) {
   // Produção: Upstash Redis com URL tradicional (alternativa)
   // Formato: redis://default:TOKEN@HOST:PORT
