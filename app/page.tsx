@@ -360,10 +360,9 @@ export default function Home() {
               </button>
               
               <button
-                onClick={() => {
-                  import('@/services/backupService').then(({ downloadBackup }) => {
-                    downloadBackup(tournament, selectedCategory);
-                  });
+                onClick={async () => {
+                  const { downloadBackup } = await import('@/services/backupService');
+                  await downloadBackup(tournament, selectedCategory);
                 }}
                 className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
               >

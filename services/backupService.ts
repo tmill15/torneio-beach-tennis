@@ -7,6 +7,87 @@ import type { Tournament, TournamentBackup, GameConfig } from '@/types';
 import { z } from 'zod';
 
 /**
+ * Funções de criptografia usando Web Crypto API
+ */
+
+/**
+ * Deriva uma chave de criptografia a partir de uma senha usando PBKDF2
+ */
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    passwordKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Criptografa dados usando AES-GCM
+ */
+async function encryptData(data: string, password: string): Promise<{ encrypted: string; salt: string; iv: string }> {
+  // Gerar salt e IV aleatórios
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Derivar chave da senha
+  const key = await deriveKey(password, salt);
+
+  // Criptografar dados
+  const encoder = new TextEncoder();
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    encoder.encode(data)
+  );
+
+  // Converter para base64 para armazenamento
+  return {
+    encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+    salt: btoa(String.fromCharCode(...salt)),
+    iv: btoa(String.fromCharCode(...iv)),
+  };
+}
+
+/**
+ * Descriptografa dados usando AES-GCM
+ */
+async function decryptData(encrypted: string, password: string, salt: string, iv: string): Promise<string> {
+  // Converter de base64
+  const encryptedData = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+  const saltData = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
+  const ivData = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+
+  // Derivar chave da senha
+  const key = await deriveKey(password, saltData);
+
+  // Descriptografar dados
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: ivData },
+    key,
+    encryptedData
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decrypted);
+}
+
+/**
  * Versão atual do formato de backup
  */
 const BACKUP_VERSION = '1.0.0';
@@ -29,12 +110,24 @@ const tournamentBackupSchema = z.object({
     grupos: z.array(z.any()), // Simplified for now
     waitingList: z.array(z.any()), // Simplified for now
   }),
+  syncCredentials: z.object({
+    encrypted: z.string(),
+    salt: z.string(),
+    iv: z.string(),
+  }).optional(),
 });
 
 /**
  * Exporta torneio para string JSON (completo ou filtrado por categoria)
+ * @param tournament - Torneio completo
+ * @param categoria - Categoria específica (opcional). Se não informada, faz backup de todas as categorias
+ * @param password - Senha para criptografar credenciais (opcional). Apenas para backup completo.
  */
-export function exportTournament(tournament: Tournament, categoria?: string): string {
+export async function exportTournament(
+  tournament: Tournament, 
+  categoria?: string,
+  password?: string
+): Promise<string> {
   let filteredTournament: Tournament = tournament;
   
   // Se categoria for especificada, filtrar apenas dados dessa categoria
@@ -52,6 +145,27 @@ export function exportTournament(tournament: Tournament, categoria?: string): st
     exportDate: new Date().toISOString(),
     tournament: filteredTournament,
   };
+
+  // Incluir credenciais criptografadas apenas se:
+  // 1. É backup completo (sem categoria específica)
+  // 2. Senha foi fornecida
+  // 3. Estamos no navegador (localStorage disponível)
+  if (!categoria && password && typeof window !== 'undefined') {
+    const tournamentId = localStorage.getItem('beachtennis-tournament-id');
+    const adminToken = localStorage.getItem('beachtennis-admin-token');
+
+    if (tournamentId && adminToken) {
+      // Criptografar credenciais
+      const credentials = JSON.stringify({ tournamentId, adminToken });
+      const encrypted = await encryptData(credentials, password);
+
+      backup.syncCredentials = {
+        encrypted: encrypted.encrypted,
+        salt: encrypted.salt,
+        iv: encrypted.iv,
+      };
+    }
+  }
 
   return JSON.stringify(backup, null, 2);
 }
@@ -87,9 +201,14 @@ function generateBackupFilename(tournament: Tournament, categoria?: string): str
  * Gera e faz download do arquivo de backup
  * @param tournament - Torneio completo
  * @param categoria - Categoria específica (opcional). Se não informada, faz backup de todas as categorias
+ * @param password - Senha para criptografar credenciais (opcional). Apenas para backup completo.
  */
-export function downloadBackup(tournament: Tournament, categoria?: string): void {
-  const json = exportTournament(tournament, categoria);
+export async function downloadBackup(
+  tournament: Tournament, 
+  categoria?: string,
+  password?: string
+): Promise<void> {
+  const json = await exportTournament(tournament, categoria, password);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
@@ -148,9 +267,19 @@ function normalizeGameConfig(config: any): GameConfig {
 
 /**
  * Importa torneio a partir de string JSON
- * Retorna o torneio importado e indica se é backup de categoria específica
+ * Retorna o torneio importado, indica se é backup de categoria específica e credenciais descriptografadas (se houver)
+ * @param jsonData - JSON do backup
+ * @param password - Senha para descriptografar credenciais (opcional, apenas se backup tiver credenciais)
  */
-export function importTournament(jsonData: string): { tournament: Tournament; isSingleCategory: boolean; category?: string } {
+export async function importTournament(
+  jsonData: string,
+  password?: string
+): Promise<{ 
+  tournament: Tournament; 
+  isSingleCategory: boolean; 
+  category?: string;
+  credentials?: { tournamentId: string; adminToken: string };
+}> {
   try {
     const data = JSON.parse(jsonData);
     const backup = tournamentBackupSchema.parse(data);
@@ -170,10 +299,36 @@ export function importTournament(jsonData: string): { tournament: Tournament; is
     const isSingleCategory = normalizedTournament.categorias.length === 1;
     const category = isSingleCategory ? normalizedTournament.categorias[0] : undefined;
 
+    // Descriptografar credenciais se existirem
+    let credentials: { tournamentId: string; adminToken: string } | undefined;
+    if (backup.syncCredentials) {
+      if (!password) {
+        throw new Error('Este backup contém credenciais criptografadas. É necessária uma senha para restaurá-las.');
+      }
+
+      try {
+        // Descriptografar credenciais
+        const decrypted = await decryptData(
+          backup.syncCredentials.encrypted,
+          password,
+          backup.syncCredentials.salt,
+          backup.syncCredentials.iv
+        );
+        const decryptedData = JSON.parse(decrypted);
+        credentials = {
+          tournamentId: decryptedData.tournamentId,
+          adminToken: decryptedData.adminToken,
+        };
+      } catch (error) {
+        throw new Error('Senha incorreta ou dados corrompidos. Não foi possível descriptografar as credenciais.');
+      }
+    }
+
     return {
       tournament: normalizedTournament,
       isSingleCategory,
       category,
+      credentials,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -216,6 +371,7 @@ export function getBackupMetadata(jsonData: string): {
   categorias: string[];
   totalGroups: number;
   totalPlayers: number;
+  hasCredentials: boolean;
 } | null {
   try {
     const data = JSON.parse(jsonData);
@@ -232,6 +388,7 @@ export function getBackupMetadata(jsonData: string): {
       categorias: backup.tournament.categorias,
       totalGroups: backup.tournament.grupos.length,
       totalPlayers,
+      hasCredentials: !!backup.syncCredentials,
     };
   } catch {
     return null;
