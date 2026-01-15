@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Erro ao salvar torneio.',
-          details: 'Verifique os logs do servidor para mais informações.'
+          details: 'Não foi possível conectar ao Redis. Verifique se o serviço está disponível.'
         },
         { status: 500 }
       );

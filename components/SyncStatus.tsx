@@ -7,9 +7,10 @@
 
 interface SyncStatusProps {
   status: 'idle' | 'saving' | 'saved' | 'error';
+  onRetry?: () => void;
 }
 
-export function SyncStatus({ status }: SyncStatusProps) {
+export function SyncStatus({ status, onRetry }: SyncStatusProps) {
   const getStatusConfig = () => {
     switch (status) {
       case 'saving':
@@ -62,6 +63,15 @@ export function SyncStatus({ status }: SyncStatusProps) {
     <div className={`flex items-center gap-2 text-sm ${config.color}`}>
       {config.icon}
       <span className="hidden sm:inline">{config.text}</span>
+      {status === 'error' && onRetry && (
+        <button
+          onClick={onRetry}
+          className="ml-2 px-2 py-1 text-xs bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded transition-colors"
+          title="Tentar sincronizar novamente"
+        >
+          Tentar novamente
+        </button>
+      )}
     </div>
   );
 }

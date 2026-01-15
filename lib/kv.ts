@@ -4,6 +4,11 @@
  * 
  * Usa biblioteca 'redis' oficial (recomendada pela Vercel/Upstash)
  * Funciona tanto em desenvolvimento (Redis local) quanto em produção (Upstash)
+ * 
+ * IMPORTANTE SOBRE LIMITES DA VERCEL:
+ * - Tentativas de conexão TCP ao Redis NÃO contam nos limites de requisições HTTP da Vercel
+ * - Apenas requisições HTTP (GET, POST, etc) contam nos limites
+ * - O cliente Redis gerencia reconexão automaticamente
  */
 
 import { createClient } from 'redis';
@@ -24,27 +29,43 @@ const REDIS_URL_LOCAL = 'redis://localhost:6379';
 // Cliente Redis (usando biblioteca oficial)
 let redisClient: ReturnType<typeof createClient> | null = null;
 
+// Flag para evitar spam de logs de erro (apenas para UX, não afeta funcionalidade)
+let redisErrorLogged = false;
+
 // Inicializar cliente Redis
 if (isDevelopment) {
   // Desenvolvimento: Redis local
   console.log('🔧 Modo desenvolvimento: usando Redis local');
   try {
-    redisClient = createClient({ url: REDIS_URL_LOCAL });
+    redisClient = createClient({ 
+      url: REDIS_URL_LOCAL,
+      socket: {
+        // Deixar o cliente Redis gerenciar reconexão automaticamente
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            return false; // Parar após 10 tentativas
+          }
+          return Math.min(retries * 100, 3000); // Backoff exponencial
+        }
+      }
+    });
     
     redisClient.on('error', (err) => {
-      console.error('❌ Erro na conexão Redis local:', err.message);
+      // Logar apenas uma vez para evitar spam no console
+      if (!redisErrorLogged) {
+        console.error('❌ Erro na conexão Redis local:', err.message);
+        console.warn('💡 Dica: Inicie o Redis com `docker-compose up -d` ou `redis-server`');
+        redisErrorLogged = true;
+      }
     });
     
     redisClient.on('connect', () => {
       console.log('✅ Conectado ao Redis local com sucesso');
+      redisErrorLogged = false; // Reset flag quando conectar
     });
     
-    // Conectar (lazy - só conecta quando necessário)
-    if (process.env.NEXT_PHASE !== 'phase-production-build') {
-      redisClient.connect().catch((err) => {
-        console.warn('⚠️ Erro ao conectar ao Redis local (será reconectado quando necessário):', err.message);
-      });
-    }
+    // NÃO conectar na inicialização - deixar totalmente lazy
+    // A conexão será feita apenas quando necessário (nas funções getTournament, saveTournament, etc)
   } catch (error) {
     console.error('❌ Erro ao criar cliente Redis local:', error);
   }
@@ -64,34 +85,44 @@ if (isDevelopment) {
   
   // Usar biblioteca 'redis' oficial (recomendada pela Vercel)
   try {
-    redisClient = createClient({ url: redisUrl });
+    redisClient = createClient({ 
+      url: redisUrl,
+      socket: {
+        // Deixar o cliente Redis gerenciar reconexão automaticamente
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            return false; // Parar após 10 tentativas
+          }
+          return Math.min(retries * 200, 5000); // Backoff exponencial
+        }
+      }
+    });
     
     // Tratar erros de conexão
     redisClient.on('error', (err) => {
       if (process.env.NEXT_PHASE === 'phase-production-build') {
         return; // Silenciar durante build
       }
-      console.error('❌ Erro na conexão Redis:', err.message);
+      // Logar apenas uma vez para evitar spam no console
+      if (!redisErrorLogged) {
+        console.error('❌ Erro na conexão Redis:', err.message);
+        console.warn('💡 Verifique o status do Upstash Redis no dashboard da Vercel');
+        redisErrorLogged = true;
+      }
     });
     
     redisClient.on('connect', () => {
       console.log('✅ Conectado ao Redis com sucesso');
+      redisErrorLogged = false; // Reset flag quando conectar
     });
     
     redisClient.on('ready', () => {
       console.log('✅ Redis está pronto para uso');
+      redisErrorLogged = false; // Reset flag quando estiver pronto
     });
     
-    // Conectar (lazy - só conecta quando necessário)
-    // Não conectamos durante build
-    if (process.env.NEXT_PHASE !== 'phase-production-build') {
-      redisClient.connect().catch((err) => {
-        // Ignorar erros de conexão inicial (será reconectado quando necessário)
-        if (process.env.NEXT_PHASE !== 'phase-production-build') {
-          console.warn('⚠️ Erro ao conectar inicialmente (será reconectado quando necessário):', err.message);
-        }
-      });
-    }
+    // NÃO conectar na inicialização - deixar totalmente lazy
+    // A conexão será feita apenas quando necessário (nas funções getTournament, saveTournament, etc)
   } catch (error) {
     console.error('❌ Erro ao criar cliente Redis:', error);
   }
@@ -103,10 +134,36 @@ if (isDevelopment) {
     const url = UPSTASH_REDIS_URL;
     const maskedUrl = url.replace(/:[^:@]+@/, ':***@');
     console.log('🔗 URL Redis:', maskedUrl);
-    redisClient = createClient({ url });
-    if (process.env.NEXT_PHASE !== 'phase-production-build') {
-      redisClient.connect().catch(() => {});
-    }
+    redisClient = createClient({ 
+      url,
+      socket: {
+        // Deixar o cliente Redis gerenciar reconexão automaticamente
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            return false; // Parar após 10 tentativas
+          }
+          return Math.min(retries * 200, 5000); // Backoff exponencial
+        }
+      }
+    });
+    
+    redisClient.on('error', (err) => {
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return;
+      }
+      if (!redisErrorLogged) {
+        console.error('❌ Erro na conexão Redis:', err.message);
+        redisErrorLogged = true;
+      }
+    });
+    
+    redisClient.on('connect', () => {
+      console.log('✅ Conectado ao Redis com sucesso');
+      redisErrorLogged = false;
+    });
+    
+    // NÃO conectar na inicialização - deixar totalmente lazy
+    // A conexão será feita apenas quando necessário
   } catch (error) {
     console.error('❌ Erro ao criar cliente Redis:', error);
   }
@@ -170,14 +227,25 @@ export async function getTournament(id: string): Promise<TournamentData | null> 
     const key = `tournament:${id}`;
     let result: string | null = null;
 
-    if (redisClient) {
-      // Garantir que está conectado
-      if (!redisClient.isOpen) {
-        await redisClient.connect();
-      }
-      result = await redisClient.get(key);
-    } else {
+    if (!redisClient) {
       console.error('❌ Redis client não inicializado');
+      return null;
+    }
+
+    // Garantir que está conectado (deixar o cliente Redis gerenciar)
+    if (!redisClient.isOpen) {
+      try {
+        await redisClient.connect();
+      } catch (connectError) {
+        // Erro já será logado pelo event handler 'error'
+        return null;
+      }
+    }
+
+    try {
+      result = await redisClient.get(key);
+    } catch (getError) {
+      console.error('❌ Erro ao buscar torneio do Redis:', getError instanceof Error ? getError.message : 'Erro desconhecido');
       return null;
     }
 
@@ -204,20 +272,34 @@ export async function saveTournament(
     const value = JSON.stringify(data);
     console.log(`💾 Salvando torneio ${id} no Redis...`);
 
-    if (redisClient) {
-      // Garantir que está conectado
-      if (!redisClient.isOpen) {
-        await redisClient.connect();
-      }
-      await redisClient.setEx(key, ttlSeconds, value);
-    } else {
+    if (!redisClient) {
       console.error('❌ Redis client não inicializado');
       console.error('Verifique se Upstash Redis está configurado no Vercel Marketplace');
       return false;
     }
 
-    console.log(`✅ Torneio ${id} salvo com sucesso`);
-    return true;
+    // Garantir que está conectado (deixar o cliente Redis gerenciar)
+    if (!redisClient.isOpen) {
+      try {
+        await redisClient.connect();
+      } catch (connectError) {
+        // Erro já será logado pelo event handler 'error'
+        return false;
+      }
+    }
+
+    try {
+      await redisClient.setEx(key, ttlSeconds, value);
+      console.log(`✅ Torneio ${id} salvo com sucesso`);
+      return true;
+    } catch (setError) {
+      const errorMessage = setError instanceof Error ? setError.message : 'Erro desconhecido';
+      
+      // Erro ao salvar - retornar false (erro de conexão já foi logado pelo event handler)
+      // Não precisa logar novamente aqui
+      
+      return false;
+    }
   } catch (error) {
     console.error('❌ Erro ao salvar torneio:', error);
     if (error instanceof Error) {
@@ -235,19 +317,30 @@ export async function deleteTournament(id: string): Promise<boolean> {
   try {
     const key = `tournament:${id}`;
 
-    if (redisClient) {
-      if (!redisClient.isOpen) {
-        await redisClient.connect();
-      }
-      await redisClient.del(key);
-    } else {
-      console.error('Redis client não inicializado');
+    if (!redisClient) {
+      console.error('❌ Redis client não inicializado');
       return false;
     }
 
-    return true;
+    // Garantir que está conectado (deixar o cliente Redis gerenciar)
+    if (!redisClient.isOpen) {
+      try {
+        await redisClient.connect();
+      } catch (connectError) {
+        // Erro já será logado pelo event handler 'error'
+        return false;
+      }
+    }
+
+    try {
+      await redisClient.del(key);
+      return true;
+    } catch (delError) {
+      console.error('❌ Erro ao deletar torneio do Redis:', delError instanceof Error ? delError.message : 'Erro desconhecido');
+      return false;
+    }
   } catch (error) {
-    console.error('Erro ao deletar torneio:', error);
+    console.error('❌ Erro ao deletar torneio:', error);
     return false;
   }
 }
@@ -260,20 +353,32 @@ export async function existsTournament(id: string): Promise<boolean> {
     const key = `tournament:${id}`;
     let exists = false;
 
-    if (redisClient) {
-      if (!redisClient.isOpen) {
+    if (!redisClient) {
+      console.error('❌ Redis client não inicializado');
+      return false;
+    }
+
+    // Garantir que está conectado (deixar o cliente Redis gerenciar)
+    if (!redisClient.isOpen) {
+      try {
         await redisClient.connect();
+      } catch (connectError) {
+        // Erro já será logado pelo event handler 'error'
+        return false;
       }
+    }
+
+    try {
       const result = await redisClient.exists(key);
       exists = result === 1;
-    } else {
-      console.error('Redis client não inicializado');
+    } catch (existsError) {
+      console.error('❌ Erro ao verificar existência do torneio no Redis:', existsError instanceof Error ? existsError.message : 'Erro desconhecido');
       return false;
     }
 
     return exists;
   } catch (error) {
-    console.error('Erro ao verificar existência do torneio:', error);
+    console.error('❌ Erro ao verificar existência do torneio:', error);
     return false;
   }
 }

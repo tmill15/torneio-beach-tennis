@@ -26,6 +26,7 @@ interface UseTournamentSyncResult {
   shareLink: string | null;
   tournamentId: string | null;
   viewerError?: any; // Erro do SWR (para detectar torneio não encontrado)
+  retrySync: () => void; // Função para forçar retry manual
 }
 
 const fetcher = async (url: string) => {
@@ -63,8 +64,10 @@ export function useTournamentSync({
 
   const lastSyncedData = useRef<string | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const retryTimer = useRef<NodeJS.Timeout | null>(null);
   const retryCount = useRef(0);
-  const maxRetries = 3;
+  const maxRetries = 3; // Tentativas imediatas com backoff exponencial
+  const retryDelays = [2000, 4000, 8000]; // 2s, 4s, 8s
 
   // Usar tournamentId externo ou do localStorage
   const tournamentId = externalTournamentId || storedTournamentId;
@@ -87,6 +90,107 @@ export function useTournamentSync({
     }
   }, [isAdmin, viewerData, onTournamentUpdate]);
 
+  // Função para realizar o sync
+  const performSync = useCallback(async (isRetry: boolean = false) => {
+    if (!isAdmin || !tournamentId || !storedAdminToken || !sharingEnabled) {
+      return;
+    }
+
+    const currentDataString = JSON.stringify(tournament);
+
+    // Dirty checking: só salvar se houver mudança real (exceto em retry manual)
+    if (!isRetry && currentDataString === lastSyncedData.current) {
+      return;
+    }
+
+    setSyncStatus('saving');
+
+    try {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tournamentId,
+          adminToken: storedAdminToken,
+          data: tournament,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `Erro HTTP ${response.status}`;
+        const errorDetails = errorData.details || '';
+        console.error('❌ Erro na resposta do servidor:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage,
+          details: errorDetails,
+        });
+        throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
+      }
+
+      // Sucesso: atualizar referência e status
+      lastSyncedData.current = currentDataString;
+      setSyncStatus('saved');
+      retryCount.current = 0;
+
+      // Limpar timer de retry se existir
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
+
+      // Resetar status para 'idle' após 2 segundos
+      setTimeout(() => {
+        setSyncStatus('idle');
+      }, 2000);
+    } catch (error) {
+      console.error('Erro ao sincronizar:', error);
+      
+      // Tentar novamente com backoff exponencial
+      if (retryCount.current < maxRetries) {
+        retryCount.current += 1;
+        const delay = retryDelays[retryCount.current - 1];
+        console.log(`🔄 Tentativa ${retryCount.current}/${maxRetries} em ${delay/1000}s...`);
+        
+        // Manter erro visível durante o delay
+        setSyncStatus('error');
+        
+        retryTimer.current = setTimeout(() => {
+          // Mudar para 'saving' antes de tentar novamente
+          setSyncStatus('saving');
+          performSync(false);
+        }, delay);
+      } else {
+        // Esgotou todas as tentativas, manter erro
+        setSyncStatus('error');
+        retryCount.current = 0; // Reset para próxima tentativa manual
+        console.log('❌ Todas as tentativas de sincronização falharam. Use o botão "Tentar novamente" para tentar novamente.');
+      }
+    }
+  }, [isAdmin, tournamentId, storedAdminToken, tournament, sharingEnabled]);
+
+  // Retry manual (força nova tentativa)
+  const retrySync = useCallback(() => {
+    // Limpar timers
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+
+    // Reset contador
+    retryCount.current = 0;
+
+    // Forçar sync imediatamente (marcar como retry manual)
+    performSync(true);
+  }, [performSync]);
+
   // Modo Admin: sincronizar com debounce e dirty checking
   // Só sincroniza se compartilhamento estiver ativo
   useEffect(() => {
@@ -100,67 +204,8 @@ export function useTournamentSync({
     }
 
     // Debounce de 2 segundos
-    debounceTimer.current = setTimeout(async () => {
-      const currentDataString = JSON.stringify(tournament);
-
-      // Dirty checking: só salvar se houver mudança real
-      if (currentDataString === lastSyncedData.current) {
-        return;
-      }
-
-      setSyncStatus('saving');
-
-      try {
-        const response = await fetch('/api/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tournamentId,
-            adminToken: storedAdminToken,
-            data: tournament,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMessage = errorData.error || `Erro HTTP ${response.status}`;
-          const errorDetails = errorData.details || '';
-          console.error('❌ Erro na resposta do servidor:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorMessage,
-            details: errorDetails,
-          });
-          throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
-        }
-
-        // Sucesso: atualizar referência e status
-        lastSyncedData.current = currentDataString;
-        setSyncStatus('saved');
-        retryCount.current = 0;
-
-        // Resetar status para 'idle' após 2 segundos
-        setTimeout(() => {
-          setSyncStatus('idle');
-        }, 2000);
-      } catch (error) {
-        console.error('Erro ao sincronizar:', error);
-        setSyncStatus('error');
-
-        // Backoff exponencial em caso de erro
-        if (retryCount.current < maxRetries) {
-          retryCount.current += 1;
-          const delay = Math.pow(2, retryCount.current) * 1000; // 2s, 4s, 8s
-          setTimeout(() => {
-            setSyncStatus('idle');
-          }, delay);
-        } else {
-          // Após max retries, manter erro
-          retryCount.current = 0;
-        }
-      }
+    debounceTimer.current = setTimeout(() => {
+      performSync(false);
     }, 2000);
 
     // Cleanup
@@ -169,7 +214,7 @@ export function useTournamentSync({
         clearTimeout(debounceTimer.current);
       }
     };
-  }, [isAdmin, tournamentId, storedAdminToken, tournament, sharingEnabled]);
+  }, [isAdmin, tournamentId, storedAdminToken, tournament, sharingEnabled, performSync]);
 
   // Gerar link de compartilhamento
   const shareLink = tournamentId
@@ -181,6 +226,7 @@ export function useTournamentSync({
     shareLink,
     tournamentId,
     viewerError: !isAdmin ? viewerError : undefined,
+    retrySync,
   };
 }
 
