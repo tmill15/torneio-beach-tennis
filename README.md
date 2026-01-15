@@ -47,7 +47,7 @@ npm run dev
 
 Abra [http://localhost:3000](http://localhost:3000) no navegador.
 
-**Nota:** O Redis é necessário para o sistema de sincronização funcionar. Em desenvolvimento, ele roda localmente via Docker. Em produção, usa Vercel KV.
+**Nota:** O Redis é necessário para o sistema de sincronização funcionar. Em desenvolvimento, ele roda localmente via Docker. Em produção, usa Upstash Redis via Vercel Marketplace.
 
 ## 📖 Como Usar
 
@@ -138,27 +138,74 @@ torneio-beach-tennis/
 
 ## 📋 Regras de Negócio
 
+### Estrutura do Torneio
+
+O torneio é dividido em **3 fases progressivas**:
+
+- **Fase 1:** Grupos iniciais (múltiplos grupos de 4 jogadores)
+- **Fase 2:** Grupos semifinais (múltiplos grupos de 4 jogadores)
+- **Fase 3:** Final (grupo único com 2 ou 4 jogadores)
+
 ### Formação de Grupos
-- Grupos de **4 duplas** cada
+- Grupos de **4 jogadores** cada
 - Lista de espera ilimitada
 - Excedentes aguardam até completar novo grupo
 - **Seeds** distribuídos uniformemente entre grupos
 
 ### Geração de Jogos (Round Robin)
 - Algoritmo: Circle Method
-- Cada dupla joga contra todas as outras
-- Para 4 duplas: 6 partidas em 3 rodadas
+- Cada jogador joga contra todos os outros do grupo
+- Para 4 jogadores: 6 partidas em 3 rodadas
 - Exemplo:
   - Rodada 1: A×B, C×D
   - Rodada 2: A×C, B×D
   - Rodada 3: A×D, B×C
+
+### Classificação entre Fases
+
+#### Fase 1 → Fase 2
+- **Classificação Direta:** Top 2 de cada grupo
+- **Repescagem:** Melhores 3º lugares (quando necessário para completar grupos)
+- **Regra:** Apenas repescagem se o número de classificados diretos não formar grupos completos de 4
+
+#### Fase 2 → Fase 3 (Final)
+A classificação depende do número de grupos na Fase 2:
+- **≤ 2 grupos:** Top 2 de cada grupo (2 ou 4 jogadores na final)
+- **3 grupos:** Top 1 de cada grupo + melhor 2º colocado (4 jogadores na final)
+- **4 grupos:** Top 1 de cada grupo (4 jogadores na final)
+- **5+ grupos:** Top 1 de cada grupo, selecionados os 4 melhores por estatísticas (4 jogadores na final)
+
+#### Fase 3 (Final)
+- Grupo único com 2 ou 4 jogadores
+- Campeão: 1º lugar do grupo final
+
+### Classificação por Número de Participantes
+
+| Participantes | Fase 1 | Classificação F1→F2 | Fase 2 | Classificação F2→F3 | Fase 3 |
+|--------------|--------|---------------------|--------|---------------------|--------|
+| **8** | 2 grupos (4+4) | Top 2 de cada (4) | 1 grupo (4) | Top 2 (2) | Final (2) |
+| **12** | 3 grupos (4+4+4) | Top 2 de cada (6) + 2 repescados = 8 | 2 grupos (4+4) | Top 2 de cada (4) | Final (4) |
+| **16** | 4 grupos (4+4+4+4) | Top 2 de cada (8) | 2 grupos (4+4) | Top 2 de cada (4) | Final (4) |
+| **20** | 5 grupos (4+4+4+4+4) | Top 2 de cada (10) | 2 grupos (8+8) + 2 repescados = 3 grupos (4+4+4) | Top 1 de cada + melhor 2º (4) | Final (4) |
+| **24** | 6 grupos (4+4+4+4+4+4) | Top 2 de cada (12) | 3 grupos (4+4+4) | Top 1 de cada + melhor 2º (4) | Final (4) |
+| **28** | 7 grupos (4+4+4+4+4+4+4) | Top 2 de cada (14) | 3 grupos (12+12) + 2 repescados = 4 grupos (4+4+4+4) | Top 1 de cada (4) | Final (4) |
+| **32** | 8 grupos (4+4+4+4+4+4+4+4) | Top 2 de cada (16) | 4 grupos (4+4+4+4) | Top 1 de cada (4) | Final (4) |
+| **36+** | Múltiplos grupos | Top 2 de cada | Múltiplos grupos | Top 1 de cada, selecionados os 4 melhores | Final (4) |
+
+**Nota:** Participantes que não completam um grupo na Fase 1 ficam na lista de espera até formar um novo grupo completo.
 
 ### Ranking e Desempate
 Critérios de classificação (nesta ordem):
 1. **Vitórias** (matches ganhos)
 2. **Saldo de Sets** (sets ganhos - perdidos)
 3. **Saldo de Games** (games ganhos - perdidos)
-4. **Empate Técnico** (decisão manual)
+4. **Empate Técnico** (decisão manual, sorteio ou partida extra)
+
+**Desempate entre Grupos:**
+- Quando há empate técnico entre jogadores de grupos diferentes (ex: melhores 3º lugares), o sistema oferece:
+  - Decisão manual (administrador escolhe)
+  - Sorteio aleatório
+  - Partida extra de simples (para 2 jogadores empatados)
 
 ### Configuração de Jogos
 - **Sets:** Melhor de 1 ou 3 sets
@@ -169,16 +216,32 @@ Critérios de classificação (nesta ordem):
 
 ## 🔧 Tecnologias
 
+### Stack Principal
 - **Framework:** Next.js 14 (App Router)
 - **Linguagem:** TypeScript
 - **Estilização:** Tailwind CSS
-- **Estado:** React Hooks + Context API
-- **Persistência:** LocalStorage + Vercel KV (produção) / Redis (dev)
-- **Sincronização:** SWR para viewers, debounce para admins
+- **Estado:** React Hooks + LocalStorage
 - **Validação:** Zod
+
+### Persistência e Sincronização
+- **Cliente:** LocalStorage (dados locais)
+- **Servidor (Produção):** Upstash Redis via Vercel Marketplace
+- **Servidor (Desenvolvimento):** Redis 7 via Docker
+- **Sincronização:** 
+  - SWR para espectadores (refresh a cada 1 minuto)
+  - Debounce + Dirty Checking para admins (2 segundos)
+- **TTL:** 10 dias (renovado automaticamente a cada sync)
+
+### Bibliotecas
 - **PWA:** next-pwa
-- **Cache/DB:** Vercel KV (produção), Redis 7 (desenvolvimento)
-- **Versionamento:** Semantic Versioning (SemVer)
+- **QR Code:** qrcode.react
+- **PDF:** jspdf
+- **UUID:** uuid
+- **HTTP Client:** fetch API nativo
+
+### Versionamento
+- **Semantic Versioning (SemVer)** automático via GitHub Actions
+- Baseado em Conventional Commits
 
 ## 📱 PWA - Progressive Web App
 
@@ -253,38 +316,89 @@ vercel
 
 ### Configuração para Produção (Vercel)
 
-Para que a sincronização funcione em produção, você precisa configurar:
+#### 1. Variáveis de Ambiente
 
-1. **Upstash Redis (via Vercel Marketplace):**
-   - Acesse o dashboard da Vercel: https://vercel.com/dashboard
-   - Vá em **Marketplace** (menu lateral)
-   - Procure por **"Upstash Redis"** ou **"Upstash"**
-   - Clique em **"Add Integration"** ou **"Install"**
-   - Selecione seu projeto
-   - Crie um novo banco Redis ou use um existente
-   - A Vercel automaticamente injeta as variáveis de ambiente necessárias:
-     - `UPSTASH_REDIS_URL` (preferencial - URL Redis tradicional)
-     - OU `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (fallback)
-   - ✅ **Não precisa configurar manualmente** - as variáveis são injetadas automaticamente após conectar o banco ao projeto
+##### Obrigatórias (Injetadas Automaticamente)
+Após conectar o Upstash Redis via Vercel Marketplace, as seguintes variáveis são injetadas automaticamente:
 
-2. **Variável de Ambiente (Opcional):**
-   - `NEXT_PUBLIC_APP_URL`: URL base da aplicação (ex: `https://seu-app.vercel.app`)
-   - Usado para gerar links de compartilhamento
-   - Se não configurado, usa `window.location.origin` automaticamente
-   - **Configuração:**
-     - Vercel Dashboard → Seu Projeto → **Settings** → **Environment Variables**
-     - Adicione: `NEXT_PUBLIC_APP_URL` = `https://seu-dominio.vercel.app`
+- **`REDIS_URL`** (preferencial) - URL Redis completa fornecida pela Vercel
+- **OU `UPSTASH_REDIS_URL`** - URL Redis tradicional (alternativa)
+- **OU `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`** - REST API (fallback)
+- **OU `KV_REST_API_URL` + `KV_REST_API_TOKEN`** - Vercel KV antigo (fallback)
 
-3. **Verificar Deploy:**
-   - Após o deploy, teste criando um torneio
-   - Ative o compartilhamento nas configurações
-   - Gere um link de compartilhamento
-   - Acesse o link em outro navegador/dispositivo para testar a sincronização
+**Como configurar:**
+1. Acesse: https://vercel.com/dashboard
+2. Vá em **Marketplace** (menu lateral)
+3. Procure por **"Upstash Redis"**
+4. Clique em **"Add Integration"** ou **"Install"**
+5. Selecione seu projeto
+6. Crie um novo banco Redis ou use um existente
+7. ✅ As variáveis são injetadas automaticamente - **não precisa configurar manualmente**
+
+##### Opcionais
+- **`NEXT_PUBLIC_APP_URL`**: URL base da aplicação (ex: `https://seu-app.vercel.app`)
+  - Usado para gerar links de compartilhamento
+  - Se não configurado, usa `window.location.origin` automaticamente
+  - **Configuração:**
+    - Vercel Dashboard → Seu Projeto → **Settings** → **Environment Variables**
+    - Adicione: `NEXT_PUBLIC_APP_URL` = `https://seu-dominio.vercel.app`
+
+#### 2. Deploy em Desenvolvimento
+
+```bash
+# Opção 1: Comando único (recomendado)
+npm run dev:full
+
+# Opção 2: Manual (2 terminais)
+# Terminal 1: Subir Redis
+npm run dev:redis
+
+# Terminal 2: Iniciar Next.js
+npm run dev
+```
+
+**Requisitos:**
+- Docker instalado (para Redis local)
+- Node.js 18+
+- npm ou yarn
+
+**Nota:** O Redis local é necessário apenas para testar sincronização em desenvolvimento. O app funciona sem Redis, mas a sincronização não estará disponível.
+
+#### 3. Deploy em Produção
+
+##### Via Vercel Dashboard
+1. Conecte seu repositório GitHub à Vercel
+2. Configure o Upstash Redis (veja seção "Variáveis de Ambiente")
+3. Configure `NEXT_PUBLIC_APP_URL` (opcional)
+4. Faça deploy automático ou manual
+
+##### Via Vercel CLI
+```bash
+# Instalar Vercel CLI
+npm install -g vercel
+
+# Fazer deploy
+vercel
+
+# Deploy em produção
+vercel --prod
+```
+
+##### Verificar Deploy
+Após o deploy:
+1. Teste criando um torneio
+2. Ative o compartilhamento nas configurações
+3. Gere um link de compartilhamento
+4. Acesse o link em outro navegador/dispositivo para testar a sincronização
+5. Verifique os logs em: Vercel Dashboard → Deployments → Functions → `/api/save`
+   - ✅ `✅ Upstash Redis: usando REDIS_URL` = Funcionando!
+   - ❌ `❌ Redis não configurado!` = Verificar configuração
 
 **Nota:** 
 - O Redis local (via Docker) é usado apenas em desenvolvimento
 - Em produção, o sistema usa **Upstash Redis** via Vercel Marketplace
 - O código detecta automaticamente o ambiente e usa a configuração apropriada
+- TTL de dados no Redis: 10 dias (renovado automaticamente a cada sync)
 
 ## 📄 Licença
 
@@ -322,9 +436,6 @@ Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
 
 ---
 
-**Versão Atual:** 0.4.0  
-**Última Atualização:** 14/01/2026  
-
 Desenvolvido por Thiago Milhomem para a comunidade de Beach Tennis
 
-**Nota:** A versão é gerenciada automaticamente via GitHub Actions baseado em Conventional Commits.
+**Nota:** A versão é gerenciada automaticamente via GitHub Actions baseado em Conventional Commits. Consulte os [releases do GitHub](https://github.com/tmill15/torneio-beach-tennis/releases) para ver a versão atual e histórico de atualizações.
