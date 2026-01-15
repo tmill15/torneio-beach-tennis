@@ -25,9 +25,18 @@ interface UseTournamentSyncResult {
   syncStatus: 'idle' | 'saving' | 'saved' | 'error';
   shareLink: string | null;
   tournamentId: string | null;
+  viewerError?: any; // Erro do SWR (para detectar torneio não encontrado)
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+    const errorObj = { status: res.status, response: { status: res.status }, ...error };
+    throw errorObj;
+  }
+  return res.json();
+};
 
 /**
  * Hook para sincronização de torneio
@@ -171,6 +180,7 @@ export function useTournamentSync({
     syncStatus,
     shareLink,
     tournamentId,
+    viewerError: !isAdmin ? viewerError : undefined,
   };
 }
 

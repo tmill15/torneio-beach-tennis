@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { CrossGroupTiebreak, Tournament, Match, SetScore, GameConfig } from '@/types';
 import { MatchList } from './MatchList';
 
@@ -33,9 +33,12 @@ export function CrossGroupTiebreakerCard({
   onUndoTiebreak,
 }: CrossGroupTiebreakerCardProps) {
   // Encontrar os jogadores envolvidos (garantir unicidade por ID)
-  const categoryGroups = tournament.grupos.filter(
-    g => g.categoria === categoria && g.fase === tiebreak.phase
-  );
+  // Incluir tanto grupos normais quanto grupos de desempate cross-group
+  const categoryGroups = useMemo(() => {
+    return tournament.grupos.filter(
+      g => g.categoria === categoria && g.fase === tiebreak.phase
+    );
+  }, [tournament.grupos, categoria, tiebreak.phase]);
   
   // Usar Map para garantir que cada jogador apareça apenas uma vez
   const playersMap = new Map<string, typeof categoryGroups[0]['players'][0]>();
@@ -49,42 +52,71 @@ export function CrossGroupTiebreakerCard({
   
   const players = Array.from(playersMap.values());
 
-  // Encontrar a partida de desempate se existir
-  let tiebreakMatch: Match | undefined;
-  if (tiebreak.matchId) {
+  // Encontrar a partida de desempate se existir (usar useMemo para recalcular quando tournament mudar)
+  const tiebreakMatch: Match | undefined = useMemo(() => {
+    if (!tiebreak.matchId) return undefined;
+    
+    // Procurar em todos os grupos da categoria e fase (incluindo grupos de desempate)
     for (const group of categoryGroups) {
       const match = group.matches.find(m => m.id === tiebreak.matchId);
       if (match) {
-        tiebreakMatch = match;
-        break;
+        return match;
       }
     }
-  }
+    return undefined;
+  }, [tiebreak.matchId, categoryGroups]);
 
   // Inicializar viewMode: se for partida extra e a partida não estiver finalizada, começar na aba "Partida"
-  const [viewMode, setViewMode] = useState<'info' | 'match'>(() => {
-    if (tiebreak.method === 'singles' && tiebreakMatch && !tiebreakMatch.isFinished) {
-      return 'match';
-    }
-    return 'info';
-  });
+  const [viewMode, setViewMode] = useState<'info' | 'match'>('info');
 
-  // Quando a partida for finalizada, mudar para a aba "Informações"
+  // Atualizar viewMode baseado no estado da partida
   useEffect(() => {
-    if (tiebreakMatch?.isFinished && viewMode === 'match') {
+    if (tiebreak.method === 'singles' && tiebreakMatch) {
+      if (tiebreakMatch.isFinished || tiebreak.winnerId) {
+        // Se a partida está finalizada ou há um vencedor, mostrar aba de informações
+        setViewMode('info');
+      } else {
+        // Se a partida não está finalizada, mostrar aba de partida
+        setViewMode('match');
+      }
+    } else {
+      // Se não há partida ou não é método singles, sempre mostrar informações
       setViewMode('info');
     }
-  }, [tiebreakMatch?.isFinished, viewMode]);
+  }, [tiebreak.method, tiebreakMatch, tiebreak.winnerId]);
 
-  // Encontrar o vencedor
-  const winner = players.find(p => p.id === tiebreak.winnerId);
-  const losers = players.filter(p => p.id !== tiebreak.winnerId);
+  // Encontrar o vencedor (usar useMemo para recalcular quando tiebreak.winnerId mudar)
+  const winner = useMemo(() => {
+    if (!tiebreak.winnerId) return undefined;
+    return players.find(p => p.id === tiebreak.winnerId);
+  }, [tiebreak.winnerId, players]);
+  
+  const losers = useMemo(() => {
+    if (!tiebreak.winnerId) return [];
+    return players.filter(p => p.id !== tiebreak.winnerId);
+  }, [tiebreak.winnerId, players]);
 
   // Determinar o grupo de origem de cada jogador
   const getPlayerGroup = (playerId: string) => {
+    // Primeiro, procurar em grupos normais
+    for (const group of categoryGroups) {
+      if (!group.nome.startsWith('DESEMPATE_CROSS_GROUP_') && group.players.some(p => p.id === playerId)) {
+        return group.nome;
+      }
+    }
+    // Se não encontrou em grupos normais, pode estar no grupo de desempate
+    // Nesse caso, procurar o grupo original do jogador antes do desempate
+    // ou retornar "Desempate" se estiver no grupo de desempate
+    for (const group of categoryGroups) {
+      if (group.nome.startsWith('DESEMPATE_CROSS_GROUP_') && group.players.some(p => p.id === playerId)) {
+        return 'Desempate';
+      }
+    }
+    // Se ainda não encontrou, procurar em todos os grupos (fallback)
     for (const group of categoryGroups) {
       if (group.players.some(p => p.id === playerId)) {
-        return group.nome;
+        // Se for grupo de desempate, retornar "Desempate", senão o nome do grupo
+        return group.nome.startsWith('DESEMPATE_CROSS_GROUP_') ? 'Desempate' : group.nome;
       }
     }
     return '?';

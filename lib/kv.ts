@@ -197,7 +197,7 @@ export async function getTournament(id: string): Promise<TournamentData | null> 
 export async function saveTournament(
   id: string,
   data: TournamentData,
-  ttlSeconds: number = 7776000 // 90 dias padrão
+  ttlSeconds: number = 864000 // 10 dias padrão
 ): Promise<boolean> {
   try {
     const key = `tournament:${id}`;

@@ -75,9 +75,9 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Salvar no KV com TTL de 90 dias (7.776.000 segundos)
+    // Salvar no KV com TTL de 10 dias (864.000 segundos)
     console.log(`📤 Tentando salvar torneio ${tournamentId}...`);
-    const saved = await saveTournament(tournamentId, tournamentData, 7776000);
+    const saved = await saveTournament(tournamentId, tournamentData, 864000);
 
     if (!saved) {
       console.error(`❌ Falha ao salvar torneio ${tournamentId}`);
