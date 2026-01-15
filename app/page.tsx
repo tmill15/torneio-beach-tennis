@@ -56,7 +56,7 @@ export default function Home() {
 
   // Sincronização (modo admin)
   const isAdmin = !!adminToken;
-  const { syncStatus, shareLink } = useTournamentSync({
+  const { syncStatus, shareLink, retrySync } = useTournamentSync({
     tournament,
     tournamentId: tournamentId || undefined,
     isAdmin,
@@ -174,8 +174,8 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex items-start sm:items-center justify-between mb-4 gap-4">
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   {tournament.nome}
@@ -195,10 +195,14 @@ export default function Home() {
                 Painel do Torneio
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 flex-shrink-0">
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                {/* Status de sincronização (apenas admin e se compartilhamento ativo) */}
-                {isAdmin && sharingEnabled && <SyncStatus status={syncStatus} />}
+                {/* Status de sincronização (tablet/desktop - ao lado de Configurações) */}
+                {isAdmin && sharingEnabled && (
+                  <div className="hidden sm:block">
+                    <SyncStatus status={syncStatus} onRetry={retrySync} />
+                  </div>
+                )}
                 
                 <Link
                   href="/config"
@@ -208,15 +212,22 @@ export default function Home() {
                 </Link>
               </div>
               
-              {/* Indicador de compartilhamento (mobile, embaixo do botão) */}
+              {/* Indicador de compartilhamento e sync (mobile apenas) */}
               {sharingEnabled && (
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="sm:hidden px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center justify-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors w-full"
-                >
-                  <span>🔗</span>
-                  <span>Compartilhado</span>
-                </button>
+                <div className="flex flex-col gap-2 w-full sm:hidden">
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full flex items-center justify-center gap-1.5 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors w-full"
+                  >
+                    <span>🔗</span>
+                    <span>Compartilhado</span>
+                  </button>
+                  {/* Status de sincronização (mobile - abaixo do botão Compartilhado) */}
+                  {/* Reservar espaço mesmo quando não há status para evitar deslocamento */}
+                  <div className="flex justify-center min-h-[24px]">
+                    {isAdmin && <SyncStatus status={syncStatus} onRetry={retrySync} />}
+                  </div>
+                </div>
               )}
             </div>
           </div>
