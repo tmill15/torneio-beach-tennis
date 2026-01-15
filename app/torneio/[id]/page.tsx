@@ -321,12 +321,15 @@ export default function TournamentViewerPage() {
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
               // Verificar se a fase está completa: todos os grupos da fase devem ter todos os jogos finalizados
+              // E não deve haver desempates pendentes
               const phaseGroups = (tournament.grupos || []).filter(
                 g => g.categoria === selectedCategory && g.fase === selectedPhase
               );
-              const groupPhaseComplete = phaseGroups.length > 0 && phaseGroups.every(g => 
+              const allMatchesFinished = phaseGroups.length > 0 && phaseGroups.every(g => 
                 g.matches.every(m => m.isFinished)
               );
+              // A fase só está completa se todos os jogos estão finalizados E não há desempates pendentes
+              const groupPhaseComplete = allMatchesFinished && !hasPendingTies(selectedCategory, selectedPhase);
 
               return (
                 <GroupCard
