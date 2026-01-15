@@ -31,15 +31,46 @@ export default function TournamentViewerPage() {
   const [selectedPhase, setSelectedPhase] = useState<number>(1);
   const [showShareModal, setShowShareModal] = useState(false);
 
+  // Estado para controlar se o torneio não foi encontrado
+  const [tournamentNotFound, setTournamentNotFound] = useState(false);
+
   // Usar SWR para buscar dados (modo viewer)
-  const { syncStatus } = useTournamentSync({
+  const { syncStatus, viewerError } = useTournamentSync({
     tournament,
     tournamentId,
     isAdmin: false,
     onTournamentUpdate: (updatedTournament) => {
       setTournament(updatedTournament);
+      setTournamentNotFound(false);
     },
   });
+
+  // Verificar erro do SWR (torneio não encontrado)
+  useEffect(() => {
+    if (viewerError) {
+      // Se o erro é 404, o torneio não existe
+      if (viewerError.status === 404 || (viewerError.response?.status === 404)) {
+        setTournamentNotFound(true);
+      }
+    } else if (isMounted && tournamentId) {
+      // Se não há erro mas também não há dados após um tempo, verificar
+      const timer = setTimeout(() => {
+        // Se após 3 segundos o torneio ainda estiver vazio (sem categorias), verificar se existe
+        if (tournament && (!tournament.categorias || tournament.categorias.length === 0)) {
+          fetch(`/api/load?id=${tournamentId}`)
+            .then(res => {
+              if (res.status === 404) {
+                setTournamentNotFound(true);
+              }
+            })
+            .catch(() => {
+              // Ignorar erros de rede
+            });
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isMounted, tournamentId, tournament, viewerError]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -113,7 +144,42 @@ export default function TournamentViewerPage() {
     );
   }
 
-  // Se não há torneio carregado ainda
+  // Se o torneio não foi encontrado
+  if (tournamentNotFound) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">🔍</div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Torneio não encontrado
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                O torneio que você está tentando acessar não existe mais ou não está disponível.
+              </p>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-left">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">
+                  Isso pode ocorrer quando:
+                </p>
+                <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                  <li>O administrador desativou o compartilhamento do torneio</li>
+                  <li>O torneio foi excluído do servidor</li>
+                  <li>O link compartilhado está incorreto ou expirado</li>
+                  <li>O torneio não foi sincronizado ainda</li>
+                </ul>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-6">
+                Entre em contato com o administrador do torneio para obter um novo link de acesso.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Se não há torneio carregado ainda (mas não é erro de não encontrado)
   if (!tournament || !Array.isArray(tournament.categorias) || tournament.categorias.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">

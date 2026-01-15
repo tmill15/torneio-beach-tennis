@@ -42,7 +42,7 @@ export default function ConfigPage() {
   }, [isMounted, adminToken, tournamentId, setAdminToken, setTournamentId]);
 
   // Handler para toggle de compartilhamento
-  const handleToggleSharing = (enabled: boolean) => {
+  const handleToggleSharing = async (enabled: boolean) => {
     if (enabled) {
       // Ativar: gerar credenciais se não existirem
       if (!tournamentId || !adminToken) {
@@ -50,9 +50,31 @@ export default function ConfigPage() {
         setTournamentId(newId);
         setAdminToken(newToken);
       }
+      setSharingEnabled(enabled);
+    } else {
+      // Desativar: apagar dados do Redis e salvar estado
+      if (tournamentId && adminToken) {
+        try {
+          // Apagar registro do Redis
+          const response = await fetch(`/api/tournament/${tournamentId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${adminToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            console.warn('⚠️ Não foi possível apagar o torneio do Redis:', await response.text());
+          } else {
+            console.log('✅ Torneio removido do Redis');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao apagar torneio do Redis:', error);
+        }
+      }
+      setSharingEnabled(enabled);
     }
-    // Desativar: apenas salvar estado (mantém credenciais)
-    setSharingEnabled(enabled);
   };
   
   const {

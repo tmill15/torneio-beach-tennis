@@ -114,11 +114,27 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
       if (importResult.credentials) {
         localStorage.setItem(TOURNAMENT_ID_KEY, importResult.credentials.tournamentId);
         localStorage.setItem(ADMIN_TOKEN_KEY, importResult.credentials.adminToken);
+        // Disparar evento para sincronizar com useLocalStorage
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: TOURNAMENT_ID_KEY,
+          newValue: importResult.credentials.tournamentId,
+        }));
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: ADMIN_TOKEN_KEY,
+          newValue: importResult.credentials.adminToken,
+        }));
       }
       
       // Se tem estado de compartilhamento, restaurar no localStorage
+      // IMPORTANTE: Usar JSON.stringify para garantir que boolean seja preservado corretamente
       if (importResult.sharingEnabled !== undefined) {
-        localStorage.setItem(SHARING_ENABLED_KEY, String(importResult.sharingEnabled));
+        const sharingValue = JSON.stringify(importResult.sharingEnabled);
+        localStorage.setItem(SHARING_ENABLED_KEY, sharingValue);
+        // Disparar evento para sincronizar com useLocalStorage
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: SHARING_ENABLED_KEY,
+          newValue: sharingValue,
+        }));
       }
       
       // Confirmação antes de importar
@@ -134,10 +150,6 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         ? `\n✅ Credenciais de sincronização serão restauradas.`
         : '';
       
-      const sharingText = importResult.sharingEnabled !== undefined
-        ? `\n${importResult.sharingEnabled ? '✅' : '⚪'} Estado de compartilhamento será restaurado (${importResult.sharingEnabled ? 'ativado' : 'desativado'}).`
-        : '';
-      
       const message = `Você está prestes a ${actionText}.\n\n` +
         `Dados do backup:\n` +
         `- Torneio: ${importResult.tournament.nome}\n` +
@@ -146,7 +158,6 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         `- Jogadores: ${importResult.tournament.waitingList.length + importResult.tournament.grupos.reduce((sum, g) => sum + (g.players?.length || 0), 0)}` +
         warningText +
         credentialsText +
-        sharingText +
         `\n\nDeseja continuar?`;
 
       if (window.confirm(message)) {
