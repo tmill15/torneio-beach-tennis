@@ -7,7 +7,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentManager } from '@/hooks/useTournamentManager';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
@@ -22,11 +24,14 @@ const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 export default function Home() {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
+  
+  const { activeTournamentId, tournamentList } = useTournamentManager();
   
   const {
     tournament,
@@ -68,6 +73,13 @@ export default function Home() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Redirecionar para /config se não houver torneios
+  useEffect(() => {
+    if (isMounted && tournamentList.tournaments.length === 0) {
+      router.push('/config');
+    }
+  }, [isMounted, tournamentList.tournaments.length, router]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>(
     tournament.categorias[0] || ''
@@ -155,6 +167,10 @@ export default function Home() {
     generateSinglesMatch(groupId, player1Id, player2Id);
   };
 
+  // Verificar se não há torneios
+  const hasNoTournaments = isMounted && tournamentList.tournaments.length === 0;
+  const hasNoActiveTournament = isMounted && !activeTournamentId;
+
   // Evita erro de hydration - só renderiza após montar no cliente
   if (!isMounted) {
     return (
@@ -163,6 +179,45 @@ export default function Home() {
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Se não há torneios ou não há torneio ativo, mostrar mensagem
+  if (hasNoTournaments || hasNoActiveTournament) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">🔍</div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                {hasNoTournaments ? 'Nenhum torneio encontrado' : 'Nenhum torneio ativo'}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                {hasNoTournaments
+                  ? 'Você ainda não criou nenhum torneio. Crie um novo torneio para começar.'
+                  : 'Nenhum torneio está ativo no momento. Selecione ou crie um torneio para começar.'}
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left mb-6">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  Para começar:
+                </p>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                  <li>Acesse a página de Configurações</li>
+                  <li>Clique em "Gerenciar Torneios"</li>
+                  <li>Crie um novo torneio ou selecione um existente</li>
+                </ul>
+              </div>
+              <Link
+                href="/config"
+                className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                ⚙️ Ir para Configurações
+              </Link>
+            </div>
           </div>
         </div>
       </main>

@@ -8,11 +8,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
 import { useLocalStorage } from './useLocalStorage';
+import { useTournamentManager } from './useTournamentManager';
 import type { Tournament } from '@/types';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
-export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled';
+export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled'; // Chave base (compatibilidade)
 
 interface UseTournamentSyncOptions {
   tournament: Tournament;
@@ -48,17 +49,26 @@ export function useTournamentSync({
   isAdmin,
   onTournamentUpdate,
 }: UseTournamentSyncOptions): UseTournamentSyncResult {
+  const { activeTournamentId } = useTournamentManager();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [storedTournamentId, setStoredTournamentId] = useLocalStorage<string | null>(
-    TOURNAMENT_ID_KEY,
-    null
-  );
   const [storedAdminToken, setStoredAdminToken] = useLocalStorage<string | null>(
     ADMIN_TOKEN_KEY,
     null
   );
+
+  // Determinar chave de sharingEnabled baseada no torneio ativo
+  const getSharingKey = useCallback(() => {
+    const tournamentId = externalTournamentId || activeTournamentId;
+    if (tournamentId) {
+      return `beachtennis-sharing-enabled-${tournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade)
+    return SHARING_ENABLED_KEY;
+  }, [externalTournamentId, activeTournamentId]);
+
+  const sharingKey = getSharingKey();
   const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(
-    SHARING_ENABLED_KEY,
+    sharingKey,
     false
   );
 
@@ -69,8 +79,8 @@ export function useTournamentSync({
   const maxRetries = 3; // Tentativas imediatas com backoff exponencial
   const retryDelays = [2000, 4000, 8000]; // 2s, 4s, 8s
 
-  // Usar tournamentId externo ou do localStorage
-  const tournamentId = externalTournamentId || storedTournamentId;
+  // Usar tournamentId externo, activeTournamentId do manager, ou do localStorage (compatibilidade)
+  const tournamentId = externalTournamentId || activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
 
   // Modo Viewer: usar SWR para buscar dados
   const { data: viewerData, error: viewerError } = useSWR(

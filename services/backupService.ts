@@ -3,7 +3,7 @@
  * Export/Import de torneios em formato JSON
  */
 
-import type { Tournament, TournamentBackup, GameConfig } from '@/types';
+import type { Tournament, TournamentBackup, TournamentListBackup, TournamentList, GameConfig } from '@/types';
 import { z } from 'zod';
 
 /**
@@ -238,6 +238,149 @@ export async function downloadBackup(
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Exporta todos os torneios para string JSON
+ * @param tournamentList - Lista de metadados dos torneios
+ * @param tournaments - Map de ID -> Tournament com todos os torneios
+ * @param password - Senha para criptografar credenciais
+ */
+export async function exportAllTournaments(
+  tournamentList: TournamentList,
+  tournaments: Record<string, Tournament>,
+  password: string
+): Promise<string> {
+  if (!password || password.length < 6) {
+    throw new Error('A senha deve ter pelo menos 6 caracteres');
+  }
+
+  if (typeof window === 'undefined') {
+    throw new Error('Esta função só pode ser executada no navegador');
+  }
+
+  // Coletar credenciais e sharingEnabled de todos os torneios
+  const credentials: Record<string, { tournamentId: string; adminToken: string }> = {};
+  const sharingEnabled: Record<string, boolean> = {};
+
+  for (const metadata of tournamentList.tournaments) {
+    const tournamentId = metadata.id;
+    const storedId = localStorage.getItem(`beachtennis-tournament-id`);
+    const storedToken = localStorage.getItem('beachtennis-admin-token');
+    const sharingKey = `beachtennis-sharing-enabled-${tournamentId}`;
+    const sharingValue = localStorage.getItem(sharingKey);
+
+    // Se este torneio tem credenciais no localStorage
+    if (storedId === tournamentId && storedToken) {
+      credentials[tournamentId] = {
+        tournamentId: storedId,
+        adminToken: storedToken,
+      };
+    }
+
+    // Se este torneio tem sharingEnabled
+    if (sharingValue !== null) {
+      sharingEnabled[tournamentId] = sharingValue === 'true';
+    }
+  }
+
+  // Criptografar credenciais
+  const credentialsJson = JSON.stringify(credentials);
+  const encrypted = await encryptData(credentialsJson, password);
+
+  const backup: TournamentListBackup = {
+    version: BACKUP_VERSION,
+    exportDate: new Date().toISOString(),
+    tournamentList,
+    tournaments,
+    credentials: {
+      encrypted: encrypted.encrypted,
+      salt: encrypted.salt,
+      iv: encrypted.iv,
+    },
+    sharingEnabled,
+  };
+
+  return JSON.stringify(backup, null, 2);
+}
+
+/**
+ * Faz download do backup de todos os torneios
+ */
+export async function downloadAllTournamentsBackup(
+  tournamentList: TournamentList,
+  tournaments: Record<string, Tournament>,
+  password: string
+): Promise<void> {
+  const json = await exportAllTournaments(tournamentList, tournaments, password);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const date = new Date();
+  const dateStr = date.toISOString().split('T')[0];
+  const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '-');
+  const filename = `backup-todos-torneios-${dateStr}-${timeStr}.json`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Importa todos os torneios a partir de string JSON
+ */
+export async function importAllTournaments(
+  jsonData: string,
+  password: string
+): Promise<{
+  tournamentList: TournamentList;
+  tournaments: Record<string, Tournament>;
+  credentials: Record<string, { tournamentId: string; adminToken: string }>;
+  sharingEnabled: Record<string, boolean>;
+}> {
+  const data = JSON.parse(jsonData);
+
+  // Validar estrutura básica
+  if (!data.version || !data.tournamentList || !data.tournaments) {
+    throw new Error('Formato de backup inválido');
+  }
+
+  // Verificar versão
+  if (!isVersionCompatible(data.version)) {
+    throw new Error(`Versão do backup (${data.version}) não é compatível com a versão atual (${BACKUP_VERSION})`);
+  }
+
+  // Descriptografar credenciais
+  let credentials: Record<string, { tournamentId: string; adminToken: string }> = {};
+  if (data.credentials) {
+    const decrypted = await decryptData(
+      data.credentials.encrypted,
+      password,
+      data.credentials.salt,
+      data.credentials.iv
+    );
+    credentials = JSON.parse(decrypted);
+  }
+
+  // Normalizar todos os torneios
+  const normalizedTournaments: Record<string, Tournament> = {};
+  for (const [id, tournament] of Object.entries(data.tournaments)) {
+    normalizedTournaments[id] = {
+      ...(tournament as Tournament),
+      gameConfig: normalizeGameConfig((tournament as Tournament).gameConfig),
+    };
+  }
+
+  return {
+    tournamentList: data.tournamentList,
+    tournaments: normalizedTournaments,
+    credentials: credentials || {},
+    sharingEnabled: data.sharingEnabled || {},
+  };
 }
 
 /**

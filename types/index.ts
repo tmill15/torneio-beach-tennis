@@ -123,6 +123,27 @@ export interface RankingEntry {
 }
 
 // ============================================
+// TOURNAMENT METADATA (Metadados do Torneio)
+// ============================================
+
+export interface TournamentMetadata {
+  id: string;                    // UUID do torneio
+  name: string;                  // Nome do torneio
+  date: string;                  // Data de criação (ISO 8601)
+  categories: string[];          // Todas as categorias do torneio
+  status: 'active' | 'archived'; // Status do torneio
+}
+
+// ============================================
+// TOURNAMENT LIST (Lista de Torneios)
+// ============================================
+
+export interface TournamentList {
+  tournaments: TournamentMetadata[];
+  activeTournamentId: string | null;
+}
+
+// ============================================
 // BACKUP (Export/Import)
 // ============================================
 
@@ -139,6 +160,19 @@ export interface TournamentBackup {
   };
   // Estado de compartilhamento (apenas em backup completo)
   sharingEnabled?: boolean;            // Estado do toggle de compartilhamento
+}
+
+// ============================================
+// TOURNAMENT LIST BACKUP (Backup de Todos os Torneios)
+// ============================================
+
+export interface TournamentListBackup {
+  version: string;                   // Versão do backup (SemVer)
+  exportDate: string;                // Data da exportação (ISO 8601)
+  tournamentList: TournamentList;     // Lista de metadados
+  tournaments: Record<string, Tournament>; // Map de ID -> Tournament
+  credentials: Record<string, { tournamentId: string; adminToken: string }>; // Por torneio
+  sharingEnabled: Record<string, boolean>; // Por torneio
 }
 
 // ============================================

@@ -7,7 +7,7 @@
 
 import { useState, useRef, ChangeEvent } from 'react';
 import type { Tournament } from '@/types';
-import { downloadBackup, importTournament, validateBackup, getBackupMetadata } from '@/services/backupService';
+import { downloadBackup, importTournament, validateBackup, getBackupMetadata, importAllTournaments } from '@/services/backupService';
 import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 
 interface BackupPanelProps {
@@ -31,6 +31,7 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
 
   const handleExport = async () => {
     try {
+      // Backup do torneio ativo (sempre completo quando chamado da página de config)
       const categoria = exportCategory === 'all' ? undefined : exportCategory;
       const isFullBackup = !categoria;
       
@@ -42,7 +43,9 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
         }
       }
 
+      // Sempre fazer backup do torneio ativo
       await downloadBackup(tournament, categoria, isFullBackup ? exportPassword : undefined);
+
       setError(null);
       setShowExportModal(false);
       setExportPassword('');
@@ -63,7 +66,26 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
     try {
       const json = await file.text();
 
-      // Valida o backup
+      // Verificar se é backup de todos os torneios
+      let isAllTournamentsBackup = false;
+      try {
+        const data = JSON.parse(json);
+        if (data.tournamentList && data.tournaments) {
+          isAllTournamentsBackup = true;
+        }
+      } catch {
+        // Não é JSON válido ou não é backup de todos os torneios
+      }
+
+      if (isAllTournamentsBackup) {
+        // Backup de todos os torneios - sempre pede senha
+        setPendingImportData(json);
+        setShowImportPasswordModal(true);
+        setIsImporting(false);
+        return;
+      }
+
+      // Backup de torneio único - validação normal
       if (!validateBackup(json)) {
         setError('Arquivo de backup inválido ou corrompido');
         setIsImporting(false);
@@ -104,6 +126,78 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
     try {
       setIsImporting(true);
       setError(null);
+
+      // Verificar se é backup de todos os torneios
+      let isAllTournamentsBackup = false;
+      try {
+        const data = JSON.parse(json);
+        if (data.tournamentList && data.tournaments) {
+          isAllTournamentsBackup = true;
+        }
+      } catch {
+        // Não é backup de todos os torneios
+      }
+
+      if (isAllTournamentsBackup) {
+        // Importar todos os torneios
+        if (!password) {
+          throw new Error('Senha é obrigatória para backup de todos os torneios');
+        }
+
+        const importResult = await importAllTournaments(json, password);
+
+        // Confirmar antes de importar
+        const message = `Você está prestes a restaurar TODOS os torneios do backup.\n\n` +
+          `Dados do backup:\n` +
+          `- Total de torneios: ${importResult.tournamentList.tournaments.length}\n` +
+          `- Torneio ativo: ${importResult.tournamentList.activeTournamentId ? importResult.tournamentList.tournaments.find(t => t.id === importResult.tournamentList.activeTournamentId)?.name || 'N/A' : 'Nenhum'}\n` +
+          `\n⚠️ ATENÇÃO: Todos os torneios atuais serão completamente substituídos!\n` +
+          `- Todos os torneios serão substituídos\n` +
+          `- Todas as credenciais serão restauradas\n` +
+          `- Todos os estados de compartilhamento serão restaurados\n` +
+          `\n\nDeseja continuar?`;
+
+        if (window.confirm(message)) {
+          // Restaurar lista de torneios
+          localStorage.setItem('beachtennis-tournament-list', JSON.stringify(importResult.tournamentList));
+
+          // Restaurar cada torneio
+          for (const [id, tournamentData] of Object.entries(importResult.tournaments)) {
+            localStorage.setItem(`beachtennis-tournament-${id}`, JSON.stringify(tournamentData));
+          }
+
+          // Restaurar credenciais
+          for (const [id, creds] of Object.entries(importResult.credentials)) {
+            // Se é o torneio ativo, atualizar credenciais principais
+            if (id === importResult.tournamentList.activeTournamentId) {
+              localStorage.setItem('beachtennis-tournament-id', creds.tournamentId);
+              localStorage.setItem('beachtennis-admin-token', creds.adminToken);
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: 'beachtennis-tournament-id',
+                newValue: creds.tournamentId,
+              }));
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: 'beachtennis-admin-token',
+                newValue: creds.adminToken,
+              }));
+            }
+          }
+
+          // Restaurar sharingEnabled
+          for (const [id, enabled] of Object.entries(importResult.sharingEnabled)) {
+            const sharingKey = `beachtennis-sharing-enabled-${id}`;
+            localStorage.setItem(sharingKey, JSON.stringify(enabled));
+            window.dispatchEvent(new StorageEvent('storage', {
+              key: sharingKey,
+              newValue: JSON.stringify(enabled),
+            }));
+          }
+
+          // Recarregar página para aplicar mudanças
+          window.location.reload();
+        }
+        return;
+      }
 
       // Detectar se é backup de categoria específica e descriptografar credenciais
       const importResult = await importTournament(json, password);
@@ -229,6 +323,14 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
             </h3>
 
             <div className="space-y-4">
+              {/* Remover opção de backup de todos os torneios - apenas backup do torneio ativo */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  ℹ️ Este backup incluirá apenas o torneio atualmente ativo.
+                  Para fazer backup de todos os torneios, use a opção no modal de gerenciamento.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Selecionar Categoria
@@ -255,7 +357,7 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
                 </p>
               </div>
 
-              {/* Campo de senha apenas para backup completo */}
+              {/* Campo de senha para backup completo */}
               {exportCategory === 'all' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

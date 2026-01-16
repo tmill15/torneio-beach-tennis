@@ -61,7 +61,7 @@ Atue como um Engenheiro de Software Sênior e Product Manager. Estamos construin
 - **Torneio Ativo:** Deve existir um estado global `activeTournamentId`. O Dashboard e o Modo Espectador devem renderizar os dados baseados apenas neste ID.
 - **Arquivamento:** Torneios arquivados ficam ocultos na lista principal, mas mantidos no Redis.
 
-# 3. Sincronização & Performance (Vercel KV + SWR)
+# 3. Sincronização & Performance (Redis + SWR)
 - **Modo Espectador:** Use a biblioteca `swr`. Configure `refreshInterval: 60000` (1 min) e `revalidateOnFocus: true`.
 - **Modo Admin (Escrita Otimizada):** - Implementar "Dirty Checking": Só enviar dados ao KV se houver mudança real.
   - Implementar "Debounce": Aguardar 2 segundos após a última alteração antes de disparar o POST para `/api/save`.
