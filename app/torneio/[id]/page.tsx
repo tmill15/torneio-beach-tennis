@@ -10,7 +10,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { ShareTournament } from '@/components/ShareTournament';
 import { GroupCard } from '@/components/GroupCard';
-import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { Tournament } from '@/types';
 import { createEmptyTournament } from '@/services/backupService';
@@ -264,32 +263,6 @@ export default function TournamentViewerPage() {
       )
     : [];
 
-  // Encontrar desempates cross-group para a fase selecionada
-  const crossGroupTiebreaks = (tournament.crossGroupTiebreaks || []).filter(
-    t => t.phase === selectedPhase
-  );
-
-  // Verificar se há empates pendentes dentro dos grupos da fase atual (apenas para UI informativa)
-  const hasPendingInGroupTiebreaks = (() => {
-    for (const group of groupsInSelectedPhase) {
-      const ranking = calculateRanking(group);
-      const ties = detectTies(ranking);
-      
-      // Se há empates detectados não resolvidos
-      if (ties.length > 0) {
-        return true;
-      }
-      
-      // Se há partidas de desempate pendentes
-      const pendingTiebreakerMatches = group.matches.filter(m => m.isTiebreaker && !m.isFinished);
-      if (pendingTiebreakerMatches.length > 0) {
-        return true;
-      }
-    }
-    return false;
-  })();
-
-
   // Evita erro de hydration
   if (!isMounted) {
     return (
@@ -511,39 +484,6 @@ export default function TournamentViewerPage() {
             </div>
           </div>
         ) : null}
-
-        {/* Desempates Cross-Group */}
-        {crossGroupTiebreaks.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Desempates entre Grupos
-            </h2>
-            <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
-              {crossGroupTiebreaks.map((tiebreak, index) => {
-                const tiebreakGroup = (tournament.grupos || []).find(
-                  g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') &&
-                    g.categoria === selectedCategory &&
-                    g.fase === tiebreak.phase
-                );
-
-                return (
-                  <CrossGroupTiebreakerCard
-                    key={`tiebreak-${tiebreak.phase}-${tiebreak.position}-${index}`}
-                    tiebreak={tiebreak}
-                    tournament={tournament}
-                    categoria={selectedCategory}
-                    gameConfig={tournament.gameConfig}
-                    isReadOnly={true} // Sempre read-only no modo viewer
-                    onUpdateScore={() => {}} // Desabilitado
-                    onFinalizeMatch={() => {}} // Desabilitado
-                    onReopenMatch={() => {}} // Desabilitado
-                    onUndoTiebreak={() => {}} // Desabilitado
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (
