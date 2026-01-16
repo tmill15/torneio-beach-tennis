@@ -10,7 +10,9 @@ export function TournamentSelector() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [dropdownTop, setDropdownTop] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   
   const {
     tournamentList,
@@ -54,6 +56,15 @@ export function TournamentSelector() {
     };
   }, [isOpen]);
 
+  // Calcular posição do dropdown em mobile
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const scrollY = window.scrollY || window.pageYOffset;
+      setDropdownTop(buttonRect.bottom + scrollY + 8); // 8px = 0.5rem
+    }
+  }, [isOpen]);
+
   if (!isMounted) {
     return (
       <div className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg animate-pulse">
@@ -83,6 +94,7 @@ export function TournamentSelector() {
     <div className="relative w-full sm:w-auto" ref={dropdownRef}>
       {/* Botão Seletor - Estilo consistente com outros botões */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto"
         aria-label={`Trocar torneio${activeTournament ? `: ${activeTournament.name}` : ''}`}
@@ -110,7 +122,11 @@ export function TournamentSelector() {
           <div
             className="fixed sm:absolute inset-x-4 sm:inset-x-auto sm:left-0 sm:right-auto sm:mt-2 sm:w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
             role="listbox"
-            style={{ top: 'calc(100% + 0.5rem)' }}
+            style={{ 
+              top: typeof window !== 'undefined' && window.innerWidth < 640 
+                ? `${dropdownTop}px` 
+                : undefined 
+            }}
           >
           {allTournaments.length === 0 ? (
             <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
