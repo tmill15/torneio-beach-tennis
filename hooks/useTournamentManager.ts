@@ -17,6 +17,15 @@ const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 /**
+ * Gerar adminToken aleatório seguro
+ */
+function generateAdminToken(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
  * Hook para gerenciar múltiplos torneios
  */
 export function useTournamentManager() {
@@ -140,6 +149,15 @@ export function useTournamentManager() {
     const tournamentStorageKey = `beachtennis-tournament-${newId}`;
     localStorage.setItem(tournamentStorageKey, JSON.stringify(emptyTournament));
 
+    // Gerar adminToken global apenas se não existir
+    if (typeof window !== 'undefined') {
+      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      if (!existingToken) {
+        const adminToken = generateAdminToken();
+        localStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
+      }
+    }
+
     // Atualizar tournamentId no localStorage (compatibilidade)
     localStorage.setItem(TOURNAMENT_ID_KEY, newId);
 
@@ -194,13 +212,15 @@ export function useTournamentManager() {
     updateTournamentMetadata(id, { status: 'active' });
   }, [updateTournamentMetadata]);
 
+
   /**
    * Deletar torneio
    */
   const deleteTournament = useCallback(async (id: string) => {
-    // Remover do Redis se houver adminToken
+    // Remover do Redis se houver adminToken global
     if (typeof window !== 'undefined') {
       const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      
       if (adminToken) {
         try {
           const response = await fetch(`/api/tournament/${id}`, {
@@ -213,7 +233,7 @@ export function useTournamentManager() {
 
           if (!response.ok && response.status !== 404) {
             console.error('Erro ao remover torneio do Redis:', await response.text());
-            // Continuar mesmo se falhar (pode não existir no Redis)
+            // Continuar mesmo se falhar (pode não existir no Redis ou token não corresponder)
           }
         } catch (error) {
           console.error('Erro ao deletar torneio do Redis:', error);
@@ -242,16 +262,19 @@ export function useTournamentManager() {
     });
 
     // Remover dados do localStorage
-    const tournamentStorageKey = `beachtennis-tournament-${id}`;
-    localStorage.removeItem(tournamentStorageKey);
+    if (typeof window !== 'undefined') {
+      const tournamentStorageKey = `beachtennis-tournament-${id}`;
+      localStorage.removeItem(tournamentStorageKey);
 
-    // Remover sharingEnabled específico do torneio
-    const sharingKey = `beachtennis-sharing-enabled-${id}`;
-    localStorage.removeItem(sharingKey);
 
-    // Se era o torneio ativo, limpar tournamentId
-    if (tournamentList.activeTournamentId === id) {
-      localStorage.removeItem(TOURNAMENT_ID_KEY);
+      // Remover sharingEnabled específico do torneio
+      const sharingKey = `beachtennis-sharing-enabled-${id}`;
+      localStorage.removeItem(sharingKey);
+
+      // Se era o torneio ativo, limpar tournamentId (mas manter adminToken global)
+      if (tournamentList.activeTournamentId === id) {
+        localStorage.removeItem(TOURNAMENT_ID_KEY);
+      }
     }
   }, [tournamentList, setTournamentList]);
 
@@ -265,7 +288,16 @@ export function useTournamentManager() {
     }));
 
     // Atualizar tournamentId no localStorage (compatibilidade)
-    localStorage.setItem(TOURNAMENT_ID_KEY, id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TOURNAMENT_ID_KEY, id);
+      
+      // Garantir que existe adminToken global (gerar se não existir)
+      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      if (!existingToken) {
+        const newToken = generateAdminToken();
+        localStorage.setItem(ADMIN_TOKEN_KEY, newToken);
+      }
+    }
   }, [setTournamentList]);
 
   /**

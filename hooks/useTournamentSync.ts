@@ -58,9 +58,9 @@ export function useTournamentSync({
 
   // Determinar chave de sharingEnabled baseada no torneio ativo
   const getSharingKey = useCallback(() => {
-    const tournamentId = externalTournamentId || activeTournamentId;
-    if (tournamentId) {
-      return `beachtennis-sharing-enabled-${tournamentId}`;
+    const currentTournamentId = externalTournamentId || activeTournamentId;
+    if (currentTournamentId) {
+      return `beachtennis-sharing-enabled-${currentTournamentId}`;
     }
     // Fallback para chave antiga (compatibilidade)
     return SHARING_ENABLED_KEY;
@@ -103,6 +103,10 @@ export function useTournamentSync({
   // Função para realizar o sync
   const performSync = useCallback(async (isRetry: boolean = false) => {
     if (!isAdmin || !tournamentId || !storedAdminToken || !sharingEnabled) {
+      if (!isAdmin) console.log('⏸️ Sync pausado: não é admin');
+      if (!tournamentId) console.log('⏸️ Sync pausado: sem tournamentId');
+      if (!storedAdminToken) console.log('⏸️ Sync pausado: sem adminToken');
+      if (!sharingEnabled) console.log('⏸️ Sync pausado: compartilhamento desativado');
       return;
     }
 
@@ -114,6 +118,12 @@ export function useTournamentSync({
     }
 
     setSyncStatus('saving');
+    
+    console.log('🔄 Iniciando sincronização:', {
+      tournamentId,
+      hasAdminToken: !!storedAdminToken,
+      sharingEnabled,
+    });
 
     try {
       const response = await fetch('/api/save', {
@@ -137,7 +147,32 @@ export function useTournamentSync({
           statusText: response.statusText,
           error: errorMessage,
           details: errorDetails,
+          tournamentId,
+          hasAdminToken: !!storedAdminToken,
         });
+        
+        // Se o erro for 401 (token inválido), pode ser que o torneio já existe com token diferente
+        // Nesse caso, tentar deletar o torneio antigo e tentar novamente
+        if (response.status === 401 && !isRetry) {
+          console.log('🔄 Token inválido detectado. Tentando limpar torneio antigo...');
+          try {
+            // Tentar deletar o torneio (pode falhar se não tivermos o token correto)
+            await fetch(`/api/tournament/${tournamentId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${storedAdminToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            // Aguardar um pouco e tentar novamente
+            setTimeout(() => {
+              performSync(false);
+            }, 1000);
+          } catch {
+            // Ignorar erro de deleção
+          }
+        }
+        
         throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
       }
 

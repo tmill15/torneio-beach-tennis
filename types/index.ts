@@ -171,7 +171,11 @@ export interface TournamentListBackup {
   exportDate: string;                // Data da exportação (ISO 8601)
   tournamentList: TournamentList;     // Lista de metadados
   tournaments: Record<string, Tournament>; // Map de ID -> Tournament
-  credentials: Record<string, { tournamentId: string; adminToken: string }>; // Por torneio
+  credentials: {
+    encrypted: string;                 // Credenciais criptografadas (JSON com Record<string, { tournamentId: string; adminToken: string }>)
+    salt: string;                      // Salt usado na criptografia (base64)
+    iv: string;                        // IV usado na criptografia (base64)
+  };
   sharingEnabled: Record<string, boolean>; // Por torneio
 }
 

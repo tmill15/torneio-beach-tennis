@@ -263,18 +263,19 @@ export async function exportAllTournaments(
   const credentials: Record<string, { tournamentId: string; adminToken: string }> = {};
   const sharingEnabled: Record<string, boolean> = {};
 
+  // Obter adminToken global (usado para todos os torneios)
+  const globalAdminToken = localStorage.getItem('beachtennis-admin-token');
+
   for (const metadata of tournamentList.tournaments) {
     const tournamentId = metadata.id;
-    const storedId = localStorage.getItem(`beachtennis-tournament-id`);
-    const storedToken = localStorage.getItem('beachtennis-admin-token');
     const sharingKey = `beachtennis-sharing-enabled-${tournamentId}`;
     const sharingValue = localStorage.getItem(sharingKey);
 
-    // Se este torneio tem credenciais no localStorage
-    if (storedId === tournamentId && storedToken) {
+    // Se existe adminToken global, usar para todos os torneios
+    if (globalAdminToken) {
       credentials[tournamentId] = {
-        tournamentId: storedId,
-        adminToken: storedToken,
+        tournamentId: tournamentId,
+        adminToken: globalAdminToken,
       };
     }
 
@@ -293,11 +294,7 @@ export async function exportAllTournaments(
     exportDate: new Date().toISOString(),
     tournamentList,
     tournaments,
-    credentials: {
-      encrypted: encrypted.encrypted,
-      salt: encrypted.salt,
-      iv: encrypted.iv,
-    },
+    credentials: encrypted,
     sharingEnabled,
   };
 

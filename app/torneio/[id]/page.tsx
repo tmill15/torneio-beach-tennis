@@ -33,6 +33,9 @@ export default function TournamentViewerPage() {
 
   // Estado para controlar se o torneio não foi encontrado
   const [tournamentNotFound, setTournamentNotFound] = useState(false);
+  
+  // Ref para rastrear se já selecionamos a categoria inicialmente (evitar loops)
+  const hasSelectedInitialCategory = useRef(false);
 
   // Usar SWR para buscar dados (modo viewer)
   const { syncStatus, viewerError } = useTournamentSync({
@@ -40,8 +43,27 @@ export default function TournamentViewerPage() {
     tournamentId,
     isAdmin: false,
     onTournamentUpdate: (updatedTournament) => {
-      setTournament(updatedTournament);
+      // IMPORTANTE: Substituir completamente o estado, não fazer merge
+      // Garantir que as categorias mantêm a ordem original (não ordenar)
+      // O array já vem na ordem correta da configuração
+      // Criar um novo objeto para garantir que o React detecte a mudança
+      const newTournament = {
+        ...updatedTournament,
+        categorias: [...updatedTournament.categorias], // Criar novo array para garantir imutabilidade
+      };
+      
+      setTournament(newTournament);
       setTournamentNotFound(false);
+      
+      // Selecionar primeira categoria automaticamente se ainda não foi selecionada
+      // IMPORTANTE: Fazer isso aqui para garantir que usamos a ordem correta do servidor
+      if (!hasSelectedInitialCategory.current && newTournament.categorias.length > 0) {
+        const primeiraCategoria = newTournament.categorias[0];
+        if (primeiraCategoria) {
+          setSelectedCategory(primeiraCategoria);
+          hasSelectedInitialCategory.current = true;
+        }
+      }
     },
   });
 
@@ -77,14 +99,32 @@ export default function TournamentViewerPage() {
   }, []);
 
   // Selecionar primeira categoria automaticamente quando torneio for carregado
+  // IMPORTANTE: Usar a primeira categoria na ordem definida na configuração (não ordenar alfabeticamente)
+  // Esta lógica é um fallback caso a seleção no onTournamentUpdate não funcione
   useEffect(() => {
-    const categorias = tournament.categorias || [];
+    // Só processar se o torneio estiver montado e tiver categorias
+    if (!isMounted) return;
     
-    // Se há categorias disponíveis e nenhuma está selecionada, seleciona a primeira
+    // Se já selecionamos a categoria inicialmente, não fazer nada
+    if (hasSelectedInitialCategory.current) return;
+    
+    // Garantir que estamos usando o array original, sem ordenação
+    // O array tournament.categorias já vem na ordem correta definida na configuração
+    const categorias = Array.isArray(tournament.categorias) ? tournament.categorias : [];
+    
+    // Se há categorias disponíveis e nenhuma está selecionada (ou a selecionada não existe mais)
     if (categorias.length > 0 && (!selectedCategory || !categorias.includes(selectedCategory))) {
-      setSelectedCategory(categorias[0]);
+      // Selecionar a primeira categoria na ordem original do array (ordem da configuração)
+      // IMPORTANTE: Não aplicar nenhuma ordenação - usar exatamente a ordem do array
+      // A primeira categoria (índice 0) é a primeira na ordem definida na configuração
+      // Exemplo: se categorias = ["Normal", "Iniciante"], deve selecionar "Normal"
+      const primeiraCategoria = categorias[0];
+      if (primeiraCategoria) {
+        setSelectedCategory(primeiraCategoria);
+        hasSelectedInitialCategory.current = true;
+      }
     }
-  }, [tournament.categorias, selectedCategory]);
+  }, [isMounted, tournament.categorias, selectedCategory]);
 
   // Funções auxiliares para compatibilidade com componentes
   const getGroupRanking = (groupId: string) => {

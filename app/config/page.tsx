@@ -79,11 +79,50 @@ export default function ConfigPage() {
   // Handler para toggle de compartilhamento
   const handleToggleSharing = async (enabled: boolean) => {
     if (enabled) {
-      // Ativar: gerar credenciais se não existirem
-      if (!tournamentId || !adminToken) {
+      // Ativar: usar activeTournamentId como tournamentId (prioridade)
+      // Só gerar novo ID se não houver activeTournamentId (compatibilidade)
+      const currentTournamentId = activeTournamentId || tournamentId;
+      
+      if (activeTournamentId) {
+        // Usar o ID do torneio ativo
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(TOURNAMENT_ID_KEY, activeTournamentId);
+        }
+        // Gerar adminToken global se não existir (será usado para todos os torneios)
+        if (!adminToken) {
+          const { adminToken: newToken } = generateTournamentShare();
+          setAdminToken(newToken);
+        }
+        
+        // Se o torneio já existe no Redis com token diferente, tentar deletar primeiro
+        // Isso evita erro 401 na primeira sincronização
+        if (currentTournamentId && adminToken) {
+          try {
+            // Tentar verificar se existe e deletar se necessário
+            const checkResponse = await fetch(`/api/load?id=${currentTournamentId}`);
+            if (checkResponse.ok) {
+              // Torneio existe, tentar deletar com o token atual (pode falhar se token for diferente)
+              try {
+                await fetch(`/api/tournament/${currentTournamentId}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${adminToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+              } catch {
+                // Ignorar erro de deleção (token pode ser diferente, mas não importa)
+                // O primeiro save vai criar/atualizar com o novo token
+              }
+            }
+          } catch {
+            // Ignorar erro de verificação
+          }
+        }
+      } else if (!tournamentId || !adminToken) {
+        // Fallback: gerar credenciais apenas se não houver activeTournamentId
         const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
-        // Se não há activeTournamentId, atualizar no localStorage (compatibilidade)
-        if (!activeTournamentId && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
           localStorage.setItem(TOURNAMENT_ID_KEY, newId);
         }
         setAdminToken(newToken);

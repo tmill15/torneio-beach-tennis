@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTournament } from '@/hooks/useTournament';
@@ -29,9 +29,33 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
-  const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
-  
   const { activeTournamentId, tournamentList } = useTournamentManager();
+  
+  // Determinar chave de sharingEnabled baseada no torneio ativo
+  const sharingKey = useMemo(() => {
+    const currentTournamentId = activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
+    if (currentTournamentId) {
+      return `beachtennis-sharing-enabled-${currentTournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade)
+    return SHARING_ENABLED_KEY;
+  }, [activeTournamentId]);
+  
+  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(sharingKey, false);
+  
+  // Atualizar sharingEnabled quando a chave mudar
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sharingKey) {
+      try {
+        const item = window.localStorage.getItem(sharingKey);
+        const value = item ? JSON.parse(item) : false;
+        setSharingEnabled(value);
+      } catch (error) {
+        console.error(`Erro ao ler sharingEnabled da chave "${sharingKey}":`, error);
+        setSharingEnabled(false);
+      }
+    }
+  }, [sharingKey, setSharingEnabled]);
   
   const {
     tournament,
@@ -61,9 +85,23 @@ export default function Home() {
 
   // Sincronização (modo admin)
   const isAdmin = !!adminToken;
+  // IMPORTANTE: Usar activeTournamentId como prioridade para garantir que o ID do Redis
+  // corresponda ao ID do torneio. O tournamentId do localStorage é apenas para compatibilidade.
+  const currentTournamentId = activeTournamentId || tournamentId || undefined;
+  
+  // Garantir que o tournamentId no localStorage esteja sincronizado com activeTournamentId
+  useEffect(() => {
+    if (activeTournamentId && typeof window !== 'undefined') {
+      const storedId = localStorage.getItem(TOURNAMENT_ID_KEY);
+      if (storedId !== activeTournamentId) {
+        localStorage.setItem(TOURNAMENT_ID_KEY, activeTournamentId);
+      }
+    }
+  }, [activeTournamentId]);
+  
   const { syncStatus, shareLink, retrySync } = useTournamentSync({
     tournament,
-    tournamentId: tournamentId || undefined,
+    tournamentId: currentTournamentId,
     isAdmin,
     onTournamentUpdate: (updatedTournament) => {
       updateTournament(() => updatedTournament);

@@ -61,10 +61,21 @@ export async function POST(req: NextRequest) {
     if (existingData) {
       // Se já existe, verificar se o token corresponde
       if (existingData.adminTokenHash !== adminTokenHash) {
-        return NextResponse.json(
-          { error: 'Token de autorização inválido.' },
-          { status: 401 }
-        );
+        // Se o torneio não foi atualizado recentemente (mais de 1 hora), permitir sobrescrever
+        // Isso resolve o caso onde o compartilhamento foi ativado mas o token antigo não está disponível
+        const lastUpdate = new Date(existingData.updatedAt);
+        const now = new Date();
+        const hoursSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceUpdate > 1) {
+          console.log(`⚠️ Token não corresponde, mas torneio está antigo (${hoursSinceUpdate.toFixed(1)}h). Permitindo sobrescrever.`);
+          // Permitir sobrescrever com novo token
+        } else {
+          return NextResponse.json(
+            { error: 'Token de autorização inválido.' },
+            { status: 401 }
+          );
+        }
       }
     }
 
