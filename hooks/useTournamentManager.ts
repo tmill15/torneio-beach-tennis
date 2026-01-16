@@ -200,16 +200,99 @@ export function useTournamentManager() {
 
   /**
    * Arquivar torneio
+   * Remove do Redis quando arquivado
    */
-  const archiveTournament = useCallback((id: string) => {
+  const archiveTournament = useCallback(async (id: string) => {
+    // Remover do Redis quando arquivar
+    if (typeof window !== 'undefined') {
+      const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      
+      console.log('📦 [Archive] Iniciando arquivamento do torneio:', id);
+      console.log('📦 [Archive] AdminToken disponível:', !!adminToken);
+      
+      if (adminToken) {
+        try {
+          console.log('📦 [Archive] Enviando requisição DELETE para /api/tournament/' + id);
+          const response = await fetch(`/api/tournament/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${adminToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('📦 [Archive] Resposta do servidor:', response.status, response.statusText);
+
+          if (response.ok) {
+            console.log('✅ [Archive] Torneio removido do Redis com sucesso');
+          } else if (response.status === 404) {
+            console.log('ℹ️ [Archive] Torneio não encontrado no Redis (já estava removido)');
+          } else {
+            const errorText = await response.text();
+            console.error('❌ [Archive] Erro ao remover torneio do Redis:', response.status, errorText);
+          }
+        } catch (error) {
+          console.error('❌ [Archive] Erro ao deletar torneio do Redis ao arquivar:', error);
+          // Continuar mesmo se falhar
+        }
+      } else {
+        console.warn('⚠️ [Archive] AdminToken não encontrado. Não é possível remover do Redis.');
+      }
+    }
+    
+    // Atualizar status para arquivado
+    console.log('📦 [Archive] Atualizando status para arquivado');
     updateTournamentMetadata(id, { status: 'archived' });
   }, [updateTournamentMetadata]);
 
   /**
    * Desarquivar torneio
+   * Restaura no Redis se o compartilhamento estiver habilitado
    */
-  const unarchiveTournament = useCallback((id: string) => {
+  const unarchiveTournament = useCallback(async (id: string) => {
+    // Atualizar status para ativo primeiro
     updateTournamentMetadata(id, { status: 'active' });
+    
+    // Verificar se o compartilhamento está habilitado para este torneio
+    if (typeof window !== 'undefined') {
+      const sharingKey = `beachtennis-sharing-enabled-${id}`;
+      const sharingEnabled = localStorage.getItem(sharingKey) === 'true';
+      
+      if (sharingEnabled) {
+        // Se compartilhamento está habilitado, restaurar no Redis
+        const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+        const tournamentStorageKey = `beachtennis-tournament-${id}`;
+        const tournamentData = localStorage.getItem(tournamentStorageKey);
+        
+        if (adminToken && tournamentData) {
+          try {
+            const tournament = JSON.parse(tournamentData);
+            console.log('📤 [Unarchive] Restaurando torneio no Redis:', id);
+            
+            const response = await fetch('/api/save', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                tournamentId: id,
+                adminToken: adminToken,
+                data: tournament,
+              }),
+            });
+
+            if (response.ok) {
+              console.log('✅ [Unarchive] Torneio restaurado no Redis com sucesso');
+            } else {
+              const errorText = await response.text();
+              console.error('❌ [Unarchive] Erro ao restaurar torneio no Redis:', response.status, errorText);
+            }
+          } catch (error) {
+            console.error('❌ [Unarchive] Erro ao restaurar torneio no Redis:', error);
+          }
+        }
+      }
+    }
   }, [updateTournamentMetadata]);
 
 

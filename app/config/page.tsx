@@ -48,7 +48,8 @@ export default function ConfigPage() {
   const [selectedTournament, setSelectedTournament] = useState<TournamentMetadata | null>(null);
   const [newTournamentName, setNewTournamentName] = useState('');
   const [editTournamentName, setEditTournamentName] = useState('');
-  const [tournamentFilter, setTournamentFilter] = useState<'all' | 'active' | 'archived'>('all');
+  const [tournamentFilter, setTournamentFilter] = useState<'all' | 'active' | 'archived'>('active');
+  const [archiveNotification, setArchiveNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
   const getSharingKey = () => {
@@ -332,11 +333,32 @@ export default function ConfigPage() {
     }
   };
 
-  const handleArchive = (tournament: any) => {
+  const handleArchive = async (tournament: any) => {
     if (tournament.status === 'archived') {
-      unarchiveTournament(tournament.id);
+      await unarchiveTournament(tournament.id);
     } else {
-      archiveTournament(tournament.id);
+      await archiveTournament(tournament.id);
+      
+      // Desabilitar compartilhamento ao arquivar
+      const sharingKey = `beachtennis-sharing-enabled-${tournament.id}`;
+      if (typeof window !== 'undefined') {
+        const wasSharingEnabled = localStorage.getItem(sharingKey) === 'true';
+        if (wasSharingEnabled) {
+          localStorage.setItem(sharingKey, 'false');
+          // Se for o torneio ativo, atualizar o estado também
+          if (tournament.id === activeTournamentId) {
+            setSharingEnabled(false);
+          }
+          // Mostrar aviso não intrusivo
+          setArchiveNotification({
+            show: true,
+            message: `Compartilhamento do torneio "${tournament.name}" foi desativado automaticamente.`
+          });
+          setTimeout(() => {
+            setArchiveNotification({ show: false, message: '' });
+          }, 5000);
+        }
+      }
     }
   };
 
@@ -818,9 +840,17 @@ export default function ConfigPage() {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4 gap-4">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Configurações do Torneio
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  Configurações do Torneio
+                </h1>
+                {activeTournamentMetadata?.status === 'archived' && (
+                  <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Torneio Arquivado</span>
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex gap-2">
               <button
@@ -1388,11 +1418,12 @@ export default function ConfigPage() {
                   </div>
                   <button
                     onClick={() => handleToggleSharing(!sharingEnabled)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    disabled={!activeTournamentId || activeTournamentMetadata?.status === 'archived'}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
                       sharingEnabled
                         ? 'bg-blue-600'
                         : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
+                    } ${!activeTournamentId || activeTournamentMetadata?.status === 'archived' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -1625,16 +1656,6 @@ export default function ConfigPage() {
             {/* Filtros */}
             <div className="mb-6 flex flex-wrap gap-2 items-center">
               <button
-                onClick={() => setTournamentFilter('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  tournamentFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                Todos ({getTournaments().length})
-              </button>
-              <button
                 onClick={() => setTournamentFilter('active')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   tournamentFilter === 'active'
@@ -1653,6 +1674,16 @@ export default function ConfigPage() {
                 }`}
               >
                 Arquivados ({getTournaments('archived').length})
+              </button>
+              <button
+                onClick={() => setTournamentFilter('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  tournamentFilter === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                Todos ({getTournaments().length})
               </button>
               <div className="ml-auto flex gap-2">
                 <button
@@ -1711,7 +1742,7 @@ export default function ConfigPage() {
                   return (
                     <div
                       key={tournament.id}
-                      className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 ${
+                      className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[200px] ${
                         isActive ? 'ring-2 ring-blue-500' : ''
                       }`}
                     >
@@ -1724,16 +1755,22 @@ export default function ConfigPage() {
                             {formattedDate}
                           </p>
                         </div>
-                        {isActive && (
-                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded">
-                            Ativo
-                          </span>
-                        )}
-                        {tournament.status === 'archived' && (
-                          <span className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-medium rounded">
-                            Arquivado
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {isActive && (
+                            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded">
+                              Selecionado
+                            </span>
+                          )}
+                          {tournament.status === 'archived' ? (
+                            <span className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-medium rounded">
+                              Arquivado
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium rounded">
+                              Ativo
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mb-3">
@@ -1753,26 +1790,26 @@ export default function ConfigPage() {
                           {!isActive && (
                             <button
                               onClick={() => handleActivate(tournament)}
-                              className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors"
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap"
                             >
                               ✅ Selecionar
                             </button>
                           )}
                           <button
                             onClick={() => handleEditClick(tournament)}
-                            className="px-3 py-1.5 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-purple-200 text-xs font-medium rounded transition-colors"
+                            className="px-2.5 py-1.5 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-purple-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
                           >
                             ✏️ Editar
                           </button>
                           <button
                             onClick={() => handleArchive(tournament)}
-                            className="px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900 hover:bg-yellow-200 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs font-medium rounded transition-colors"
+                            className="px-2.5 py-1.5 bg-yellow-100 dark:bg-yellow-900 hover:bg-yellow-200 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
                           >
                             {tournament.status === 'archived' ? '📤 Desarquivar' : '📦 Arquivar'}
                           </button>
                           <button
                             onClick={() => handleDeleteClick(tournament)}
-                            className="px-3 py-1.5 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800 text-red-800 dark:text-red-200 text-xs font-medium rounded transition-colors"
+                            className="px-2.5 py-1.5 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800 text-red-800 dark:text-red-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
                           >
                             🗑️ Deletar
                           </button>
@@ -1944,6 +1981,24 @@ export default function ConfigPage() {
                 Exportar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notificação de arquivamento */}
+      {archiveNotification.show && (
+        <div className="fixed bottom-4 right-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg shadow-lg z-50 max-w-md">
+          <div className="flex items-start gap-3">
+            <span className="text-xl">📦</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium">{archiveNotification.message}</p>
+            </div>
+            <button
+              onClick={() => setArchiveNotification({ show: false, message: '' })}
+              className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

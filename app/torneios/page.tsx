@@ -118,11 +118,11 @@ export default function TournamentsPage() {
     }
   };
 
-  const handleArchive = (tournament: TournamentMetadata) => {
+  const handleArchive = async (tournament: TournamentMetadata) => {
     if (tournament.status === 'archived') {
-      unarchiveTournament(tournament.id);
+      await unarchiveTournament(tournament.id);
     } else {
-      archiveTournament(tournament.id);
+      await archiveTournament(tournament.id);
     }
   };
 

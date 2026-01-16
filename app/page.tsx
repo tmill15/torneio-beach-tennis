@@ -29,7 +29,7 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
-  const { activeTournamentId, tournamentList } = useTournamentManager();
+  const { activeTournamentId, tournamentList, activeTournamentMetadata } = useTournamentManager();
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
   const sharingKey = useMemo(() => {
@@ -269,10 +269,16 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-start sm:items-center justify-between mb-4 gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   {tournament.nome}
                 </h1>
+                {activeTournamentMetadata?.status === 'archived' && (
+                  <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Torneio Arquivado</span>
+                  </span>
+                )}
                 {/* Indicador de compartilhamento (desktop) */}
                 {sharingEnabled && (
                   <button
