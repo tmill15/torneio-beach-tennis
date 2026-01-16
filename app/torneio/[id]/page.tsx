@@ -269,6 +269,26 @@ export default function TournamentViewerPage() {
     t => t.phase === selectedPhase
   );
 
+  // Verificar se há empates pendentes dentro dos grupos da fase atual (apenas para UI informativa)
+  const hasPendingInGroupTiebreaks = (() => {
+    for (const group of groupsInSelectedPhase) {
+      const ranking = calculateRanking(group);
+      const ties = detectTies(ranking);
+      
+      // Se há empates detectados não resolvidos
+      if (ties.length > 0) {
+        return true;
+      }
+      
+      // Se há partidas de desempate pendentes
+      const pendingTiebreakerMatches = group.matches.filter(m => m.isTiebreaker && !m.isFinished);
+      if (pendingTiebreakerMatches.length > 0) {
+        return true;
+      }
+    }
+    return false;
+  })();
+
 
   // Evita erro de hydration
   if (!isMounted) {

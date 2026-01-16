@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
           console.log(`⚠️ Token não corresponde, mas torneio está antigo (${hoursSinceUpdate.toFixed(1)}h). Permitindo sobrescrever.`);
           // Permitir sobrescrever com novo token
         } else {
-          return NextResponse.json(
-            { error: 'Token de autorização inválido.' },
-            { status: 401 }
-          );
+        return NextResponse.json(
+          { error: 'Token de autorização inválido.' },
+          { status: 401 }
+        );
         }
       }
     }

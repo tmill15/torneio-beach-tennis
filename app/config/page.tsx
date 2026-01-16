@@ -799,9 +799,9 @@ export default function ConfigPage() {
   const uniqueEnrolledPlayerIds = new Set(allEnrolledPlayers.map(p => p.id));
   const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Mensagem de erro se não há torneios */}
         {showNoTournamentsError && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center mb-8">
@@ -836,15 +836,15 @@ export default function ConfigPage() {
         {/* Conteúdo normal (oculto se não há torneios) */}
         {!showNoTournamentsError && (
           <>
-            {/* Header */}
-            <div className="mb-8">
+        {/* Header */}
+        <div className="mb-8">
               <div className="flex items-center justify-between mb-4 gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   <span className="hidden sm:inline">Configurações do Torneio</span>
                   <span className="sm:hidden">Config. do Torneio</span>
-                </h1>
+            </h1>
                 {activeTournamentMetadata?.status === 'archived' && (
                   <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
                     <span>📦</span>
@@ -864,13 +864,13 @@ export default function ConfigPage() {
                 <span>🏆</span>
                 <span className="text-sm">Gerenciar Torneios</span>
               </button>
-              <Link
-                href="/"
+            <Link
+              href="/"
                 className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
-              >
+            >
                 <span>📊</span>
                 <span className="text-sm">Ver Dashboard</span>
-              </Link>
+            </Link>
             </div>
           </div>
           <p className="text-gray-600 dark:text-gray-400">
@@ -1825,8 +1825,8 @@ export default function ConfigPage() {
                             🗑️ Deletar
                           </button>
                         </div>
-                    </div>
-                  );
+    </div>
+  );
                 })}
               </div>
             )}
