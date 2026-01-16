@@ -1,0 +1,127 @@
+{
+    "exportDate": "2024-01-15T00:00:00.000Z",
+    "categoria": "Geral",
+    "totalPlayers": 24,
+    "players": [
+        {
+            "nome": "Jogador A1",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador A2",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador A3",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador A4",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador B1",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador B2",
+            "categoria": "Geral",
+            "isSeed": true
+        },
+        {
+            "nome": "Jogador B3",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador B4",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador C1",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador C2",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador C3",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador C4",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador D1",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador D2",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador D3",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador D4",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador E1",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador E2",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador E3",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador E4",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador F1",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador F2",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador F3",
+            "categoria": "Geral",
+            "isSeed": false
+        },
+        {
+            "nome": "Jogador F4",
+            "categoria": "Geral",
+            "isSeed": false
+        }
+    ]
+}
