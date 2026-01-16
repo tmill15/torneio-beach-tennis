@@ -20,7 +20,7 @@ export default function TournamentsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<TournamentMetadata | null>(null);
   const [newTournamentName, setNewTournamentName] = useState('');
-  const [newTournamentCategories, setNewTournamentCategories] = useState('Iniciante, Normal');
+  const [newTournamentCategories, setNewTournamentCategories] = useState('Geral');
   const [editTournamentName, setEditTournamentName] = useState('');
   const [editTournamentCategories, setEditTournamentCategories] = useState('');
 
@@ -56,12 +56,12 @@ export default function TournamentsPage() {
       .filter(c => c.length > 0);
 
     if (categories.length === 0) {
-      categories.push('Iniciante', 'Normal');
+      categories.push('Geral');
     }
 
     const newId = createTournament(newTournamentName.trim(), categories);
     setNewTournamentName('');
-    setNewTournamentCategories('Iniciante, Normal');
+    setNewTournamentCategories('Geral');
     setShowCreateModal(false);
     
     // Redirecionar para o dashboard do novo torneio
@@ -343,7 +343,7 @@ export default function TournamentsPage() {
                     type="text"
                     value={newTournamentCategories}
                     onChange={(e) => setNewTournamentCategories(e.target.value)}
-                    placeholder="Iniciante, Normal"
+                    placeholder="Geral"
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -353,7 +353,7 @@ export default function TournamentsPage() {
                   onClick={() => {
                     setShowCreateModal(false);
                     setNewTournamentName('');
-                    setNewTournamentCategories('Iniciante, Normal');
+                    setNewTournamentCategories('Geral');
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
                 >

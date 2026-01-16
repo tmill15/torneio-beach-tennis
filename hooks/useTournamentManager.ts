@@ -127,7 +127,7 @@ export function useTournamentManager() {
   /**
    * Criar novo torneio
    */
-  const createTournament = useCallback((name: string, categories: string[] = ['Iniciante', 'Normal']) => {
+  const createTournament = useCallback((name: string, categories: string[] = ['Geral']) => {
     const newId = uuidv4();
     const metadata: TournamentMetadata = {
       id: newId,
@@ -142,12 +142,27 @@ export function useTournamentManager() {
       activeTournamentId: newId,
     }));
 
-    // Criar torneio vazio no localStorage
-    const emptyTournament = createEmptyTournament();
-    emptyTournament.nome = metadata.name;
-    emptyTournament.categorias = categories;
+    // Criar torneio vazio no localStorage com as categorias corretas
+    // Não usar createEmptyTournament() que sempre cria com ['Iniciante', 'Normal']
+    // Criar diretamente com as categorias passadas
+    const emptyTournament: Tournament = {
+      version: '0.4.0',
+      nome: metadata.name,
+      categorias: [...categories], // Usar as categorias passadas diretamente
+      gameConfig: {
+        quantidadeSets: 1,
+        gamesPerSet: 6,
+        tieBreakDecisivo: false,
+        pontosTieBreak: 7,
+      },
+      grupos: [],
+      waitingList: [],
+      completedCategories: [],
+    };
     const tournamentStorageKey = `beachtennis-tournament-${newId}`;
+    // Salvar imediatamente para evitar race conditions
     localStorage.setItem(tournamentStorageKey, JSON.stringify(emptyTournament));
+    console.log(`✅ [createTournament] Torneio criado com categorias:`, emptyTournament.categorias);
 
     // Gerar adminToken global apenas se não existir
     if (typeof window !== 'undefined') {

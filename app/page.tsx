@@ -20,42 +20,27 @@ import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 
-const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id'; // Mantido apenas para compatibilidade com hooks
 
 export default function Home() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
   const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const { activeTournamentId, tournamentList, activeTournamentMetadata } = useTournamentManager();
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
+  // Usar apenas activeTournamentId (não precisa mais de fallback para compatibilidade)
   const sharingKey = useMemo(() => {
-    const currentTournamentId = activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
-    if (currentTournamentId) {
-      return `beachtennis-sharing-enabled-${currentTournamentId}`;
+    if (activeTournamentId) {
+      return `beachtennis-sharing-enabled-${activeTournamentId}`;
     }
-    // Fallback para chave antiga (compatibilidade)
+    // Fallback para chave antiga (compatibilidade apenas para migração)
     return SHARING_ENABLED_KEY;
   }, [activeTournamentId]);
   
   const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(sharingKey, false);
-  
-  // Atualizar sharingEnabled quando a chave mudar
-  useEffect(() => {
-    if (typeof window !== 'undefined' && sharingKey) {
-      try {
-        const item = window.localStorage.getItem(sharingKey);
-        const value = item ? JSON.parse(item) : false;
-        setSharingEnabled(value);
-      } catch (error) {
-        console.error(`Erro ao ler sharingEnabled da chave "${sharingKey}":`, error);
-        setSharingEnabled(false);
-      }
-    }
-  }, [sharingKey, setSharingEnabled]);
   
   const {
     tournament,
@@ -85,11 +70,9 @@ export default function Home() {
 
   // Sincronização (modo admin)
   const isAdmin = !!adminToken;
-  // IMPORTANTE: Usar activeTournamentId como prioridade para garantir que o ID do Redis
-  // corresponda ao ID do torneio. O tournamentId do localStorage é apenas para compatibilidade.
-  const currentTournamentId = activeTournamentId || tournamentId || undefined;
   
   // Garantir que o tournamentId no localStorage esteja sincronizado com activeTournamentId
+  // (necessário apenas para compatibilidade com hooks que ainda usam TOURNAMENT_ID_KEY)
   useEffect(() => {
     if (activeTournamentId && typeof window !== 'undefined') {
       const storedId = localStorage.getItem(TOURNAMENT_ID_KEY);
@@ -101,7 +84,7 @@ export default function Home() {
   
   const { syncStatus, shareLink, retrySync } = useTournamentSync({
     tournament,
-    tournamentId: currentTournamentId,
+    tournamentId: activeTournamentId || undefined, // Usar apenas activeTournamentId (converter null para undefined)
     isAdmin,
     onTournamentUpdate: (updatedTournament) => {
       updateTournament(() => updatedTournament);

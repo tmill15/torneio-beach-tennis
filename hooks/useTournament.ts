@@ -45,7 +45,12 @@ export function useTournament() {
 
   // Estado interno para o torneio atual (gerenciado dinamicamente)
   const [rawTournament, setRawTournamentInternal] = useState<Tournament>(() => {
-    if (typeof window === 'undefined') return createEmptyTournament();
+    if (typeof window === 'undefined') {
+      // Criar torneio vazio com "Geral" em vez de "Iniciante" e "Normal"
+      const empty = createEmptyTournament();
+      empty.categorias = ['Geral'];
+      return empty;
+    }
     
     const storageKey = getStorageKey();
     const stored = localStorage.getItem(storageKey);
@@ -59,7 +64,12 @@ export function useTournament() {
         console.error('Erro ao carregar torneio:', error);
       }
     }
-    return createEmptyTournament();
+    // Se não encontrou e há activeTournamentId, criar torneio vazio com "Geral"
+    // O useEffect vai carregar o torneio correto quando estiver disponível
+    // Se não houver activeTournamentId, criar vazio com "Geral" também
+    const empty = createEmptyTournament();
+    empty.categorias = ['Geral'];
+    return empty;
   });
   
   // Wrapper para setRawTournament que salva na chave correta
@@ -86,13 +96,38 @@ export function useTournament() {
         const parsed = JSON.parse(stored);
         if (isValidTournamentStructure(parsed)) {
           setRawTournamentInternal(parsed);
+        } else {
+          // Se estrutura inválida, não criar torneio vazio - manter o que já existe
+          console.warn('⚠️ Estrutura de torneio inválida, mantendo estado atual');
         }
       } catch (error) {
         console.error('Erro ao carregar torneio:', error);
+        // Em caso de erro, não criar torneio vazio - manter o que já existe
       }
-    } else {
-      const empty = createEmptyTournament();
-      setRawTournamentInternal(empty);
+    } else if (activeTournamentId) {
+      // Se há activeTournamentId mas não há dados no localStorage,
+      // aguardar um pouco antes de verificar novamente (pode ser race condition)
+      // Isso evita sobrescrever torneios recém-criados
+      const timeout = setTimeout(() => {
+        const checkAgain = localStorage.getItem(storageKey);
+        if (checkAgain) {
+          // Se encontrou, carregar o torneio correto
+          try {
+            const parsed = JSON.parse(checkAgain);
+            if (isValidTournamentStructure(parsed)) {
+              console.log('✅ [useTournament] Torneio carregado com categorias:', parsed.categorias);
+              setRawTournamentInternal(parsed);
+            }
+          } catch (error) {
+            console.error('Erro ao carregar torneio após delay:', error);
+          }
+        } else {
+          // Se ainda não encontrou após delay, NÃO criar torneio vazio
+          // Isso evitaria sobrescrever torneios recém-criados
+          console.warn('⚠️ Torneio não encontrado no localStorage após delay. Aguardando criação...');
+        }
+      }, 1000); // Aumentado para 1000ms para dar mais tempo ao createTournament salvar
+      return () => clearTimeout(timeout);
     }
   }, [activeTournamentId, getStorageKey]);
 
@@ -137,6 +172,7 @@ export function useTournament() {
       
       // ⚠️ ÚLTIMO RECURSO: Só cria torneio vazio se dados estiverem realmente corrompidos
       const emptyTournament = createEmptyTournament();
+      emptyTournament.categorias = ['Geral']; // Usar "Geral" em vez de "Iniciante" e "Normal"
       console.warn('⚠️ Criando torneio vazio. Verifique backups automáticos no localStorage.');
       return emptyTournament;
     }
@@ -1494,7 +1530,9 @@ export function useTournament() {
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
-    updateTournament(createEmptyTournament());
+    const empty = createEmptyTournament();
+    empty.categorias = ['Geral']; // Usar "Geral" em vez de "Iniciante" e "Normal"
+    updateTournament(empty);
   }, [updateTournament]);
 
   return {

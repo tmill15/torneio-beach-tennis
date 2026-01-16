@@ -228,11 +228,12 @@ export default function ConfigPage() {
       return;
     }
 
-    // Sempre criar com categoria "Geral"
-    createTournament(newTournamentName.trim(), ['Geral']);
+    // Sempre criar com categoria "Geral" (padrão)
+    const newTournamentId = createTournament(newTournamentName.trim());
     setNewTournamentName('');
     setShowCreateModal(false);
-    router.push('/');
+    // Redirecionar para config para fazer ajustes iniciais
+    router.push('/config');
   };
 
   const handleBackupAllTournaments = () => {
@@ -327,10 +328,8 @@ export default function ConfigPage() {
     setShowDeleteModal(false);
     setSelectedTournament(null);
 
-    // Se deletou o torneio ativo, redirecionar para dashboard
-    if (selectedTournament.id === activeTournamentId) {
-      router.push('/');
-    }
+    // Não redirecionar - permanecer em /config
+    // Se deletou o torneio ativo, o sistema automaticamente selecionará outro ou mostrará mensagem
   };
 
   const handleArchive = async (tournament: any) => {
