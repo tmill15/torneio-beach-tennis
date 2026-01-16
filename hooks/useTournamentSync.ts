@@ -94,11 +94,17 @@ export function useTournamentSync({
   );
 
   // Atualizar torneio quando dados chegarem do servidor (modo viewer)
+  // Usar ref para onTournamentUpdate para evitar dependências circulares
+  const onTournamentUpdateRef = useRef(onTournamentUpdate);
   useEffect(() => {
-    if (!isAdmin && viewerData?.tournament && onTournamentUpdate) {
-      onTournamentUpdate(viewerData.tournament);
+    onTournamentUpdateRef.current = onTournamentUpdate;
+  }, [onTournamentUpdate]);
+
+  useEffect(() => {
+    if (!isAdmin && viewerData?.tournament && onTournamentUpdateRef.current) {
+      onTournamentUpdateRef.current(viewerData.tournament);
     }
-  }, [isAdmin, viewerData, onTournamentUpdate]);
+  }, [isAdmin, viewerData]); // Removido onTournamentUpdate das dependências
 
   // Função para realizar o sync
   const performSync = useCallback(async (isRetry: boolean = false) => {
@@ -263,7 +269,7 @@ export function useTournamentSync({
 
   // Gerar link de compartilhamento
   const shareLink = tournamentId
-    ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/torneio/${tournamentId}`
+    ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/torneio/${tournamentId}`
     : null;
 
   return {

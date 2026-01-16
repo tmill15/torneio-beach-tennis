@@ -279,17 +279,16 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-shrink-0">
+              {/* Status de sincronização (desktop - antes dos botões) */}
+              {isAdmin && sharingEnabled && (
+                <div className="hidden sm:block">
+                  <SyncStatus status={syncStatus} onRetry={retrySync} />
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <div className="w-full sm:w-auto">
                   <TournamentSelector />
                 </div>
-                {/* Status de sincronização (tablet/desktop - ao lado de Configurações) */}
-                {isAdmin && sharingEnabled && (
-                  <div className="hidden sm:block">
-                    <SyncStatus status={syncStatus} onRetry={retrySync} />
-                  </div>
-                )}
-                
                 <Link
                   href="/config"
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
@@ -574,7 +573,12 @@ export default function Home() {
               const ranking = getGroupRanking(group.id);
               const maxPhase = getMaxPhase(selectedCategory);
               const isReadOnly = selectedPhase < maxPhase; // Fase anterior = read-only
-              const groupPhaseComplete = isReadOnly ? isPhaseComplete(selectedCategory, selectedPhase) : false;
+              // Verificar se a fase está realmente concluída (foi avançada):
+              // - Para Fase 1 e 2: fase está concluída se existe uma fase seguinte (maxPhase > selectedPhase)
+              // - Para Fase 3: fase está concluída se a categoria está em completedCategories
+              const groupPhaseComplete = selectedPhase === 3
+                ? (tournament.completedCategories || []).includes(selectedCategory)
+                : maxPhase > selectedPhase;
 
               return (
                 <GroupCard
