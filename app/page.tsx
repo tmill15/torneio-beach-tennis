@@ -16,6 +16,7 @@ import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import { SyncStatus } from '@/components/SyncStatus';
 import { ShareTournament } from '@/components/ShareTournament';
+import { TournamentSelector } from '@/components/TournamentSelector';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
@@ -277,8 +278,11 @@ export default function Home() {
                 Painel do Torneio
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 flex-shrink-0">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                <div className="w-full sm:w-auto">
+                  <TournamentSelector />
+                </div>
                 {/* Status de sincronização (tablet/desktop - ao lado de Configurações) */}
                 {isAdmin && sharingEnabled && (
                   <div className="hidden sm:block">
@@ -288,9 +292,10 @@ export default function Home() {
                 
                 <Link
                   href="/config"
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
                 >
-                  ⚙️ Configurações
+                  <span>⚙️</span>
+                  <span className="text-sm">Configurações</span>
                 </Link>
               </div>
               

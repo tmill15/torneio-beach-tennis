@@ -17,6 +17,7 @@ import { validateThreePhaseTournament } from '@/services/phaseValidation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
 import { ShareTournament } from '@/components/ShareTournament';
+import { TournamentSelector } from '@/components/TournamentSelector';
 import type { TournamentMetadata, Tournament } from '@/types';
 
 const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
@@ -839,9 +840,10 @@ export default function ConfigPage() {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4 gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Configurações do Torneio
+                  <span className="hidden sm:inline">Configurações do Torneio</span>
+                  <span className="sm:hidden">Config. do Torneio</span>
                 </h1>
                 {activeTournamentMetadata?.status === 'archived' && (
                   <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
@@ -851,18 +853,23 @@ export default function ConfigPage() {
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="w-full sm:w-auto">
+                <TournamentSelector />
+              </div>
               <button
                 onClick={() => setShowTournamentsModal(true)}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
               >
-                🏆 Gerenciar Torneios
+                <span>🏆</span>
+                <span className="text-sm">Gerenciar Torneios</span>
               </button>
               <Link
                 href="/"
-                className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
               >
-                Ver Dashboard
+                <span>📊</span>
+                <span className="text-sm">Ver Dashboard</span>
               </Link>
             </div>
           </div>
@@ -880,8 +887,13 @@ export default function ConfigPage() {
                 Nome do Torneio
               </h2>
               {activeTournamentMetadata ? (
-                <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-                  {activeTournamentMetadata.name}
+                <div className="relative">
+                  <div className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-not-allowed flex items-center">
+                    <span className="flex-1">{activeTournamentMetadata.name}</span>
+                    <span className="absolute right-3 text-gray-400 dark:text-gray-500" title="Somente leitura - Use o gerenciamento de torneios para editar">
+                      🔒
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 italic">
@@ -899,18 +911,18 @@ export default function ConfigPage() {
                 Categorias
               </h2>
               
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 max-[430px]:gap-1.5 mb-4">
                 <input
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
                   placeholder="Nova categoria"
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  className="flex-1 min-w-0 px-4 max-[430px]:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
                 />
                 <button
                   onClick={handleAddCategory}
-                  className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 max-[430px]:px-3 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors flex-shrink-0 text-sm whitespace-nowrap"
                 >
                   Adicionar
                 </button>
@@ -1095,13 +1107,13 @@ export default function ConfigPage() {
 
             {/* Participantes (com Abas) */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col max-[430px]:flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 max-[430px]:gap-2">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Participantes
                 </h2>
                 
                 {/* Botões Export/Import */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-[430px]:w-full max-[430px]:justify-start">
                   <button
                     onClick={() => {
                       setExportCategory(selectedCategory);
@@ -1326,14 +1338,14 @@ export default function ConfigPage() {
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                             </div>
-                            <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
+                            <div className="flex flex-row items-center gap-2 max-[430px]:gap-1.5 w-full sm:w-auto">
                               <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                               <button
                               onClick={() => handleRedrawGroups(categoria)}
                               disabled={!canRedraw}
-                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 max-[430px]:px-2 py-1 text-white text-sm max-[430px]:text-xs rounded font-medium transition-colors whitespace-nowrap ${
                                 canRedraw
                                   ? 'bg-yellow-600 hover:bg-yellow-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
@@ -1349,7 +1361,7 @@ export default function ConfigPage() {
                             <button
                               onClick={() => handleClearTournamentPlayers(categoria)}
                               disabled={!canClearCategory}
-                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 max-[430px]:px-2 py-1 text-white text-sm max-[430px]:text-xs rounded font-medium transition-colors whitespace-nowrap ${
                                 canClearCategory
                                   ? 'bg-red-600 hover:bg-red-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
