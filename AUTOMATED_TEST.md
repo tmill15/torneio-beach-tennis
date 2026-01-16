@@ -2,6 +2,19 @@
 
 Este documento descreve como reproduzir os cenários de teste para validação do sistema de desempate (Empates em Grupo e Empates entre Grupos).
 
+## 0. Preparação do Torneio (Configuração Inicial)
+
+Antes de rodar os cenários de teste, você precisa preparar o torneio com 24 jogadores.
+
+### Geração de Cenário (Backup)
+**Esta é a configuração padrão para a automação.**
+O script `generate_backup.js` cria um torneio já com os jogos da Fase 1 preenchidos para gerar os empates exatos descritos abaixo.
+*Nota: Os 24 jogadores e seus resultados são gerados automaticamente pelo script. Não é necessário importar lista de participantes nem jogar as partidas manualmente.*
+
+1.  Esta abordagem permite validar a **Lógica de Desempate** imediatamente.
+2.  Siga os passos descritos em cada cenário de teste abaixo.
+
+---
 ## 1. Teste de Empates na Fase 1 (Grupos)
 
 Este teste simula empates dentro dos grupos na primeira fase do torneio.
