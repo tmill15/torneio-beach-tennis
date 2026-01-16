@@ -498,7 +498,7 @@ export default function TournamentViewerPage() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Desempates entre Grupos
             </h2>
-            <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,1fr))]">
+            <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
               {crossGroupTiebreaks.map((tiebreak, index) => {
                 const tiebreakGroup = (tournament.grupos || []).find(
                   g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') &&
@@ -527,7 +527,7 @@ export default function TournamentViewerPage() {
 
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (
-          <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,1fr))]">
+          <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
               // Verificar se a fase está realmente concluída (foi avançada):

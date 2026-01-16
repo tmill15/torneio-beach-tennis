@@ -63,7 +63,7 @@ export function GroupCard({
   const pendingTiebreakerMatches = group.matches.filter(m => m.isTiebreaker && !m.isFinished);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-orange-500 px-6 py-4">
         <h3 className="text-xl font-bold text-white">
@@ -81,7 +81,7 @@ export function GroupCard({
 
       {/* Conteúdo baseado no viewMode */}
       {viewMode === 'classificacao' && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 flex-1">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 uppercase tracking-wide">
             Classificação
           </h4>
@@ -189,7 +189,7 @@ export function GroupCard({
       )}
 
       {viewMode === 'jogos' && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 flex-1">
           <MatchList
             matches={group.matches}
             gameConfig={gameConfig}
@@ -314,7 +314,7 @@ export function GroupCard({
 
       {/* Indicador de Read-Only */}
       {isReadOnly && (
-        <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700">
+        <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700 mt-auto">
           <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
             {isPhaseComplete
               ? '📋 Modo visualização - Esta fase já foi concluída'
