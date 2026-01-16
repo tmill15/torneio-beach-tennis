@@ -174,7 +174,7 @@ export default function TournamentViewerPage() {
   if (!isMounted) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
@@ -188,7 +188,7 @@ export default function TournamentViewerPage() {
   if (tournamentNotFound) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">🔍</div>
@@ -223,7 +223,7 @@ export default function TournamentViewerPage() {
   if (!tournament || !Array.isArray(tournament.categorias) || tournament.categorias.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">⏳</div>
@@ -243,7 +243,7 @@ export default function TournamentViewerPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-full mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -394,7 +394,7 @@ export default function TournamentViewerPage() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Desempates entre Grupos
             </h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,1fr))]">
               {crossGroupTiebreaks.map((tiebreak, index) => {
                 const tiebreakGroup = (tournament.grupos || []).find(
                   g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') &&
@@ -423,7 +423,7 @@ export default function TournamentViewerPage() {
 
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,1fr))]">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
               // Verificar se a fase está completa: todos os grupos da fase devem ter todos os jogos finalizados
