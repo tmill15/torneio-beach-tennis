@@ -186,9 +186,8 @@ export function useTournamentManager() {
     id: string,
     updates: Partial<Pick<TournamentMetadata, 'name' | 'categories' | 'status'>>
   ) => {
-    setTournamentList(prev => ({
-      ...prev,
-      tournaments: prev.tournaments.map(t => {
+    setTournamentList(prev => {
+      const newTournaments = prev.tournaments.map(t => {
         if (t.id === id) {
           const updated = { ...t, ...updates };
           // Se atualizou nome ou categorias, atualizar também no torneio completo
@@ -209,8 +208,14 @@ export function useTournamentManager() {
           return updated;
         }
         return t;
-      }),
-    }));
+      });
+      
+      // Criar novo objeto para garantir que a referência mude
+      return {
+        ...prev,
+        tournaments: newTournaments,
+      };
+    });
   }, [setTournamentList]);
 
   /**

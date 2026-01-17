@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
@@ -53,16 +53,16 @@ export default function ConfigPage() {
   const [archiveNotification, setArchiveNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
-  const getSharingKey = () => {
+  // IMPORTANTE: useMemo garante que a chave seja estável entre renders
+  const sharingKey = useMemo(() => {
     const tournamentId = activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
     if (tournamentId) {
       return `beachtennis-sharing-enabled-${tournamentId}`;
     }
     // Fallback para chave antiga (compatibilidade)
     return SHARING_ENABLED_KEY;
-  };
+  }, [activeTournamentId]);
   
-  const sharingKey = getSharingKey();
   const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(sharingKey, false);
   const [showShareModal, setShowShareModal] = useState(false);
   

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTournamentManager } from '@/hooks/useTournamentManager';
 import type { TournamentMetadata } from '@/types';
@@ -65,6 +65,15 @@ export function TournamentSelector() {
     }
   }, [isOpen]);
 
+  // Filtrar apenas torneios ativos (excluir arquivados) para o dropdown
+  // IMPORTANTE: useMemo deve ser chamado ANTES de qualquer early return para seguir as regras dos hooks
+  // Usar tournamentList.tournaments diretamente como dependência para garantir atualização
+  const allTournaments = useMemo(() => {
+    return tournamentList.tournaments.filter(t => t.status === 'active');
+  }, [tournamentList.tournaments]);
+
+  const activeTournament = activeTournamentMetadata;
+
   if (!isMounted) {
     return (
       <div className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg animate-pulse">
@@ -72,9 +81,6 @@ export function TournamentSelector() {
       </div>
     );
   }
-
-  const activeTournament = activeTournamentMetadata;
-  const allTournaments = getTournaments();
 
   const handleSelectTournament = async (tournamentId: string) => {
     if (tournamentId === activeTournamentId) {
