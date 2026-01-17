@@ -17,8 +17,7 @@ import type {
  * Calcula o ranking completo de um grupo
  * Critérios de desempate:
  * 1. Vitórias (matches ganhos)
- * 2. Saldo de sets
- * 3. Saldo de games
+ * 2. Saldo de games
  */
 export function calculateRanking(group: Group): RankingEntry[] {
   const rankings: RankingEntry[] = [];
@@ -54,24 +53,19 @@ function compareRanking(a: RankingEntry, b: RankingEntry): number {
     return b.vitorias - a.vitorias;
   }
 
-  // 2. Saldo de sets (descendente)
-  if (a.saldoSets !== b.saldoSets) {
-    return b.saldoSets - a.saldoSets;
-  }
-
-  // 3. Saldo de games (descendente)
+  // 2. Saldo de games (descendente)
   if (a.saldoGames !== b.saldoGames) {
     return b.saldoGames - a.saldoGames;
   }
 
-  // 4. Desempate manual (se definido)
+  // 3. Desempate manual (se definido)
   const tieA = a.player.tiebreakOrder || 999;
   const tieB = b.player.tiebreakOrder || 999;
   if (tieA !== tieB) {
     return tieA - tieB;
   }
 
-  // 5. Empate técnico
+  // 4. Empate técnico
   return 0;
 }
 

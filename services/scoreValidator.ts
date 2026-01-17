@@ -219,6 +219,25 @@ function validateTieBreakSet(
     );
   }
 
+  // Se o vencedor passou do mínimo, a diferença DEVE ser EXATAMENTE 2
+  // (significa que houve empate em minPoints-1 e o jogo continuou ponto a ponto)
+  if (winnerPoints > minPoints) {
+    // Em tie-break, se passar do mínimo, só pode ser com diferença de 2
+    if (difference !== 2) {
+      // Gerar exemplos corretos baseados no minPoints
+      const example1 = `${minPoints + 1}x${minPoints - 1}`;
+      const example2 = `${minPoints + 2}x${minPoints}`;
+      const example3 = `${minPoints + 3}x${minPoints + 1}`;
+      const example4 = `${minPoints + 5}x${minPoints + 3}`;
+      
+      errors.push(
+        `Tie-break inválido ${gamesA}x${gamesB}. ` +
+        `Quando o placar passa de ${minPoints} pontos, a diferença deve ser EXATAMENTE 2. ` +
+        `Exemplos válidos: ${example1}, ${example2}, ${example3}, ${example4}, etc.`
+      );
+    }
+  }
+
   return { isValid: errors.length === 0, errors, warnings };
 }
 
