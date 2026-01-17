@@ -365,8 +365,8 @@ export default function ConfigPage() {
   const handleActivate = (tournament: any) => {
     activateTournament(tournament.id);
     setShowTournamentsModal(false);
-    // Forçar reload completo para garantir que todos os hooks sejam atualizados
-    window.location.href = '/config';
+    // Não precisa mais de reload! O sistema de eventos customizados do useLocalStorage
+    // vai notificar automaticamente todos os hooks sobre a mudança
   };
 
   const filteredTournaments = tournamentFilter === 'all'

@@ -91,9 +91,8 @@ export function TournamentSelector() {
     activateTournament(tournamentId);
     setIsOpen(false);
     
-    // Sempre recarregar a página para garantir que todos os hooks sejam atualizados
-    // Isso é necessário porque useTournament precisa recarregar os dados do localStorage
-    window.location.reload();
+    // Não precisa mais de reload! O sistema de eventos customizados do useLocalStorage
+    // vai notificar automaticamente o useTournament e outros hooks sobre a mudança
   };
 
   return (

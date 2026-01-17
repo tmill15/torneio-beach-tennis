@@ -128,7 +128,9 @@ export default function TournamentsPage() {
 
   const handleActivate = (tournament: TournamentMetadata) => {
     activateTournament(tournament.id);
-    router.push('/');
+    // Não precisa mais de router.push! O sistema de eventos customizados
+    // vai notificar automaticamente todos os componentes sobre a mudança
+    // O usuário continua na página atual com o novo torneio ativo
   };
 
   if (!isMounted) {
