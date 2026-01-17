@@ -291,7 +291,7 @@ export async function saveTournament(
     try {
       await redisClient.setEx(key, ttlSeconds, value);
       console.log(`✅ Torneio ${id} salvo com sucesso`);
-      return true;
+    return true;
     } catch (setError) {
       const errorMessage = setError instanceof Error ? setError.message : 'Erro desconhecido';
       

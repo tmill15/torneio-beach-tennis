@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { QualifiedPlayer } from '@/services/phaseGenerator';
 import type { Tournament } from '@/types';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
+import { detectTies, calculateRanking } from '@/services/rankingService';
 import { CrossGroupTiebreakerModal } from './CrossGroupTiebreakerModal';
 
 interface PhaseAdvanceCardProps {
@@ -45,11 +46,41 @@ export function PhaseAdvanceCard({
   const nextPhase = currentPhase + 1;
   const isFinal = currentPhase === 3; // Fase 3 é a fase final
   
+  // Verificar se há empates pendentes dentro dos grupos da fase atual
+  const hasPendingInGroupTiebreaks = useMemo(() => {
+    if (!tournament) return false;
+    
+    const categoryGroups = tournament.grupos.filter(
+      g => g.categoria === categoria && 
+           g.fase === currentPhase && 
+           !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
+    );
+    
+    for (const group of categoryGroups) {
+      const ranking = calculateRanking(group);
+      const ties = detectTies(ranking);
+      
+      // Se há empates detectados não resolvidos
+      if (ties.length > 0) {
+        return true;
+      }
+      
+      // Se há partidas de desempate pendentes
+      const pendingTiebreakerMatches = group.matches.filter(m => m.isTiebreaker && !m.isFinished);
+      if (pendingTiebreakerMatches.length > 0) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, [tournament, categoria, currentPhase]);
+  
   // Detectar empates entre grupos
   // IMPORTANTE: Só verificar empates cross-group quando realmente precisamos selecionar
   // jogadores de uma posição específica entre grupos diferentes
+  // E apenas se NÃO houver empates pendentes dentro dos grupos
   let crossGroupTies: { player: any; stats: any; groupOrigin: string }[] = [];
-  if (tournament) {
+  if (tournament && !hasPendingInGroupTiebreaks) {
     const categoryGroups = tournament.grupos.filter(g => g.categoria === categoria && g.fase === currentPhase);
     if (currentPhase === 1) {
       // Fase 1 → Fase 2: verificar empate em 3º lugar APENAS se precisar de repescagem

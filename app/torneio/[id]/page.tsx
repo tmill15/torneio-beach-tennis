@@ -5,12 +5,12 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { ShareTournament } from '@/components/ShareTournament';
 import { GroupCard } from '@/components/GroupCard';
-import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { Tournament } from '@/types';
 import { createEmptyTournament } from '@/services/backupService';
 import {
@@ -28,21 +28,82 @@ export default function TournamentViewerPage() {
   const [tournament, setTournament] = useState<Tournament>(createEmptyTournament());
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [viewMode, setViewMode] = useState<'classificacao' | 'jogos'>('classificacao');
-  const [selectedPhase, setSelectedPhase] = useState<number>(1);
+  // Persistir fase selecionada no localStorage (chave única por torneio)
+  const phaseStorageKey = tournamentId ? `beachtennis-viewer-phase-${tournamentId}` : 'beachtennis-viewer-phase';
+  const [selectedPhase, setSelectedPhase] = useLocalStorage<number>(phaseStorageKey, 1);
   const [showShareModal, setShowShareModal] = useState(false);
 
   // Estado para controlar se o torneio não foi encontrado
   const [tournamentNotFound, setTournamentNotFound] = useState(false);
+  
+  // Ref para rastrear se já selecionamos a categoria inicialmente (evitar loops)
+  const hasSelectedInitialCategory = useRef(false);
+  // Ref para rastrear a última lista de categorias processada (evitar loops)
+  const lastProcessedCategories = useRef<string[]>([]);
+  // Ref para rastrear o valor atual de selectedCategory (evitar dependências circulares)
+  const selectedCategoryRef = useRef<string>('');
+  
+  // Atualizar ref sempre que selectedCategory mudar
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
+  // Callback para atualizar torneio (usar useCallback para evitar recriação)
+  const handleTournamentUpdate = useCallback((updatedTournament: Tournament) => {
+    // IMPORTANTE: Substituir completamente o estado, não fazer merge
+    // Garantir que as categorias mantêm a ordem original (não ordenar)
+    // O array já vem na ordem correta da configuração
+    // Criar um novo objeto para garantir que o React detecte a mudança
+    const newTournament = {
+      ...updatedTournament,
+      categorias: [...updatedTournament.categorias], // Criar novo array para garantir imutabilidade
+    };
+    
+    setTournament((prevTournament) => {
+      // Verificar se realmente mudou para evitar atualizações desnecessárias
+      const prevCategorias = JSON.stringify(prevTournament.categorias || []);
+      const newCategorias = JSON.stringify(newTournament.categorias || []);
+      const prevGrupos = JSON.stringify(prevTournament.grupos || []);
+      const newGrupos = JSON.stringify(newTournament.grupos || []);
+      
+      // Se nada mudou, retornar o estado anterior (evita re-render)
+      if (prevCategorias === newCategorias && prevGrupos === newGrupos && 
+          prevTournament.nome === newTournament.nome) {
+        return prevTournament;
+      }
+      
+      return newTournament;
+    });
+    
+    setTournamentNotFound(false);
+    
+    // Usar ref para evitar dependências circulares
+    const currentCategory = selectedCategoryRef.current;
+    const categorias = Array.isArray(newTournament.categorias) ? newTournament.categorias : [];
+    
+    // Se a categoria selecionada não existe mais no novo torneio, limpar
+    if (currentCategory && categorias.length > 0 && !categorias.includes(currentCategory)) {
+      setSelectedCategory('');
+      hasSelectedInitialCategory.current = false;
+    }
+    
+    // Selecionar primeira categoria automaticamente se ainda não foi selecionada
+    // IMPORTANTE: Fazer isso aqui para garantir que usamos a ordem correta do servidor
+    if (!hasSelectedInitialCategory.current && categorias.length > 0) {
+      const primeiraCategoria = categorias[0];
+      if (primeiraCategoria) {
+        setSelectedCategory(primeiraCategoria);
+        hasSelectedInitialCategory.current = true;
+      }
+    }
+  }, []); // Array vazio - não depende de nada que mude
 
   // Usar SWR para buscar dados (modo viewer)
   const { syncStatus, viewerError } = useTournamentSync({
     tournament,
     tournamentId,
     isAdmin: false,
-    onTournamentUpdate: (updatedTournament) => {
-      setTournament(updatedTournament);
-      setTournamentNotFound(false);
-    },
+    onTournamentUpdate: handleTournamentUpdate,
   });
 
   // Verificar erro do SWR (torneio não encontrado)
@@ -76,15 +137,69 @@ export default function TournamentViewerPage() {
     setIsMounted(true);
   }, []);
 
-  // Selecionar primeira categoria automaticamente quando torneio for carregado
+  // Limpar categoria selecionada se ela não existir mais no torneio
+  // Isso evita problemas quando o torneio muda de categorias padrão para categorias reais
   useEffect(() => {
-    const categorias = tournament.categorias || [];
+    if (!isMounted) return;
     
-    // Se há categorias disponíveis e nenhuma está selecionada, seleciona a primeira
-    if (categorias.length > 0 && (!selectedCategory || !categorias.includes(selectedCategory))) {
-      setSelectedCategory(categorias[0]);
+    const categorias = Array.isArray(tournament.categorias) ? tournament.categorias : [];
+    
+    // Só processar se as categorias mudaram (evitar processamento desnecessário)
+    // Comparar arrays de forma mais eficiente
+    const categoriesString = JSON.stringify(categorias);
+    const lastCategoriesString = JSON.stringify(lastProcessedCategories.current);
+    
+    if (categoriesString === lastCategoriesString) return;
+    
+    lastProcessedCategories.current = [...categorias];
+    
+    // Se há uma categoria selecionada mas ela não existe mais no torneio, limpar
+    const currentCategory = selectedCategoryRef.current;
+    if (currentCategory && categorias.length > 0 && !categorias.includes(currentCategory)) {
+      setSelectedCategory('');
+      hasSelectedInitialCategory.current = false; // Resetar para permitir nova seleção
     }
-  }, [tournament.categorias, selectedCategory]);
+  }, [isMounted, tournament.categorias]); // Removido selectedCategory das dependências para evitar loop
+
+  // Selecionar primeira categoria automaticamente quando torneio for carregado
+  // IMPORTANTE: Usar a primeira categoria na ordem definida na configuração (não ordenar alfabeticamente)
+  // Esta lógica é um fallback caso a seleção no onTournamentUpdate não funcione
+  useEffect(() => {
+    // Só processar se o torneio estiver montado e tiver categorias
+    if (!isMounted) return;
+    
+    // Se já selecionamos a categoria inicialmente, não fazer nada
+    if (hasSelectedInitialCategory.current) return;
+    
+    // Garantir que estamos usando o array original, sem ordenação
+    // O array tournament.categorias já vem na ordem correta definida na configuração
+    const categorias = Array.isArray(tournament.categorias) ? tournament.categorias : [];
+    
+    // IMPORTANTE: Só selecionar se o torneio não for o vazio padrão
+    // O torneio vazio tem categorias padrão ['Iniciante', 'Normal']
+    // Se o torneio tem grupos ou tem categorias diferentes das padrão, é um torneio real
+    const isDefaultTournament = categorias.length === 2 && 
+      categorias.includes('Iniciante') && 
+      categorias.includes('Normal') &&
+      (!tournament.grupos || tournament.grupos.length === 0);
+    
+    // Se é o torneio padrão vazio, não selecionar ainda (aguardar dados reais)
+    if (isDefaultTournament) return;
+    
+    // Se há categorias disponíveis e nenhuma está selecionada
+    // Usar o ref para evitar dependências circulares
+    const currentCategory = selectedCategoryRef.current;
+    if (categorias.length > 0 && !currentCategory) {
+      // Selecionar a primeira categoria na ordem original do array (ordem da configuração)
+      // IMPORTANTE: Não aplicar nenhuma ordenação - usar exatamente a ordem do array
+      // A primeira categoria (índice 0) é a primeira na ordem definida na configuração
+      const primeiraCategoria = categorias[0];
+      if (primeiraCategoria) {
+        setSelectedCategory(primeiraCategoria);
+        hasSelectedInitialCategory.current = true;
+      }
+    }
+  }, [isMounted, tournament.categorias, tournament.grupos]); // Removido selectedCategory das dependências para evitar loop
 
   // Funções auxiliares para compatibilidade com componentes
   const getGroupRanking = (groupId: string) => {
@@ -96,6 +211,7 @@ export default function TournamentViewerPage() {
   const getMaxPhase = (categoria: string) => {
     return getMaxPhaseService(tournament.grupos || [], categoria);
   };
+
 
   const isPhaseComplete = (categoria: string, phase: number) => {
     const categoryGroups = (tournament.grupos || []).filter(g => g.categoria === categoria);
@@ -112,29 +228,46 @@ export default function TournamentViewerPage() {
     );
   };
 
+  // Verificar se a categoria selecionada é válida
+  const categorias = Array.isArray(tournament.categorias) ? tournament.categorias : [];
+  const isValidCategory = selectedCategory && categorias.includes(selectedCategory);
+
+  // Validar e ajustar fase selecionada quando categoria ou torneio mudar
+  useEffect(() => {
+    if (!isMounted || !isValidCategory) return;
+    
+    const maxPhase = getMaxPhase(selectedCategory);
+    
+    // Se a fase selecionada é maior que a fase máxima disponível, ajustar para a fase máxima
+    if (selectedPhase > maxPhase && maxPhase > 0) {
+      setSelectedPhase(maxPhase);
+    }
+    // Se a fase selecionada é menor que 1, ajustar para 1
+    else if (selectedPhase < 1) {
+      setSelectedPhase(1);
+    }
+  }, [isMounted, isValidCategory, selectedCategory, selectedPhase, setSelectedPhase, tournament.grupos]);
 
   // Filtra e ordena grupos pela fase
-  // Proteção: garantir que grupos seja sempre um array
-  const groupsInCategory = (tournament.grupos || [])
-    .filter((g) => g.categoria === selectedCategory)
-    .sort((a, b) => a.fase - b.fase);
+  // Proteção: garantir que grupos seja sempre um array e que a categoria seja válida
+  const groupsInCategory = isValidCategory
+    ? (tournament.grupos || [])
+        .filter((g) => g.categoria === selectedCategory)
+        .sort((a, b) => a.fase - b.fase)
+    : [];
 
   // Filtrar grupos normais (excluir grupos de desempate cross-group)
-  const groupsInSelectedPhase = groupsInCategory.filter(
-    g => g.fase === selectedPhase && !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
-  );
-
-  // Encontrar desempates cross-group para a fase selecionada
-  const crossGroupTiebreaks = (tournament.crossGroupTiebreaks || []).filter(
-    t => t.phase === selectedPhase
-  );
-
+  const groupsInSelectedPhase = isValidCategory
+    ? groupsInCategory.filter(
+        g => g.fase === selectedPhase && !g.nome.startsWith('DESEMPATE_CROSS_GROUP_')
+      )
+    : [];
 
   // Evita erro de hydration
   if (!isMounted) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
@@ -148,7 +281,7 @@ export default function TournamentViewerPage() {
   if (tournamentNotFound) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">🔍</div>
@@ -183,7 +316,7 @@ export default function TournamentViewerPage() {
   if (!tournament || !Array.isArray(tournament.categorias) || tournament.categorias.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">⏳</div>
@@ -203,7 +336,7 @@ export default function TournamentViewerPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-full mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -263,9 +396,11 @@ export default function TournamentViewerPage() {
               <div className="flex gap-1 overflow-x-auto pb-2">
                 {[1, 2, 3].map((phase) => {
                   const phaseGroupsExist = groupsInCategory.some(g => g.fase === phase);
-                  const maxPhase = getMaxPhase(selectedCategory);
-                  const isLocked = phase > maxPhase;
+                  const maxPhase = isValidCategory ? getMaxPhase(selectedCategory) : 0;
+                  const isLocked = isValidCategory && phase > maxPhase;
                   const isCurrent = phase === selectedPhase;
+                  const isCompleted = isValidCategory && phase < maxPhase; // Fase já passou
+                  // Desabilita se for fase futura OU se não existir grupos nessa fase
                   const isDisabled = isLocked || !phaseGroupsExist;
 
                   return (
@@ -283,6 +418,7 @@ export default function TournamentViewerPage() {
                     >
                       {phase === 3 ? 'FINAL' : `Fase ${phase}`}
                       {isLocked && <span className="ml-1">🔒</span>}
+                      {isCompleted && phaseGroupsExist && <span className="ml-1 text-xs">✓</span>}
                       {isCurrent && phase === maxPhase && <span className="ml-1 text-xs opacity-75">(Atual)</span>}
                     </button>
                   );
@@ -323,7 +459,8 @@ export default function TournamentViewerPage() {
         </div>
 
         {/* Mostrar campeão se fase 3 está completa */}
-        {selectedPhase === 3 &&
+        {isValidCategory &&
+          selectedPhase === 3 &&
           isPhaseComplete(selectedCategory, 3) &&
           !hasPendingTies(selectedCategory, 3) &&
           tournament.completedCategories?.includes(selectedCategory) &&
@@ -348,54 +485,18 @@ export default function TournamentViewerPage() {
           </div>
         ) : null}
 
-        {/* Desempates Cross-Group */}
-        {crossGroupTiebreaks.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Desempates entre Grupos
-            </h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              {crossGroupTiebreaks.map((tiebreak, index) => {
-                const tiebreakGroup = (tournament.grupos || []).find(
-                  g => g.nome.startsWith('DESEMPATE_CROSS_GROUP_') &&
-                    g.categoria === selectedCategory &&
-                    g.fase === tiebreak.phase
-                );
-
-                return (
-                  <CrossGroupTiebreakerCard
-                    key={`tiebreak-${tiebreak.phase}-${tiebreak.position}-${index}`}
-                    tiebreak={tiebreak}
-                    tournament={tournament}
-                    categoria={selectedCategory}
-                    gameConfig={tournament.gameConfig}
-                    isReadOnly={true} // Sempre read-only no modo viewer
-                    onUpdateScore={() => {}} // Desabilitado
-                    onFinalizeMatch={() => {}} // Desabilitado
-                    onReopenMatch={() => {}} // Desabilitado
-                    onUndoTiebreak={() => {}} // Desabilitado
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
-              // Verificar se a fase está completa: todos os grupos da fase devem ter todos os jogos finalizados
-              // E não deve haver desempates pendentes
-              const phaseGroups = (tournament.grupos || []).filter(
-                g => g.categoria === selectedCategory && g.fase === selectedPhase
-              );
-              const allMatchesFinished = phaseGroups.length > 0 && phaseGroups.every(g => 
-                g.matches.every(m => m.isFinished)
-              );
-              // A fase só está completa se todos os jogos estão finalizados E não há desempates pendentes
-              const groupPhaseComplete = allMatchesFinished && !hasPendingTies(selectedCategory, selectedPhase);
+              // Verificar se a fase está realmente concluída (foi avançada):
+              // - Para Fase 1 e 2: fase está concluída se existe uma fase seguinte (getMaxPhase > selectedPhase)
+              // - Para Fase 3: fase está concluída se a categoria está em completedCategories
+              const maxPhase = isValidCategory ? getMaxPhase(selectedCategory) : 0;
+              const isPhaseActuallyComplete = !!(isValidCategory && (selectedPhase === 3
+                ? (tournament.completedCategories || []).includes(selectedCategory)
+                : maxPhase > selectedPhase));
 
               return (
                 <GroupCard
@@ -405,7 +506,7 @@ export default function TournamentViewerPage() {
                   gameConfig={tournament.gameConfig}
                   viewMode={viewMode}
                   isReadOnly={true} // Sempre read-only no modo viewer
-                  isPhaseComplete={groupPhaseComplete} // Indica se a fase está completa
+                  isPhaseComplete={isPhaseActuallyComplete} // Indica se a fase está realmente concluída
                   onUpdateScore={() => {}} // Desabilitado
                   onFinalizeMatch={() => {}} // Desabilitado
                   onReopenMatch={() => {}} // Desabilitado
@@ -428,7 +529,7 @@ export default function TournamentViewerPage() {
                 Nenhum grupo formado ainda
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                {selectedCategory
+                {selectedCategory && tournament.categorias.includes(selectedCategory)
                   ? `Não há grupos na categoria "${selectedCategory}" para a Fase ${selectedPhase}.`
                   : 'Aguardando formação de grupos.'}
               </p>

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tournament, Player, Group, Match, SetScore, CrossGroupTiebreak } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
+import { useTournamentManager } from './useTournamentManager';
 import { addPlayer as addPlayerService, formGroupsFromWaitingList, removePlayer as removePlayerService } from '@/services/enrollmentService';
 import { generatePairsFor4Players } from '@/services/matchGenerator';
 import { updateMatchResult, calculateRanking } from '@/services/rankingService';
@@ -25,16 +26,113 @@ import {
   isFinalPhase as isFinalPhaseService
 } from '@/services/phaseGenerator';
 
-const TOURNAMENT_STORAGE_KEY = 'beachtennis-tournament';
+const OLD_TOURNAMENT_STORAGE_KEY = 'beachtennis-tournament'; // Chave antiga (compatibilidade)
 
 /**
  * Hook principal para gerenciar o torneio
  */
 export function useTournament() {
-  const [rawTournament, setRawTournament] = useLocalStorage<Tournament>(
-    TOURNAMENT_STORAGE_KEY,
-    createEmptyTournament()
-  );
+  const { activeTournamentId } = useTournamentManager();
+  
+  // Determinar chave de storage baseada no torneio ativo
+  const getStorageKey = useCallback(() => {
+    if (activeTournamentId) {
+      return `beachtennis-tournament-${activeTournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade durante migração)
+    return OLD_TOURNAMENT_STORAGE_KEY;
+  }, [activeTournamentId]);
+
+  // Estado interno para o torneio atual (gerenciado dinamicamente)
+  const [rawTournament, setRawTournamentInternal] = useState<Tournament>(() => {
+    if (typeof window === 'undefined') {
+      // Criar torneio vazio com "Geral" em vez de "Iniciante" e "Normal"
+      const empty = createEmptyTournament();
+      empty.categorias = ['Geral'];
+      return empty;
+    }
+    
+    const storageKey = getStorageKey();
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (isValidTournamentStructure(parsed)) {
+          return parsed;
+        }
+      } catch (error) {
+        console.error('Erro ao carregar torneio:', error);
+      }
+    }
+    // Se não encontrou e há activeTournamentId, criar torneio vazio com "Geral"
+    // O useEffect vai carregar o torneio correto quando estiver disponível
+    // Se não houver activeTournamentId, criar vazio com "Geral" também
+    const empty = createEmptyTournament();
+    empty.categorias = ['Geral'];
+    return empty;
+  });
+  
+  // Wrapper para setRawTournament que salva na chave correta
+  const setRawTournament = useCallback((value: Tournament | ((prev: Tournament) => Tournament)) => {
+    setRawTournamentInternal(prev => {
+      const newValue = value instanceof Function ? value(prev) : value;
+      const storageKey = getStorageKey();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, JSON.stringify(newValue));
+      }
+      return newValue;
+    });
+  }, [getStorageKey]);
+  
+  // Sincronizar quando activeTournamentId mudar
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const storageKey = getStorageKey();
+    const stored = localStorage.getItem(storageKey);
+    
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (isValidTournamentStructure(parsed)) {
+          setRawTournamentInternal(parsed);
+        } else {
+          // Se estrutura inválida, não criar torneio vazio - manter o que já existe
+          console.warn('⚠️ Estrutura de torneio inválida, mantendo estado atual');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar torneio:', error);
+        // Em caso de erro, não criar torneio vazio - manter o que já existe
+      }
+    } else if (activeTournamentId) {
+      // Se há activeTournamentId mas não há dados no localStorage,
+      // aguardar um pouco antes de verificar novamente (pode ser race condition)
+      // Isso evita sobrescrever torneios recém-criados
+      const timeout = setTimeout(() => {
+        const checkAgain = localStorage.getItem(storageKey);
+        if (checkAgain) {
+          // Se encontrou, carregar o torneio correto
+          try {
+            const parsed = JSON.parse(checkAgain);
+            if (isValidTournamentStructure(parsed)) {
+              console.log('✅ [useTournament] Torneio carregado com categorias:', parsed.categorias);
+              setRawTournamentInternal(parsed);
+            }
+          } catch (error) {
+            console.error('Erro ao carregar torneio após delay:', error);
+          }
+        } else {
+          // Se ainda não encontrou após delay, NÃO criar torneio vazio
+          // Isso evitaria sobrescrever torneios recém-criados
+          console.warn('⚠️ Torneio não encontrado no localStorage após delay. Aguardando criação...');
+        }
+      }, 1000); // Aumentado para 1000ms para dar mais tempo ao createTournament salvar
+      return () => clearTimeout(timeout);
+    }
+  }, [activeTournamentId, getStorageKey]);
+
+  // Flag para indicar se há migração pendente
+  const [pendingMigration, setPendingMigration] = useState<Tournament | null>(null);
 
   // Valida estrutura do torneio ao carregar
   const [tournament, setTournament] = useState<Tournament>(() => {
@@ -65,8 +163,8 @@ export function useTournament() {
         grupos: groupsWithMatches,
       };
       
-      // Salva estrutura migrada
-      setTimeout(() => setRawTournament(finalTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(finalTournament);
       return finalTournament;
     }
     
@@ -77,6 +175,7 @@ export function useTournament() {
       
       // ⚠️ ÚLTIMO RECURSO: Só cria torneio vazio se dados estiverem realmente corrompidos
       const emptyTournament = createEmptyTournament();
+      emptyTournament.categorias = ['Geral']; // Usar "Geral" em vez de "Iniciante" e "Normal"
       console.warn('⚠️ Criando torneio vazio. Verifique backups automáticos no localStorage.');
       return emptyTournament;
     }
@@ -88,7 +187,8 @@ export function useTournament() {
         ...rawTournament,
         version: '0.4.0',
       };
-      setTimeout(() => setRawTournament(tournamentWithVersion), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(tournamentWithVersion);
       return tournamentWithVersion;
     }
     
@@ -131,7 +231,8 @@ export function useTournament() {
           return group;
         })
       };
-      setTimeout(() => setRawTournament(fixedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(fixedTournament);
       console.log('✅ Nomes dos grupos corrigidos!');
       return fixedTournament;
     }
@@ -192,7 +293,8 @@ export function useTournament() {
         })
       };
       
-      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(cleanedTournament);
       console.log('✅ qualificationType da Fase 2 corrigido!');
       return cleanedTournament;
     }
@@ -234,13 +336,22 @@ export function useTournament() {
           return group;
         })
       };
-      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(cleanedTournament);
       console.log('✅ qualificationType limpo da fase atual!');
       return cleanedTournament;
     }
     
     return rawTournament;
   });
+
+  // Salva migrações pendentes após montagem do componente
+  useEffect(() => {
+    if (pendingMigration) {
+      setRawTournament(pendingMigration);
+      setPendingMigration(null);
+    }
+  }, [pendingMigration, setRawTournament]);
 
   // Sincroniza com rawTournament
   useEffect(() => {
@@ -1434,7 +1545,9 @@ export function useTournament() {
    * Reseta o torneio para estado inicial
    */
   const resetTournament = useCallback(() => {
-    updateTournament(createEmptyTournament());
+    const empty = createEmptyTournament();
+    empty.categorias = ['Geral']; // Usar "Geral" em vez de "Iniciante" e "Normal"
+    updateTournament(empty);
   }, [updateTournament]);
 
   return {

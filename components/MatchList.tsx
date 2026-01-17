@@ -149,9 +149,42 @@ export function MatchList({
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-2">
-                    Partida pendente (modo visualização)
-                  </p>
+                  // Modo Espectador: Mostrar placar parcial se houver
+                  <div>
+                    {getDisplayedSets(match).length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                          Placar Parcial:
+                        </p>
+                        {getDisplayedSets(match).map((set, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-4 p-3 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+                          >
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+                              Set {idx + 1}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-center font-semibold text-gray-900 dark:text-white">
+                                {set.gamesA}
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400 font-medium">×</span>
+                              <span className="text-center font-semibold text-gray-900 dark:text-white">
+                                {set.gamesB}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-2">
+                          Partida em andamento
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 italic mt-2">
+                        Partida pendente
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

@@ -8,16 +8,61 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
 import { useLocalStorage } from './useLocalStorage';
+import { useTournamentManager } from './useTournamentManager';
 import type { Tournament } from '@/types';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
-export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled';
+const ADMIN_TOKEN_KEY_BASE = 'beachtennis-admin-token'; // Token global (deprecated)
+export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled'; // Chave base (compatibilidade)
+
+/**
+ * Gera chave de adminToken para um torneio específico
+ */
+export function getAdminTokenKey(tournamentId: string): string {
+  return `beachtennis-admin-token-${tournamentId}`;
+}
+
+/**
+ * Obtém adminToken para um torneio específico
+ * Retorna token específico ou token global (fallback para compatibilidade)
+ */
+export function getAdminToken(tournamentId: string | null): string | null {
+  if (!tournamentId || typeof window === 'undefined') return null;
+  
+  // Tentar token específico do torneio
+  const specificKey = getAdminTokenKey(tournamentId);
+  const specificToken = localStorage.getItem(specificKey);
+  if (specificToken) return specificToken;
+  
+  // Fallback: token global (compatibilidade com versões antigas)
+  return localStorage.getItem(ADMIN_TOKEN_KEY_BASE);
+}
+
+/**
+ * Define adminToken para um torneio específico
+ */
+export function setAdminToken(tournamentId: string, adminToken: string): void {
+  if (typeof window === 'undefined') return;
+  
+  const key = getAdminTokenKey(tournamentId);
+  localStorage.setItem(key, adminToken);
+}
+
+/**
+ * Remove adminToken de um torneio específico
+ */
+export function removeAdminToken(tournamentId: string): void {
+  if (typeof window === 'undefined') return;
+  
+  const key = getAdminTokenKey(tournamentId);
+  localStorage.removeItem(key);
+}
 
 interface UseTournamentSyncOptions {
   tournament: Tournament;
   tournamentId?: string;
   isAdmin: boolean;
+  sharingEnabled?: boolean;
   onTournamentUpdate?: (tournament: Tournament) => void;
 }
 
@@ -27,6 +72,7 @@ interface UseTournamentSyncResult {
   tournamentId: string | null;
   viewerError?: any; // Erro do SWR (para detectar torneio não encontrado)
   retrySync: () => void; // Função para forçar retry manual
+  forceSync: () => void; // Função para forçar sincronização imediata
 }
 
 const fetcher = async (url: string) => {
@@ -48,17 +94,28 @@ export function useTournamentSync({
   isAdmin,
   onTournamentUpdate,
 }: UseTournamentSyncOptions): UseTournamentSyncResult {
+  const { activeTournamentId } = useTournamentManager();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [storedTournamentId, setStoredTournamentId] = useLocalStorage<string | null>(
-    TOURNAMENT_ID_KEY,
-    null
-  );
-  const [storedAdminToken, setStoredAdminToken] = useLocalStorage<string | null>(
-    ADMIN_TOKEN_KEY,
-    null
-  );
+  
+  // Usar tournamentId externo, activeTournamentId do manager, ou do localStorage (compatibilidade)
+  const tournamentId = externalTournamentId || activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
+  
+  // Obter adminToken específico do torneio (ou fallback para global)
+  const storedAdminToken = tournamentId ? getAdminToken(tournamentId) : null;
+
+  // Determinar chave de sharingEnabled baseada no torneio ativo
+  const getSharingKey = useCallback(() => {
+    const currentTournamentId = externalTournamentId || activeTournamentId;
+    if (currentTournamentId) {
+      return `beachtennis-sharing-enabled-${currentTournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade)
+    return SHARING_ENABLED_KEY;
+  }, [externalTournamentId, activeTournamentId]);
+
+  const sharingKey = getSharingKey();
   const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(
-    SHARING_ENABLED_KEY,
+    sharingKey,
     false
   );
 
@@ -68,9 +125,6 @@ export function useTournamentSync({
   const retryCount = useRef(0);
   const maxRetries = 3; // Tentativas imediatas com backoff exponencial
   const retryDelays = [2000, 4000, 8000]; // 2s, 4s, 8s
-
-  // Usar tournamentId externo ou do localStorage
-  const tournamentId = externalTournamentId || storedTournamentId;
 
   // Modo Viewer: usar SWR para buscar dados
   const { data: viewerData, error: viewerError } = useSWR(
@@ -84,15 +138,25 @@ export function useTournamentSync({
   );
 
   // Atualizar torneio quando dados chegarem do servidor (modo viewer)
+  // Usar ref para onTournamentUpdate para evitar dependências circulares
+  const onTournamentUpdateRef = useRef(onTournamentUpdate);
   useEffect(() => {
-    if (!isAdmin && viewerData?.tournament && onTournamentUpdate) {
-      onTournamentUpdate(viewerData.tournament);
+    onTournamentUpdateRef.current = onTournamentUpdate;
+  }, [onTournamentUpdate]);
+
+  useEffect(() => {
+    if (!isAdmin && viewerData?.tournament && onTournamentUpdateRef.current) {
+      onTournamentUpdateRef.current(viewerData.tournament);
     }
-  }, [isAdmin, viewerData, onTournamentUpdate]);
+  }, [isAdmin, viewerData]); // Removido onTournamentUpdate das dependências
 
   // Função para realizar o sync
   const performSync = useCallback(async (isRetry: boolean = false) => {
     if (!isAdmin || !tournamentId || !storedAdminToken || !sharingEnabled) {
+      if (!isAdmin) console.log('⏸️ Sync pausado: não é admin');
+      if (!tournamentId) console.log('⏸️ Sync pausado: sem tournamentId');
+      if (!storedAdminToken) console.log('⏸️ Sync pausado: sem adminToken');
+      if (!sharingEnabled) console.log('⏸️ Sync pausado: compartilhamento desativado');
       return;
     }
 
@@ -104,6 +168,12 @@ export function useTournamentSync({
     }
 
     setSyncStatus('saving');
+    
+    console.log('🔄 Iniciando sincronização:', {
+      tournamentId,
+      hasAdminToken: !!storedAdminToken,
+      sharingEnabled,
+    });
 
     try {
       const response = await fetch('/api/save', {
@@ -127,7 +197,32 @@ export function useTournamentSync({
           statusText: response.statusText,
           error: errorMessage,
           details: errorDetails,
+          tournamentId,
+          hasAdminToken: !!storedAdminToken,
         });
+        
+        // Se o erro for 401 (token inválido), pode ser que o torneio já existe com token diferente
+        // Nesse caso, tentar deletar o torneio antigo e tentar novamente
+        if (response.status === 401 && !isRetry) {
+          console.log('🔄 Token inválido detectado. Tentando limpar torneio antigo...');
+          try {
+            // Tentar deletar o torneio (pode falhar se não tivermos o token correto)
+            await fetch(`/api/tournament/${tournamentId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${storedAdminToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            // Aguardar um pouco e tentar novamente
+            setTimeout(() => {
+              performSync(false);
+            }, 1000);
+          } catch {
+            // Ignorar erro de deleção
+          }
+        }
+        
         throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
       }
 
@@ -218,8 +313,18 @@ export function useTournamentSync({
 
   // Gerar link de compartilhamento
   const shareLink = tournamentId
-    ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/torneio/${tournamentId}`
+    ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/torneio/${tournamentId}`
     : null;
+
+  // Função para forçar sync imediato (útil quando ativar compartilhamento pela primeira vez)
+  const forceSync = useCallback(() => {
+    // Limpar debounce e disparar sync imediatamente
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    performSync(true);
+  }, [performSync]);
 
   return {
     syncStatus,
@@ -227,6 +332,7 @@ export function useTournamentSync({
     tournamentId,
     viewerError: !isAdmin ? viewerError : undefined,
     retrySync,
+    forceSync,
   };
 }
 

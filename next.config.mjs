@@ -1,4 +1,4 @@
-import withPWA from 'next-pwa';
+import withPWAInit from '@ducanh2912/next-pwa';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -6,6 +6,16 @@ import { join } from 'path';
 const packageJson = JSON.parse(
   readFileSync(join(process.cwd(), 'package.json'), 'utf8')
 );
+
+const withPWA = withPWAInit({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+  workboxOptions: {
+    disableDevLogs: true,
+  },
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -15,23 +25,4 @@ const nextConfig = {
   },
 };
 
-const pwaConfig = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-  runtimeCaching: [
-    {
-      urlPattern: /^https?.*/,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'offlineCache',
-        expiration: {
-          maxEntries: 200,
-        },
-      },
-    },
-  ],
-});
-
-export default pwaConfig(nextConfig);
+export default withPWA(nextConfig);

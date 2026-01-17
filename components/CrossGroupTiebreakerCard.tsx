@@ -36,8 +36,8 @@ export function CrossGroupTiebreakerCard({
   // Incluir tanto grupos normais quanto grupos de desempate cross-group
   const categoryGroups = useMemo(() => {
     return tournament.grupos.filter(
-      g => g.categoria === categoria && g.fase === tiebreak.phase
-    );
+    g => g.categoria === categoria && g.fase === tiebreak.phase
+  );
   }, [tournament.grupos, categoria, tiebreak.phase]);
   
   // Usar Map para garantir que cada jogador apareça apenas uma vez

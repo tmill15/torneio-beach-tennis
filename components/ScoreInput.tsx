@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import type { SetScore, GameConfig } from '@/types';
+import { validateMatchScore, type ScoreValidationConfig } from '@/services/scoreValidator';
 
 interface ScoreInputProps {
   matchId: string;
@@ -25,14 +26,31 @@ export function ScoreInput({
   onFinalize,
   disabled = false,
 }: ScoreInputProps) {
-  const [sets, setSets] = useState<SetScore[]>(
-    initialSets.length > 0 
-      ? initialSets 
-      : Array.from({ length: gameConfig.quantidadeSets }, () => ({
-          gamesA: 0,
-          gamesB: 0,
-        }))
-  );
+  const [sets, setSets] = useState<SetScore[]>(() => {
+    // Sempre garantir que temos a quantidade correta de sets baseado em gameConfig
+    const requiredSetsCount = gameConfig.quantidadeSets;
+    
+    if (initialSets.length > 0) {
+      // Se há sets iniciais, completar com sets vazios se necessário
+      const completeSets = [...initialSets];
+      while (completeSets.length < requiredSetsCount) {
+        completeSets.push({ gamesA: 0, gamesB: 0 });
+      }
+      return completeSets.slice(0, requiredSetsCount);
+    }
+    
+    // Se não há sets iniciais, criar todos vazios
+    return Array.from({ length: requiredSetsCount }, () => ({
+      gamesA: 0,
+      gamesB: 0,
+    }));
+  });
+  
+  const [showWarningsModal, setShowWarningsModal] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  
+  // Verificar se há placar parcial salvo
+  const hasPartialScore = initialSets.length > 0 && initialSets.some(s => s.gamesA > 0 || s.gamesB > 0);
 
   const handleSetChange = (index: number, field: 'gamesA' | 'gamesB', value: string) => {
     const numValue = Math.max(0, parseInt(value) || 0);
@@ -42,34 +60,121 @@ export function ScoreInput({
     setSets(newSets);
   };
 
-  const canFinalize = (): boolean => {
-    // Pelo menos 1 set deve estar preenchido
-    const hasAnySet = sets.some(s => s.gamesA > 0 || s.gamesB > 0);
-    if (!hasAnySet) return false;
+  // Validação em tempo real
+  const getValidationStatus = () => {
+    const filledSets = sets.filter(s => s.gamesA > 0 || s.gamesB > 0);
+    
+    if (filledSets.length === 0) {
+      return { canFinalize: false, errors: [], warnings: [] };
+    }
 
-    // Deve haver um vencedor (pelo menos um set com diferença)
+    // Verificar se há vencedor
     let setsA = 0;
     let setsB = 0;
-    sets.forEach(set => {
+    filledSets.forEach(set => {
       if (set.gamesA > set.gamesB) setsA++;
       else if (set.gamesB > set.gamesA) setsB++;
     });
 
-    // Precisa ter pelo menos um vencedor
-    return setsA > setsB || setsB > setsA;
+    // Para jogos de 3 sets, validar número mínimo de sets necessários
+    if (gameConfig.quantidadeSets === 3) {
+      const setsNeeded = Math.ceil(gameConfig.quantidadeSets / 2); // 2 sets para vencer
+      
+      // Se nenhum lado tem sets suficientes para vencer
+      if (setsA < setsNeeded && setsB < setsNeeded) {
+        // Verificar quantos sets já foram jogados
+        if (filledSets.length < 2) {
+          return { 
+            canFinalize: false, 
+            errors: ['Em jogos de 3 sets, é necessário jogar pelo menos 2 sets para definir um vencedor (2x0)'], 
+            warnings: [] 
+          };
+        }
+        // Se já jogaram 2 sets e está 1x1, precisa do terceiro
+        if (filledSets.length === 2 && setsA === 1 && setsB === 1) {
+          return { 
+            canFinalize: false, 
+            errors: ['Placar está 1x1. É necessário jogar o terceiro set para definir o vencedor'], 
+            warnings: [] 
+          };
+        }
+      }
+    }
+
+    if (!(setsA > setsB || setsB > setsA)) {
+      return { canFinalize: false, errors: ['Não há vencedor definido'], warnings: [] };
+    }
+
+    // Configurar validação
+    const config: ScoreValidationConfig = {
+      quantidadeSets: gameConfig.quantidadeSets,
+      gamesPerSet: gameConfig.gamesPerSet,
+      tieBreakDecisivo: gameConfig.tieBreakDecisivo,
+      pontosTieBreak: gameConfig.pontosTieBreak,
+    };
+
+    // Validar placar
+    const validation = validateMatchScore(filledSets, config);
+
+    return {
+      canFinalize: validation.isValid,
+      errors: validation.errors,
+      warnings: validation.warnings,
+    };
+  };
+
+  const validationStatus = getValidationStatus();
+
+  const handleFinalizeClick = () => {
+    const filledSets = sets.filter(s => s.gamesA > 0 || s.gamesB > 0);
+    
+    if (filledSets.length === 0 || !validationStatus.canFinalize) {
+      return;
+    }
+
+    // Se há avisos, mostrar modal para confirmação
+    if (validationStatus.warnings.length > 0) {
+      setValidationWarnings(validationStatus.warnings);
+      setShowWarningsModal(true);
+    } else {
+      // Sem avisos, finalizar diretamente
+      onFinalize(filledSets);
+    }
+  };
+
+  const handleConfirmFinalize = () => {
+    const filledSets = sets.filter(s => s.gamesA > 0 || s.gamesB > 0);
+    setShowWarningsModal(false);
+    setValidationWarnings([]);
+    onFinalize(filledSets);
+  };
+
+  const handleSavePartial = () => {
+    const filledSets = sets.filter(s => s.gamesA > 0 || s.gamesB > 0);
+    if (filledSets.length > 0) {
+      onSave(filledSets);
+    }
   };
 
   return (
     <div className="space-y-4">
       {sets.map((set, index) => {
+        const isSetFilled = set.gamesA > 0 || set.gamesB > 0;
         return (
           <div
             key={index}
             className="flex items-center gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           >
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-              Set {index + 1}
-            </span>
+            <div className="flex items-center gap-2 w-16">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Set {index + 1}
+              </span>
+              {hasPartialScore && isSetFilled && (
+                <span className="text-xs text-blue-600 dark:text-blue-400" title="Placar parcial salvo">
+                  ●
+                </span>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               <input
@@ -96,23 +201,98 @@ export function ScoreInput({
         );
       })}
 
-      <div className="flex gap-3 pt-2">
-        <button
-          onClick={() => onSave(sets)}
-          disabled={disabled || sets.every(s => s.gamesA === 0 && s.gamesB === 0)}
-          className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Salvar Parcial
-        </button>
-        <button
-          onClick={() => onFinalize(sets)}
-          disabled={disabled || !canFinalize()}
-          className="flex-1 px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Finalizar Jogo
-        </button>
+      <div className="flex gap-3 pt-2 items-stretch">
+        {/* Botão Salvar Parcial */}
+        <div className="flex-1 min-w-0 flex">
+          <button
+            onClick={handleSavePartial}
+            disabled={disabled || sets.every(s => s.gamesA === 0 && s.gamesB === 0)}
+            className="w-full px-4 py-2 min-h-[2.75rem] bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            Salvar Parcial
+          </button>
+        </div>
+        
+        {/* Botão Finalizar com Tooltip de Erros */}
+        <div className="flex-1 min-w-0 relative group flex">
+          <button
+            onClick={handleFinalizeClick}
+            disabled={disabled || !validationStatus.canFinalize}
+            className="w-full px-4 py-2 min-h-[2.75rem] bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            Finalizar Jogo
+          </button>
+          
+          {/* Tooltip com Erros */}
+          {!disabled && validationStatus.errors.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <div className="bg-gray-800 dark:bg-gray-700 text-white text-xs rounded-lg p-3 shadow-lg border border-gray-600 dark:border-gray-500">
+                <p className="font-semibold mb-1 text-red-300">❌ Não é possível finalizar:</p>
+                <ul className="space-y-1 text-gray-100">
+                  {validationStatus.errors.map((error, index) => (
+                    <li key={index} className="flex items-start gap-1">
+                      <span className="mt-0.5">•</span>
+                      <span>{error}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                  <div className="border-8 border-transparent border-t-gray-800 dark:border-t-gray-700"></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Modal de Avisos (apenas warnings, sem erros) */}
+      {showWarningsModal && validationWarnings.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              ⚠️ Atenção
+            </h3>
+
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-2">
+                  ⚠️ Avisos Detectados:
+                </p>
+                <ul className="space-y-2 text-sm text-yellow-800 dark:text-yellow-300">
+                  {validationWarnings.map((warning, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="mt-0.5">•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Deseja finalizar mesmo assim?
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowWarningsModal(false);
+                  setValidationWarnings([]);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmFinalize}
+                className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Confirmar e Finalizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,52 +5,141 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentManager } from '@/hooks/useTournamentManager';
 import { GameConfigForm } from '@/components/GameConfigForm';
 import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
 import { validateThreePhaseTournament } from '@/services/phaseValidation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { generateTournamentShare, SHARING_ENABLED_KEY, useTournamentSync } from '@/hooks/useTournamentSync';
 import { ShareTournament } from '@/components/ShareTournament';
+import { TournamentSelector } from '@/components/TournamentSelector';
+import type { TournamentMetadata, Tournament } from '@/types';
+import { getAdminToken, setAdminToken as setAdminTokenForTournament } from '@/hooks/useTournamentSync';
 
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 
 export default function ConfigPage() {
   const router = useRouter();
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
-  const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
-  const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
-  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
+  const {
+    activeTournamentId,
+    activeTournamentMetadata,
+    tournamentList,
+    getTournaments,
+    createTournament,
+    updateTournamentMetadata,
+    archiveTournament,
+    unarchiveTournament,
+    deleteTournament,
+    activateTournament,
+  } = useTournamentManager();
+  // Obter adminToken específico do torneio ativo
+  const adminToken = activeTournamentId ? getAdminToken(activeTournamentId) : null;
+  const [showTournamentsModal, setShowTournamentsModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBackupAllModal, setShowBackupAllModal] = useState(false);
+  const [backupAllPassword, setBackupAllPassword] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState<TournamentMetadata | null>(null);
+  const [newTournamentName, setNewTournamentName] = useState('');
+  const [editTournamentName, setEditTournamentName] = useState('');
+  const [tournamentFilter, setTournamentFilter] = useState<'all' | 'active' | 'archived'>('active');
+  const [archiveNotification, setArchiveNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
+  
+  // Determinar chave de sharingEnabled baseada no torneio ativo
+  // IMPORTANTE: useMemo garante que a chave seja estável entre renders
+  const sharingKey = useMemo(() => {
+    const tournamentId = activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
+    if (tournamentId) {
+      return `beachtennis-sharing-enabled-${tournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade)
+    return SHARING_ENABLED_KEY;
+  }, [activeTournamentId]);
+  
+  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(sharingKey, false);
   const [showShareModal, setShowShareModal] = useState(false);
+  
+  // Obter tournamentId (ativo ou do localStorage para compatibilidade)
+  const tournamentId = activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
   
   // Gerar adminToken automaticamente se não existir (primeira vez)
   useEffect(() => {
-    if (isMounted && !adminToken) {
-      // Gerar novo token e tournamentId se não existirem
-      const { tournamentId: newTournamentId, adminToken: newAdminToken } = generateTournamentShare();
-      setAdminToken(newAdminToken);
-      if (!tournamentId) {
-        setTournamentId(newTournamentId);
-      }
+    if (isMounted && activeTournamentId && !adminToken) {
+      // Gerar novo token para este torneio se não existir
+      const { adminToken: newAdminToken } = generateTournamentShare();
+      setAdminTokenForTournament(activeTournamentId, newAdminToken);
     }
-  }, [isMounted, adminToken, tournamentId, setAdminToken, setTournamentId]);
+  }, [isMounted, activeTournamentId, adminToken]);
 
   // Handler para toggle de compartilhamento
   const handleToggleSharing = async (enabled: boolean) => {
     if (enabled) {
-      // Ativar: gerar credenciais se não existirem
-      if (!tournamentId || !adminToken) {
+      // Ativar: usar activeTournamentId como tournamentId (prioridade)
+      // Só gerar novo ID se não houver activeTournamentId (compatibilidade)
+      const currentTournamentId = activeTournamentId || tournamentId;
+      
+      if (activeTournamentId) {
+        // Usar o ID do torneio ativo
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(TOURNAMENT_ID_KEY, activeTournamentId);
+        }
+        // Gerar adminToken para este torneio se não existir
+        if (!adminToken && activeTournamentId) {
+          const { adminToken: newToken } = generateTournamentShare();
+          setAdminTokenForTournament(activeTournamentId, newToken);
+        }
+        
+        // Se o torneio já existe no Redis com token diferente, tentar deletar primeiro
+        // Isso evita erro 401 na primeira sincronização
+        if (currentTournamentId && adminToken) {
+          try {
+            // Tentar verificar se existe e deletar se necessário
+            const checkResponse = await fetch(`/api/load?id=${currentTournamentId}`);
+            if (checkResponse.ok) {
+              // Torneio existe, tentar deletar com o token atual (pode falhar se token for diferente)
+              try {
+                await fetch(`/api/tournament/${currentTournamentId}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${adminToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+              } catch {
+                // Ignorar erro de deleção (token pode ser diferente, mas não importa)
+                // O primeiro save vai criar/atualizar com o novo token
+              }
+            }
+          } catch {
+            // Ignorar erro de verificação
+          }
+        }
+      } else if (!tournamentId) {
+        // Fallback: gerar credenciais apenas se não houver activeTournamentId
         const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
-        setTournamentId(newId);
-        setAdminToken(newToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(TOURNAMENT_ID_KEY, newId);
+          setAdminTokenForTournament(newId, newToken);
+        }
       }
       setSharingEnabled(enabled);
+      
+      // Disparar sync imediato após ativar o compartilhamento
+      // para garantir que o torneio seja salvo no Redis
+      setTimeout(() => {
+        if (forceSync) {
+          console.log('🚀 Forçando sincronização inicial após ativar compartilhamento');
+          forceSync();
+        }
+      }, 500); // Aguardar um pouco para garantir que o estado foi atualizado
     } else {
       // Desativar: apagar dados do Redis e salvar estado
       if (tournamentId && adminToken) {
@@ -99,6 +188,21 @@ export default function ConfigPage() {
     isPhaseComplete,
   } = useTournament();
 
+  // Hook de sincronização
+  const { syncStatus, retrySync, forceSync } = useTournamentSync({
+    tournament,
+    isAdmin: !!adminToken,
+    sharingEnabled,
+    onTournamentUpdate: (updatedTournament) => {
+      // Atualizar o torneio local com dados do servidor (apenas no modo espectador)
+      if (!adminToken && activeTournamentId) {
+        const storageKey = `beachtennis-tournament-${activeTournamentId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedTournament));
+        window.location.reload();
+      }
+    },
+  });
+
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(tournament.categorias[0] || '');
@@ -107,18 +211,40 @@ export default function ConfigPage() {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   
+  // Estados para modais de confirmação
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalData, setConfirmModalData] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDangerous?: boolean;
+  } | null>(null);
+  
   // Estados para modais de export/import
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportCategory, setExportCategory] = useState<string>('all');
   const [importCategory, setImportCategory] = useState<string>('');
-  const [importOverwrite, setImportOverwrite] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importFileInfo, setImportFileInfo] = useState<{ totalPlayers: number; categoria?: string } | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Sincronizar categorias dos metadados quando as categorias do torneio ativo mudarem
+  useEffect(() => {
+    if (activeTournamentId && tournament.categorias.length > 0) {
+      // Verificar se as categorias dos metadados estão diferentes das categorias reais
+      const metadata = tournamentList.tournaments.find(t => t.id === activeTournamentId);
+      if (metadata && JSON.stringify(metadata.categories) !== JSON.stringify(tournament.categorias)) {
+        // Sincronizar metadados com as categorias reais
+        updateTournamentMetadata(activeTournamentId, {
+          categories: tournament.categorias,
+        });
+      }
+    }
+  }, [tournament.categorias, activeTournamentId, tournamentList.tournaments, updateTournamentMetadata]);
 
   // Atualiza selectedCategory se não estiver mais nas categorias disponíveis
   useEffect(() => {
@@ -128,6 +254,348 @@ export default function ConfigPage() {
   }, [tournament.categorias, selectedCategory]);
 
   const waitingListStats = getWaitingListStats(tournament);
+
+  // Handlers para gerenciamento de torneios
+  const handleCreateTournament = () => {
+    if (!newTournamentName.trim()) {
+      alert('Por favor, informe um nome para o torneio.');
+      return;
+    }
+
+    // Sempre criar com categoria "Geral" (padrão)
+    const newTournamentId = createTournament(newTournamentName.trim());
+    setNewTournamentName('');
+    setShowCreateModal(false);
+    // Redirecionar para config para fazer ajustes iniciais
+    router.push('/config');
+  };
+
+  const handleBackupAllTournaments = () => {
+    // Verificar se há torneios
+    if (tournamentList.tournaments.length === 0) {
+      alert('Não há torneios para fazer backup.');
+      return;
+    }
+    // Abrir modal
+    setShowBackupAllModal(true);
+  };
+
+  const handleConfirmBackupAll = async () => {
+    // Validar senha
+    if (!backupAllPassword || backupAllPassword.length < 6) {
+      alert('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    try {
+      // Carregar todos os torneios do localStorage
+      const tournamentsMap: Record<string, Tournament> = {};
+      for (const tournamentMetadata of tournamentList.tournaments) {
+        const tournamentData = localStorage.getItem(`beachtennis-tournament-${tournamentMetadata.id}`);
+        if (tournamentData) {
+          try {
+            const tournament: Tournament = JSON.parse(tournamentData);
+            tournamentsMap[tournamentMetadata.id] = tournament;
+          } catch (error) {
+            console.error(`Erro ao carregar torneio ${tournamentMetadata.id}:`, error);
+          }
+        }
+      }
+
+      const tournamentCount = Object.keys(tournamentsMap).length;
+      if (tournamentCount === 0) {
+        alert('Não há torneios para fazer backup.');
+        setShowBackupAllModal(false);
+        setBackupAllPassword('');
+        return;
+      }
+
+      // Importar função de download
+      const { downloadAllTournamentsBackup } = await import('@/services/backupService');
+      await downloadAllTournamentsBackup(tournamentList, tournamentsMap, backupAllPassword);
+      
+      alert(`Backup de ${tournamentCount} torneio(s) criado com sucesso!`);
+      setShowBackupAllModal(false);
+      setBackupAllPassword('');
+    } catch (error) {
+      console.error('Erro ao criar backup:', error);
+      alert('Erro ao criar backup. Verifique o console para mais detalhes.');
+    }
+  };
+
+  /**
+   * Verifica se um torneio existe pelo nome
+   */
+  const checkTournamentExists = (tournamentName: string): { exists: boolean; isActive: boolean } => {
+    const existing = tournamentList.tournaments.find(
+      t => t.name.toLowerCase() === tournamentName.toLowerCase()
+    );
+    
+    if (existing) {
+      return {
+        exists: true,
+        isActive: existing.id === activeTournamentId,
+      };
+    }
+    
+    return {
+      exists: false,
+      isActive: false,
+    };
+  };
+
+  /**
+   * Aguarda até que um torneio específico esteja ativo E que o hook useTournament tenha sido atualizado
+   */
+  const waitForTournamentActive = (tournamentId: string, maxAttempts: number = 30): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      
+      const checkActive = () => {
+        attempts++;
+        
+        // 1. Verificar no localStorage se o torneio está ativo
+        const storedListStr = localStorage.getItem('beachtennis-tournament-list');
+        if (storedListStr) {
+          try {
+            const storedList = JSON.parse(storedListStr);
+            if (storedList.activeTournamentId === tournamentId) {
+              // 2. Verificar se os dados do torneio existem no localStorage
+              const tournamentKey = `beachtennis-tournament-${tournamentId}`;
+              const tournamentData = localStorage.getItem(tournamentKey);
+              
+              if (tournamentData) {
+                console.log(`✅ Torneio ${tournamentId} confirmado como ativo e dados existem (tentativa ${attempts})`);
+                resolve(true);
+                return;
+              } else {
+                console.log(`⏳ Torneio ${tournamentId} ativo mas dados ainda não disponíveis (tentativa ${attempts})`);
+              }
+            }
+          } catch (e) {
+            console.error('Erro ao verificar torneio ativo:', e);
+          }
+        }
+        
+        // Se não está ativo ainda e não excedeu tentativas, tentar novamente
+        if (attempts < maxAttempts) {
+          setTimeout(checkActive, 150); // Aumentado para 150ms
+        } else {
+          console.warn(`⚠️ Timeout: torneio ${tournamentId} não foi ativado após ${maxAttempts} tentativas`);
+          resolve(false);
+        }
+      };
+      
+      checkActive();
+    });
+  };
+
+  /**
+   * Handler para importar torneio com lógica inteligente:
+   * - Se o torneio do backup não existe, cria um novo
+   * - Se o torneio já existe, substitui os dados
+   * A confirmação já foi feita no BackupPanel
+   */
+  const handleImportTournament = async (importData: { 
+    tournament: Tournament; 
+    isSingleCategory: boolean; 
+    category?: string;
+    credentials?: { tournamentId: string; adminToken: string };
+    sharingEnabled?: boolean;
+  }) => {
+    const backupTournamentName = importData.tournament.nome;
+    
+    // Verificar se já existe um torneio com o mesmo nome
+    const existingTournament = tournamentList.tournaments.find(
+      t => t.name.toLowerCase() === backupTournamentName.toLowerCase()
+    );
+
+    if (existingTournament) {
+      // Torneio já existe - substituir dados
+      console.log('📥 Importando para torneio existente:', existingTournament.id);
+      
+      // Ativar o torneio existente antes de importar
+      activateTournament(existingTournament.id);
+      
+      // Aguardar até que o torneio esteja confirmado como ativo
+      const isActive = await waitForTournamentActive(existingTournament.id);
+      
+      if (isActive) {
+        console.log('📥 Iniciando importação DIRETA para torneio existente');
+        
+        // IMPORTAR DIRETAMENTE NO LOCALSTORAGE, sem usar o hook
+        const tournamentKey = `beachtennis-tournament-${existingTournament.id}`;
+        const newTournament: Tournament = {
+          version: importData.tournament.version || '0.4.0',
+          nome: importData.tournament.nome,
+          categorias: importData.tournament.categorias || [],
+          gameConfig: importData.tournament.gameConfig,
+          grupos: importData.tournament.grupos || [],
+          waitingList: importData.tournament.waitingList || [],
+          completedCategories: importData.tournament.completedCategories || [],
+          crossGroupTiebreaks: importData.tournament.crossGroupTiebreaks || [],
+        };
+        
+        localStorage.setItem(tournamentKey, JSON.stringify(newTournament));
+        console.log(`✅ Dados importados diretamente na chave: ${tournamentKey}`);
+        
+        // Restaurar credenciais se existirem
+        if (importData.credentials) {
+          localStorage.setItem('beachtennis-tournament-id', importData.credentials.tournamentId);
+          setAdminTokenForTournament(existingTournament.id, importData.credentials.adminToken);
+        }
+        
+        // Restaurar sharingEnabled se existir
+        if (importData.sharingEnabled !== undefined) {
+          const sharingKey = `beachtennis-sharing-enabled-${existingTournament.id}`;
+          localStorage.setItem(sharingKey, JSON.stringify(importData.sharingEnabled));
+        }
+        
+        // Aguardar um pouco e recarregar
+        setTimeout(() => {
+          console.log('🔄 Recarregando página para aplicar mudanças');
+          window.location.reload();
+        }, 300);
+      } else {
+        console.error('❌ Falha ao ativar torneio existente');
+        alert('Erro ao ativar o torneio. Tente novamente.');
+      }
+    } else {
+      // Torneio não existe - criar novo
+      console.log('🆕 Criando novo torneio:', backupTournamentName);
+      
+      // Criar novo torneio com as categorias do backup (já ativa automaticamente)
+      const newTournamentId = createTournament(backupTournamentName, importData.tournament.categorias);
+      
+      console.log('✅ Torneio criado com ID:', newTournamentId);
+      
+      // Aguardar até que o torneio esteja confirmado como ativo
+      const isActive = await waitForTournamentActive(newTournamentId);
+      
+      if (isActive) {
+        console.log('📥 Iniciando importação DIRETA para torneio recém-criado');
+        
+        // IMPORTAR DIRETAMENTE NO LOCALSTORAGE, sem usar o hook
+        const tournamentKey = `beachtennis-tournament-${newTournamentId}`;
+        const newTournament: Tournament = {
+          version: importData.tournament.version || '0.4.0',
+          nome: importData.tournament.nome,
+          categorias: importData.tournament.categorias || [],
+          gameConfig: importData.tournament.gameConfig,
+          grupos: importData.tournament.grupos || [],
+          waitingList: importData.tournament.waitingList || [],
+          completedCategories: importData.tournament.completedCategories || [],
+          crossGroupTiebreaks: importData.tournament.crossGroupTiebreaks || [],
+        };
+        
+        localStorage.setItem(tournamentKey, JSON.stringify(newTournament));
+        console.log(`✅ Dados importados diretamente na chave: ${tournamentKey}`);
+        
+        // Restaurar credenciais se existirem
+        if (importData.credentials) {
+          localStorage.setItem('beachtennis-tournament-id', importData.credentials.tournamentId);
+          setAdminTokenForTournament(newTournamentId, importData.credentials.adminToken);
+        }
+        
+        // Restaurar sharingEnabled se existir
+        if (importData.sharingEnabled !== undefined) {
+          const sharingKey = `beachtennis-sharing-enabled-${newTournamentId}`;
+          localStorage.setItem(sharingKey, JSON.stringify(importData.sharingEnabled));
+        }
+        
+        // Aguardar um pouco e recarregar
+        setTimeout(() => {
+          console.log('🔄 Recarregando página para aplicar mudanças');
+          window.location.reload();
+        }, 300);
+      } else {
+        console.error('❌ Falha ao ativar torneio recém-criado');
+        alert('Erro ao criar e ativar o novo torneio. Tente novamente.');
+      }
+    }
+  };
+
+  const handleEditClick = (tournament: TournamentMetadata) => {
+    setSelectedTournament(tournament);
+    setEditTournamentName(tournament.name);
+    setShowEditModal(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (!selectedTournament || !editTournamentName.trim()) {
+      alert('Por favor, informe um nome para o torneio.');
+      return;
+    }
+
+    const newName = editTournamentName.trim();
+    updateTournamentMetadata(selectedTournament.id, {
+      name: newName,
+    });
+
+    // Se o torneio editado é o ativo, atualizar também via useTournament
+    if (selectedTournament.id === activeTournamentId) {
+      updateTournamentName(newName);
+    }
+
+    setShowEditModal(false);
+    setSelectedTournament(null);
+    setEditTournamentName('');
+  };
+
+  const handleDeleteClick = (tournament: any) => {
+    setSelectedTournament(tournament);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedTournament) return;
+
+    await deleteTournament(selectedTournament.id);
+    setShowDeleteModal(false);
+    setSelectedTournament(null);
+
+    // Não redirecionar - permanecer em /config
+    // Se deletou o torneio ativo, o sistema automaticamente selecionará outro ou mostrará mensagem
+  };
+
+  const handleArchive = async (tournament: any) => {
+    if (tournament.status === 'archived') {
+      await unarchiveTournament(tournament.id);
+    } else {
+      await archiveTournament(tournament.id);
+      
+      // Desabilitar compartilhamento ao arquivar
+      const sharingKey = `beachtennis-sharing-enabled-${tournament.id}`;
+      if (typeof window !== 'undefined') {
+        const wasSharingEnabled = localStorage.getItem(sharingKey) === 'true';
+        if (wasSharingEnabled) {
+          localStorage.setItem(sharingKey, 'false');
+          // Se for o torneio ativo, atualizar o estado também
+          if (tournament.id === activeTournamentId) {
+            setSharingEnabled(false);
+          }
+          // Mostrar aviso não intrusivo
+          setArchiveNotification({
+            show: true,
+            message: `Compartilhamento do torneio "${tournament.name}" foi desativado automaticamente.`
+          });
+          setTimeout(() => {
+            setArchiveNotification({ show: false, message: '' });
+          }, 5000);
+        }
+      }
+    }
+  };
+
+  const handleActivate = (tournament: any) => {
+    activateTournament(tournament.id);
+    // Modal permanece aberto para continuar gerenciando
+    // O sistema de eventos customizados do useLocalStorage notifica automaticamente
+  };
+
+  const filteredTournaments = tournamentFilter === 'all'
+    ? getTournaments()
+    : getTournaments(tournamentFilter === 'active' ? 'active' : 'archived');
 
   const handleAddCategory = () => {
     if (newCategoryName.trim() && !tournament.categorias.includes(newCategoryName.trim())) {
@@ -207,17 +675,17 @@ export default function ConfigPage() {
     
     const playersCount = phase1Groups.flatMap(g => g.players).length;
     
-    const message = `Tem certeza que deseja resortear a Fase 1?\n\n` +
-      `Isso irá:\n` +
-      `- Apagar ${phase1Groups.length} grupo(s) da Fase 1\n` +
-      `- Apagar todos os jogos e placares desta fase\n` +
-      `- Resortear os ${playersCount} jogadores em novos grupos\n\n` +
-      `⚠️ Os mesmos jogadores permanecerão no torneio (não voltam para lista de espera)\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      redrawGroupsInPlace(categoria, 1);
-    }
+    setConfirmModalData({
+      title: '⚠️ Resortear Fase 1',
+      message: `Tem certeza que deseja resortear a Fase 1?\n\nIsso irá:\n• Apagar ${phase1Groups.length} grupo(s) da Fase 1\n• Apagar todos os jogos e placares desta fase\n• Resortear os ${playersCount} jogadores em novos grupos\n\n⚠️ Os mesmos jogadores permanecerão no torneio (não voltam para lista de espera)\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        redrawGroupsInPlace(categoria, 1);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Limpar toda a lista de espera de uma categoria
@@ -229,15 +697,17 @@ export default function ConfigPage() {
       return;
     }
 
-    const message = `⚠️ ATENÇÃO: Remover TODOS os jogadores da lista de espera?\n\n` +
-      `Categoria: ${categoria}\n` +
-      `Jogadores: ${playersInCategory.length}\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      // Limpar toda a lista de espera da categoria em uma única operação
-      clearWaitingList(categoria);
-    }
+    setConfirmModalData({
+      title: '⚠️ Limpar Lista de Espera',
+      message: `Remover TODOS os jogadores da lista de espera?\n\nCategoria: ${categoria}\nJogadores: ${playersInCategory.length}\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        clearWaitingList(categoria);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Limpar todos os jogadores do torneio de uma categoria
@@ -271,17 +741,17 @@ export default function ConfigPage() {
 
     const playersCount = groupsInCategory.flatMap(g => g.players).length;
 
-    const message = `⚠️ ATENÇÃO: Remover TODOS os grupos e jogadores do torneio?\n\n` +
-      `Categoria: ${categoria}\n` +
-      `Grupos: ${groupsInCategory.length}\n` +
-      `Jogadores: ${playersCount}\n\n` +
-      `Os jogadores retornarão para a lista de espera.\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      // Limpar completamente a categoria (remove todos os grupos e retorna jogadores para lista de espera)
-      clearCategory(categoria);
-    }
+    setConfirmModalData({
+      title: '⚠️ Limpar Torneio',
+      message: `Remover TODOS os grupos e jogadores do torneio?\n\nCategoria: ${categoria}\nGrupos: ${groupsInCategory.length}\nJogadores: ${playersCount}\n\nOs jogadores retornarão para a lista de espera.\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        clearCategory(categoria);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Export de jogadores com opções
@@ -419,26 +889,6 @@ export default function ConfigPage() {
 
       console.log(`🎯 Importando ${data.players.length} jogador(es) para categoria "${targetCategory}"`);
 
-      // Se sobrescrever, remover jogadores existentes
-      if (importOverwrite) {
-        console.log('🗑️ Modo sobrescrever ativo, removendo jogadores existentes...');
-        
-        // Remover da lista de espera
-        const playersToRemove = tournament.waitingList
-          .filter(p => p.categoria === targetCategory);
-        console.log(`Removendo ${playersToRemove.length} jogador(es) da lista de espera`);
-        playersToRemove.forEach(p => removePlayer(p.id));
-
-        // Remover grupos da categoria (resortear Fase 1)
-        const phase1Groups = tournament.grupos.filter(
-          g => g.categoria === targetCategory && g.fase === 1
-        );
-        if (phase1Groups.length > 0) {
-          console.log(`Removendo ${phase1Groups.length} grupo(s) da Fase 1`);
-          resetAndRedrawGroups(targetCategory, 1);
-        }
-      }
-
       // Adicionar jogadores de uma vez (evita problemas de estado)
       let skippedCount = 0;
       let duplicateCount = 0;
@@ -489,7 +939,6 @@ export default function ConfigPage() {
       setShowImportModal(false);
       setImportFile(null);
       setImportFileInfo(null);
-      setImportOverwrite(false);
       
       const skippedMessages = [];
       if (skippedCount > 0) skippedMessages.push(`${skippedCount} sem nome`);
@@ -507,6 +956,38 @@ export default function ConfigPage() {
     }
   };
 
+  // Evita erro de hydration - só renderiza após montar no cliente
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Verificar se não há torneios (após montar)
+  const hasNoTournaments = tournamentList.tournaments.length === 0;
+  const showNoTournamentsError = hasNoTournaments;
+  
+  // Se há torneios mas não há adminToken, aguardar geração
+  if (!hasNoTournaments && activeTournamentId && !adminToken) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Jogadores na lista de espera da categoria selecionada (para o formulário)
   const waitingPlayers = selectedCategory 
     ? tournament.waitingList.filter(p => p.categoria === selectedCategory)
@@ -521,8 +1002,8 @@ export default function ConfigPage() {
     : tournament.grupos.flatMap(g => g.players);
   
   // Remover duplicatas por ID
-  const enrolledPlayersMap = new Map<string, typeof enrolledPlayersRaw[0]>();
-  enrolledPlayersRaw.forEach(player => {
+  const enrolledPlayersMap: Map<string, any> = new Map();
+  enrolledPlayersRaw.forEach((player: any) => {
     if (!enrolledPlayersMap.has(player.id)) {
       enrolledPlayersMap.set(player.id, player);
     }
@@ -536,36 +1017,79 @@ export default function ConfigPage() {
   const uniqueEnrolledPlayerIds = new Set(allEnrolledPlayers.map(p => p.id));
   const totalEnrolledPlayers = uniqueEnrolledPlayerIds.size;
 
-  // Evita erro de hydration - só renderiza após montar no cliente
-  // Também aguarda geração do adminToken se necessário
-  if (!isMounted || !adminToken) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+        {/* Mensagem de erro se não há torneios */}
+        {showNoTournamentsError && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center mb-8">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">🔍</div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Nenhum torneio encontrado
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Você ainda não criou nenhum torneio. Crie um novo torneio para começar.
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left mb-6">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  Para começar:
+                </p>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                  <li>Clique no botão "Gerenciar Torneios" abaixo</li>
+                  <li>Crie um novo torneio com nome e categorias</li>
+                  <li>O torneio será ativado automaticamente</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => setShowTournamentsModal(true)}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                🏆 Gerenciar Torneios
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Conteúdo normal (oculto se não há torneios) */}
+        {!showNoTournamentsError && (
+          <>
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Configurações
+                  <span className="hidden sm:inline">Configurações do Torneio</span>
+                  <span className="sm:hidden">Config. do Torneio</span>
             </h1>
+                {activeTournamentMetadata?.status === 'archived' && (
+                  <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Torneio Arquivado</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="w-full sm:w-auto">
+                <TournamentSelector />
+              </div>
+              <button
+                onClick={() => setShowTournamentsModal(true)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
+              >
+                <span>🏆</span>
+                <span className="text-sm">Gerenciar Torneios</span>
+              </button>
             <Link
               href="/"
-              className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
             >
-              Ver Dashboard
+                <span>📊</span>
+                <span className="text-sm">Ver Dashboard</span>
             </Link>
+            </div>
           </div>
           <p className="text-gray-600 dark:text-gray-400">
             Configure seu torneio, adicione jogadores e gerencie categorias
@@ -580,13 +1104,23 @@ export default function ConfigPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Nome do Torneio
               </h2>
-              <input
-                type="text"
-                value={tournament.nome}
-                onChange={(e) => updateTournamentName(e.target.value)}
-                placeholder="Ex: Torneio Beach Tennis 2026"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              />
+              {activeTournamentMetadata ? (
+                <div className="relative">
+                  <div className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-not-allowed flex items-center">
+                    <span className="flex-1">{activeTournamentMetadata.name}</span>
+                    <span className="absolute right-3 text-gray-400 dark:text-gray-500" title="Somente leitura - Use o gerenciamento de torneios para editar">
+                      🔒
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 italic">
+                  Nenhum torneio ativo
+                </div>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Para editar o nome, use o gerenciamento de torneios
+              </p>
             </div>
 
             {/* Categorias */}
@@ -595,18 +1129,18 @@ export default function ConfigPage() {
                 Categorias
               </h2>
               
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 max-[430px]:gap-1.5 mb-4">
                 <input
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
                   placeholder="Nova categoria"
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  className="flex-1 min-w-0 px-4 max-[430px]:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
                 />
                 <button
                   onClick={handleAddCategory}
-                  className="px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 max-[430px]:px-3 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors flex-shrink-0 text-sm whitespace-nowrap"
                 >
                   Adicionar
                 </button>
@@ -712,9 +1246,17 @@ export default function ConfigPage() {
                           {/* Botão de remover */}
                           <button
                             onClick={() => {
-                              if (window.confirm(`Remover categoria "${cat}"?`)) {
-                                removeCategory(cat);
-                              }
+                              setConfirmModalData({
+                                title: '⚠️ Remover Categoria',
+                                message: `Você está prestes a remover a categoria "${cat}".\n\nTodos os dados associados a esta categoria serão perdidos.\n\nEsta ação não pode ser desfeita!`,
+                                onConfirm: () => {
+                                  removeCategory(cat);
+                                  setShowConfirmModal(false);
+                                  setConfirmModalData(null);
+                                },
+                                isDangerous: true,
+                              });
+                              setShowConfirmModal(true);
                             }}
                             className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
                           >
@@ -733,6 +1275,7 @@ export default function ConfigPage() {
               <GameConfigForm
                 config={tournament.gameConfig}
                 onChange={updateGameConfig}
+                disabled={tournament.grupos.some(g => g.matches.some(m => m.sets.some(s => s.gamesA > 0 || s.gamesB > 0)))}
               />
             </div>
           </div>
@@ -791,13 +1334,13 @@ export default function ConfigPage() {
 
             {/* Participantes (com Abas) */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col max-[430px]:flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 max-[430px]:gap-2">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Participantes
                 </h2>
                 
                 {/* Botões Export/Import */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-[430px]:w-full max-[430px]:justify-start">
                   <button
                     onClick={() => {
                       setExportCategory(selectedCategory);
@@ -1022,14 +1565,14 @@ export default function ConfigPage() {
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                             </div>
-                            <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
+                            <div className="flex flex-row items-center gap-2 max-[430px]:gap-1.5 w-full sm:w-auto">
                               <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                 {playersInCategory.length} jogador{playersInCategory.length !== 1 ? 'es' : ''}
                               </span>
                               <button
                               onClick={() => handleRedrawGroups(categoria)}
                               disabled={!canRedraw}
-                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 max-[430px]:px-2 py-1 text-white text-sm max-[430px]:text-xs rounded font-medium transition-colors whitespace-nowrap ${
                                 canRedraw
                                   ? 'bg-yellow-600 hover:bg-yellow-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
@@ -1045,7 +1588,7 @@ export default function ConfigPage() {
                             <button
                               onClick={() => handleClearTournamentPlayers(categoria)}
                               disabled={!canClearCategory}
-                              className={`flex-1 sm:flex-none px-3 py-1 text-white text-sm rounded font-medium transition-colors ${
+                              className={`flex-1 sm:flex-none px-3 max-[430px]:px-2 py-1 text-white text-sm max-[430px]:text-xs rounded font-medium transition-colors whitespace-nowrap ${
                                 canClearCategory
                                   ? 'bg-red-600 hover:bg-red-700 cursor-pointer'
                                   : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-60'
@@ -1113,11 +1656,12 @@ export default function ConfigPage() {
                   </div>
                   <button
                     onClick={() => handleToggleSharing(!sharingEnabled)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    disabled={!activeTournamentId || activeTournamentMetadata?.status === 'archived'}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
                       sharingEnabled
                         ? 'bg-blue-600'
                         : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
+                    } ${!activeTournamentId || activeTournamentMetadata?.status === 'archived' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -1158,11 +1702,14 @@ export default function ConfigPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <BackupPanel 
                 tournament={tournament} 
-                onImport={importTournament}
+                onImport={handleImportTournament}
+                checkTournamentExists={checkTournamentExists}
               />
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Modal de Compartilhamento */}
@@ -1256,40 +1803,18 @@ export default function ConfigPage() {
                 </p>
               </div>
 
-              <div className="flex items-start">
-                <input
-                  type="checkbox"
-                  id="overwrite-checkbox"
-                  checked={importOverwrite}
-                  onChange={(e) => setImportOverwrite(e.target.checked)}
-                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
-                />
-                <label
-                  htmlFor="overwrite-checkbox"
-                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
-                >
-                  <strong>Sobrescrever jogadores existentes</strong>
-                  <br />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Remove todos os jogadores da categoria antes de importar
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-200 flex items-start gap-2">
+                  <span className="text-lg">ℹ️</span>
+                  <span>
+                    Os jogadores serão <strong>adicionados</strong> à lista de espera da categoria selecionada, sem remover jogadores existentes.
                   </span>
-                </label>
+                </p>
               </div>
-
-              {importOverwrite && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                  <p className="text-sm text-yellow-900 dark:text-yellow-200 flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
-                    <span>
-                      <strong>Atenção:</strong> Todos os jogadores da categoria "{importCategory}" serão removidos (torneio + espera) antes da importação!
-                    </span>
-                  </p>
-                </div>
-              )}
             </div>
 
             {importFileInfo && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                 <p className="text-sm text-blue-900 dark:text-blue-200">
                   📄 <strong>Arquivo:</strong> {importFile?.name}<br />
                   👥 <strong>Jogadores:</strong> {importFileInfo.totalPlayers}
@@ -1309,7 +1834,6 @@ export default function ConfigPage() {
                   setShowImportModal(false);
                   setImportFile(null);
                   setImportFileInfo(null);
-                  setImportOverwrite(false);
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
               >
@@ -1320,6 +1844,460 @@ export default function ConfigPage() {
                 className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
               >
                 Importar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Gerenciar Torneios */}
+      {showTournamentsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Gerenciar Torneios
+              </h2>
+              <button
+                onClick={() => {
+                  setShowTournamentsModal(false);
+                  setTournamentFilter('all');
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filtros e Ações */}
+            <div className="mb-6 flex flex-col md:flex-row md:items-center gap-2">
+              {/* Botões de Filtro */}
+              <div className="flex gap-2 flex-1 md:flex-initial">
+                <button
+                  onClick={() => setTournamentFilter('active')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'active'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Ativos ({getTournaments('active').length})
+                </button>
+                <button
+                  onClick={() => setTournamentFilter('archived')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'archived'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Arquivados ({getTournaments('archived').length})
+                </button>
+                <button
+                  onClick={() => setTournamentFilter('all')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Todos ({getTournaments().length})
+                </button>
+              </div>
+              
+              {/* Botões de Ação */}
+              <div className="flex gap-2 md:ml-auto">
+                <button
+                  onClick={handleBackupAllTournaments}
+                  className="flex-1 md:flex-initial px-3 md:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-sm md:text-base"
+                >
+                  💾 Backup Torneios
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex-1 md:flex-initial px-3 md:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm md:text-base"
+                >
+                  + Criar Novo
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Torneios */}
+            {filteredTournaments.length === 0 ? (
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-12 text-center">
+                <p className="text-gray-600 dark:text-gray-400">
+                  {tournamentFilter === 'all'
+                    ? 'Nenhum torneio criado ainda.'
+                    : tournamentFilter === 'active'
+                    ? 'Nenhum torneio ativo.'
+                    : 'Nenhum torneio arquivado.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredTournaments.map((tournament) => {
+                  const isActive = tournament.id === activeTournamentId;
+                  const date = new Date(tournament.date);
+                  const formattedDate = date.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  });
+
+                  // Buscar categorias reais do torneio completo no localStorage
+                  let actualCategories = tournament.categories;
+                  if (typeof window !== 'undefined') {
+                    const tournamentData = localStorage.getItem(`beachtennis-tournament-${tournament.id}`);
+                    if (tournamentData) {
+                      try {
+                        const fullTournament: Tournament = JSON.parse(tournamentData);
+                        if (fullTournament.categorias && fullTournament.categorias.length > 0) {
+                          actualCategories = fullTournament.categorias;
+                        }
+                      } catch (error) {
+                        console.error(`Erro ao carregar categorias do torneio ${tournament.id}:`, error);
+                      }
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={tournament.id}
+                      onClick={() => !isActive && handleActivate(tournament)}
+                      className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[200px] transition-all ${
+                        isActive 
+                          ? 'ring-2 ring-blue-500' 
+                          : 'cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 hover:shadow-lg'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                            {tournament.name}
+                          </h3>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {formattedDate}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isActive && (
+                            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded">
+                              Selecionado
+                            </span>
+                          )}
+                          {tournament.status === 'archived' ? (
+                            <span className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-medium rounded">
+                              Arquivado
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium rounded">
+                              Ativo
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1">
+                          {actualCategories.map((cat) => (
+                            <span
+                              key={cat}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleEditClick(tournament)}
+                            className="px-2.5 py-1.5 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-purple-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => handleArchive(tournament)}
+                            className="px-2.5 py-1.5 bg-yellow-100 dark:bg-yellow-900 hover:bg-yellow-200 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
+                          >
+                            {tournament.status === 'archived' ? '📤 Desarquivar' : '📦 Arquivar'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(tournament)}
+                            className="px-2.5 py-1.5 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800 text-red-800 dark:text-red-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
+                          >
+                            🗑️ Deletar
+                          </button>
+                        </div>
+    </div>
+  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Torneio */}
+      {showEditModal && selectedTournament && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Editar Torneio
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Nome do Torneio
+                </label>
+                <input
+                  type="text"
+                  value={editTournamentName}
+                  onChange={(e) => setEditTournamentName(e.target.value)}
+                  placeholder="Ex: Torneio de Verão 2024"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedTournament(null);
+                  setEditTournamentName('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmEdit}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Criar Torneio */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Criar Novo Torneio
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Nome do Torneio
+                </label>
+                <input
+                  type="text"
+                  value={newTournamentName}
+                  onChange={(e) => setNewTournamentName(e.target.value)}
+                  placeholder="Ex: Torneio de Verão 2024"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-200">
+                  ℹ️ O torneio será criado com a categoria <strong>"Geral"</strong>. Você pode adicionar mais categorias nas configurações.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewTournamentName('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateTournament}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Criar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Backup Todos Torneios */}
+      {showBackupAllModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              💾 Backup de Todos os Torneios
+            </h3>
+
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  ℹ️ Este backup incluirá todos os torneios (ativos e arquivados), incluindo credenciais de acesso criptografadas.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Senha para Proteção <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={backupAllPassword}
+                  onChange={(e) => setBackupAllPassword(e.target.value)}
+                  placeholder="Digite uma senha (mín. 6 caracteres)"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && backupAllPassword && backupAllPassword.length >= 6) {
+                      handleConfirmBackupAll();
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Você precisará desta senha para restaurar o backup
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                  <span className="text-sm">🔒</span>
+                  <span>
+                    <strong>Dados Sensíveis:</strong> O backup incluirá credenciais de acesso criptografadas de todos os torneios.
+                    Mantenha a senha segura - você precisará dela para restaurar o backup.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBackupAllModal(false);
+                  setBackupAllPassword('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmBackupAll}
+                disabled={!backupAllPassword || backupAllPassword.length < 6}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Exportar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notificação de arquivamento */}
+      {archiveNotification.show && (
+        <div className="fixed bottom-4 right-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg shadow-lg z-50 max-w-md">
+          <div className="flex items-start gap-3">
+            <span className="text-xl">📦</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium">{archiveNotification.message}</p>
+            </div>
+            <button
+              onClick={() => setArchiveNotification({ show: false, message: '' })}
+              className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Deletar */}
+      {showDeleteModal && selectedTournament && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
+              Confirmar Exclusão
+            </h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Tem certeza que deseja deletar o torneio <strong>{selectedTournament.name}</strong>?
+            </p>
+            <p className="text-sm text-red-600 dark:text-red-400 mb-6">
+              ⚠️ Esta ação não pode ser desfeita. Os dados serão removidos permanentemente do
+              localStorage e do Redis (se compartilhado).
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedTournament(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Deletar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação Genérico */}
+      {showConfirmModal && confirmModalData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {confirmModalData.title}
+            </h3>
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {confirmModalData.message}
+              </p>
+
+              {confirmModalData.isDangerous && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                  <p className="text-sm text-red-900 dark:text-red-200 flex items-start gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <span>
+                      <strong>Atenção:</strong> Esta ação é irreversível!
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setConfirmModalData(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmModalData.onConfirm}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  confirmModalData.isDangerous
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-primary hover:bg-primary-dark text-white'
+                }`}
+              >
+                Confirmar
               </button>
             </div>
           </div>

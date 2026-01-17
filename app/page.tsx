@@ -5,28 +5,44 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentManager } from '@/hooks/useTournamentManager';
 import { useTournamentSync } from '@/hooks/useTournamentSync';
 import { GroupCard } from '@/components/GroupCard';
 import { PhaseAdvanceCard } from '@/components/PhaseAdvanceCard';
 import { CrossGroupTiebreakerCard } from '@/components/CrossGroupTiebreakerCard';
 import { SyncStatus } from '@/components/SyncStatus';
 import { ShareTournament } from '@/components/ShareTournament';
+import { TournamentSelector } from '@/components/TournamentSelector';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { SHARING_ENABLED_KEY, getAdminToken } from '@/hooks/useTournamentSync';
 
-const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id'; // Mantido apenas para compatibilidade com hooks
 
 export default function Home() {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [tournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
-  const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
-  const [sharingEnabled] = useLocalStorage<boolean>(SHARING_ENABLED_KEY, false);
+  const { activeTournamentId, tournamentList, activeTournamentMetadata } = useTournamentManager();
+  
+  // Obter adminToken específico do torneio ativo
+  const adminToken = activeTournamentId ? getAdminToken(activeTournamentId) : null;
+  
+  // Determinar chave de sharingEnabled baseada no torneio ativo
+  // Usar apenas activeTournamentId (não precisa mais de fallback para compatibilidade)
+  const sharingKey = useMemo(() => {
+    if (activeTournamentId) {
+      return `beachtennis-sharing-enabled-${activeTournamentId}`;
+    }
+    // Fallback para chave antiga (compatibilidade apenas para migração)
+    return SHARING_ENABLED_KEY;
+  }, [activeTournamentId]);
+  
+  const [sharingEnabled, setSharingEnabled] = useLocalStorage<boolean>(sharingKey, false);
   
   const {
     tournament,
@@ -56,9 +72,21 @@ export default function Home() {
 
   // Sincronização (modo admin)
   const isAdmin = !!adminToken;
+  
+  // Garantir que o tournamentId no localStorage esteja sincronizado com activeTournamentId
+  // (necessário apenas para compatibilidade com hooks que ainda usam TOURNAMENT_ID_KEY)
+  useEffect(() => {
+    if (activeTournamentId && typeof window !== 'undefined') {
+      const storedId = localStorage.getItem(TOURNAMENT_ID_KEY);
+      if (storedId !== activeTournamentId) {
+        localStorage.setItem(TOURNAMENT_ID_KEY, activeTournamentId);
+      }
+    }
+  }, [activeTournamentId]);
+  
   const { syncStatus, shareLink, retrySync } = useTournamentSync({
     tournament,
-    tournamentId: tournamentId || undefined,
+    tournamentId: activeTournamentId || undefined, // Usar apenas activeTournamentId (converter null para undefined)
     isAdmin,
     onTournamentUpdate: (updatedTournament) => {
       updateTournament(() => updatedTournament);
@@ -68,6 +96,13 @@ export default function Home() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Redirecionar para /config se não houver torneios
+  useEffect(() => {
+    if (isMounted && tournamentList.tournaments.length === 0) {
+      router.push('/config');
+    }
+  }, [isMounted, tournamentList.tournaments.length, router]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>(
     tournament.categorias[0] || ''
@@ -155,11 +190,15 @@ export default function Home() {
     generateSinglesMatch(groupId, player1Id, player2Id);
   };
 
+  // Verificar se não há torneios
+  const hasNoTournaments = isMounted && tournamentList.tournaments.length === 0;
+  const hasNoActiveTournament = isMounted && !activeTournamentId;
+
   // Evita erro de hydration - só renderiza após montar no cliente
   if (!isMounted) {
     return (
       <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto px-6 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
             <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
@@ -169,17 +208,62 @@ export default function Home() {
     );
   }
 
+  // Se não há torneios ou não há torneio ativo, mostrar mensagem
+  if (hasNoTournaments || hasNoActiveTournament) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-full mx-auto px-6 py-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">🔍</div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                {hasNoTournaments ? 'Nenhum torneio encontrado' : 'Nenhum torneio ativo'}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                {hasNoTournaments
+                  ? 'Você ainda não criou nenhum torneio. Crie um novo torneio para começar.'
+                  : 'Nenhum torneio está ativo no momento. Selecione ou crie um torneio para começar.'}
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left mb-6">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  Para começar:
+                </p>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                  <li>Acesse a página de Configurações</li>
+                  <li>Clique em "Gerenciar Torneios"</li>
+                  <li>Crie um novo torneio ou selecione um existente</li>
+                </ul>
+              </div>
+              <Link
+                href="/config"
+                className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                ⚙️ Ir para Configurações
+              </Link>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-full mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-start sm:items-center justify-between mb-4 gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                   {tournament.nome}
                 </h1>
+                {activeTournamentMetadata?.status === 'archived' && (
+                  <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm font-medium rounded-full flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Torneio Arquivado</span>
+                  </span>
+                )}
                 {/* Indicador de compartilhamento (desktop) */}
                 {sharingEnabled && (
                   <button
@@ -195,20 +279,23 @@ export default function Home() {
                 Painel do Torneio
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 flex-shrink-0">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                {/* Status de sincronização (tablet/desktop - ao lado de Configurações) */}
-                {isAdmin && sharingEnabled && (
-                  <div className="hidden sm:block">
-                    <SyncStatus status={syncStatus} onRetry={retrySync} />
-                  </div>
-                )}
-                
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-shrink-0">
+              {/* Status de sincronização (desktop - antes dos botões) */}
+              {isAdmin && sharingEnabled && (
+                <div className="hidden sm:block">
+                  <SyncStatus status={syncStatus} onRetry={retrySync} />
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                <div className="w-full sm:w-auto">
+                  <TournamentSelector />
+                </div>
                 <Link
                   href="/config"
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
                 >
-                  ⚙️ Configurações
+                  <span>⚙️</span>
+                  <span className="text-sm">Configurações</span>
                 </Link>
               </div>
               
@@ -387,17 +474,6 @@ export default function Home() {
               </button>
               
               <button
-                onClick={async () => {
-                  const { downloadBackup } = await import('@/services/backupService');
-                  await downloadBackup(tournament, selectedCategory);
-                }}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
-              >
-                <span>💾</span>
-                <span>Realizar Backup</span>
-              </button>
-              
-              <button
                 onClick={() => {
                   const message = `⚠️ ATENÇÃO: Finalizar o torneio da categoria "${selectedCategory}"?\n\n` +
                     `Isso irá:\n` +
@@ -427,7 +503,7 @@ export default function Home() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Desempates entre Grupos
             </h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
               {crossGroupTiebreaks.map((tiebreak, index) => {
                 // Encontrar a partida se existir
                 const tiebreakGroup = tournament.grupos.find(
@@ -482,12 +558,17 @@ export default function Home() {
 
         {/* Grupos */}
         {groupsInSelectedPhase.length > 0 ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid gap-8 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] md:grid-cols-[repeat(auto-fit,minmax(500px,698px))]">
             {groupsInSelectedPhase.map((group) => {
               const ranking = getGroupRanking(group.id);
               const maxPhase = getMaxPhase(selectedCategory);
               const isReadOnly = selectedPhase < maxPhase; // Fase anterior = read-only
-              const groupPhaseComplete = isReadOnly ? isPhaseComplete(selectedCategory, selectedPhase) : false;
+              // Verificar se a fase está realmente concluída (foi avançada):
+              // - Para Fase 1 e 2: fase está concluída se existe uma fase seguinte (maxPhase > selectedPhase)
+              // - Para Fase 3: fase está concluída se a categoria está em completedCategories
+              const groupPhaseComplete = selectedPhase === 3
+                ? (tournament.completedCategories || []).includes(selectedCategory)
+                : maxPhase > selectedPhase;
 
               return (
                 <GroupCard
