@@ -8,48 +8,58 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import type { Tournament } from '@/types';
 import { downloadBackup, importTournament, validateBackup, getBackupMetadata, importAllTournaments } from '@/services/backupService';
-import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { setAdminToken } from '@/hooks/useTournamentSync';
 
 interface BackupPanelProps {
   tournament: Tournament;
-  onImport: (importData: { tournament: Tournament; isSingleCategory: boolean; category?: string }) => void;
+  onImport: (importData: { 
+    tournament: Tournament; 
+    isSingleCategory: boolean; 
+    category?: string;
+    credentials?: { tournamentId: string; adminToken: string };
+    sharingEnabled?: boolean;
+  }) => void;
+  checkTournamentExists?: (tournamentName: string) => { exists: boolean; isActive: boolean } | null;
 }
 
-const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+interface ConfirmationData {
+  title: string;
+  message: string;
+  details: Array<{ label: string; value: string }>;
+  warnings?: string[];
+  tournamentExists?: boolean;
+  isActiveTournament?: boolean;
+  willCreateNew?: boolean;
+  onConfirm: () => void;
+}
 
-export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
+export function BackupPanel({ tournament, onImport, checkTournamentExists }: BackupPanelProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportCategory, setExportCategory] = useState<string>('all');
   const [exportPassword, setExportPassword] = useState<string>('');
   const [showImportPasswordModal, setShowImportPasswordModal] = useState(false);
   const [importPassword, setImportPassword] = useState<string>('');
   const [pendingImportData, setPendingImportData] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmationData, setConfirmationData] = useState<ConfirmationData | null>(null);
+  const [confirmReplaceChecked, setConfirmReplaceChecked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async () => {
     try {
-      // Backup do torneio ativo (sempre completo quando chamado da página de config)
-      const categoria = exportCategory === 'all' ? undefined : exportCategory;
-      const isFullBackup = !categoria;
-      
-      // Validar senha se for backup completo
-      if (isFullBackup) {
-        if (!exportPassword || exportPassword.length < 6) {
-          setError('A senha deve ter pelo menos 6 caracteres');
-          return;
-        }
+      // Validar senha (sempre obrigatória para backup completo)
+      if (!exportPassword || exportPassword.length < 6) {
+        setError('A senha deve ter pelo menos 6 caracteres');
+        return;
       }
 
-      // Sempre fazer backup do torneio ativo
-      await downloadBackup(tournament, categoria, isFullBackup ? exportPassword : undefined);
+      // Sempre fazer backup completo do torneio ativo
+      await downloadBackup(tournament, undefined, exportPassword);
 
       setError(null);
       setShowExportModal(false);
       setExportPassword('');
-      setExportCategory('all');
     } catch (err) {
       setError('Erro ao criar backup');
       console.error(err);
@@ -146,19 +156,25 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
 
         const importResult = await importAllTournaments(json, password);
 
-        // Confirmar antes de importar
-        const message = `Você está prestes a restaurar TODOS os torneios do backup.\n\n` +
-          `Dados do backup:\n` +
-          `- Total de torneios: ${importResult.tournamentList.tournaments.length}\n` +
-          `- Torneio ativo: ${importResult.tournamentList.activeTournamentId ? importResult.tournamentList.tournaments.find(t => t.id === importResult.tournamentList.activeTournamentId)?.name || 'N/A' : 'Nenhum'}\n` +
-          `\n⚠️ ATENÇÃO: Todos os torneios atuais serão completamente substituídos!\n` +
-          `- Todos os torneios serão substituídos\n` +
-          `- Todas as credenciais serão restauradas\n` +
-          `- Todos os estados de compartilhamento serão restaurados\n` +
-          `\n\nDeseja continuar?`;
+        // Preparar dados de confirmação
+        const activeTournamentName = importResult.tournamentList.activeTournamentId 
+          ? importResult.tournamentList.tournaments.find(t => t.id === importResult.tournamentList.activeTournamentId)?.name || 'N/A' 
+          : 'Nenhum';
 
-        if (window.confirm(message)) {
-          // Restaurar lista de torneios
+        setConfirmationData({
+          title: 'Restaurar TODOS os torneios?',
+          message: 'Você está prestes a restaurar todos os torneios do backup.',
+          details: [
+            { label: 'Total de torneios', value: `${importResult.tournamentList.tournaments.length}` },
+            { label: 'Torneio ativo', value: activeTournamentName },
+          ],
+          warnings: [
+            'Todos os torneios atuais serão completamente substituídos!',
+            'Todas as credenciais serão restauradas',
+            'Todos os estados de compartilhamento serão restaurados',
+          ],
+          onConfirm: () => {
+            // Restaurar lista de torneios
           localStorage.setItem('beachtennis-tournament-list', JSON.stringify(importResult.tournamentList));
 
           // Restaurar cada torneio
@@ -166,19 +182,17 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
             localStorage.setItem(`beachtennis-tournament-${id}`, JSON.stringify(tournamentData));
           }
 
-          // Restaurar credenciais
+          // Restaurar credenciais (adminToken por torneio)
           for (const [id, creds] of Object.entries(importResult.credentials)) {
-            // Se é o torneio ativo, atualizar credenciais principais
+            // Atualizar adminToken específico do torneio
+            setAdminToken(id, creds.adminToken);
+            
+            // Se é o torneio ativo, atualizar tournamentId global (compatibilidade)
             if (id === importResult.tournamentList.activeTournamentId) {
               localStorage.setItem('beachtennis-tournament-id', creds.tournamentId);
-              localStorage.setItem('beachtennis-admin-token', creds.adminToken);
               window.dispatchEvent(new StorageEvent('storage', {
                 key: 'beachtennis-tournament-id',
                 newValue: creds.tournamentId,
-              }));
-              window.dispatchEvent(new StorageEvent('storage', {
-                key: 'beachtennis-admin-token',
-                newValue: creds.adminToken,
               }));
             }
           }
@@ -193,9 +207,12 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
             }));
           }
 
-          // Recarregar página para aplicar mudanças
-          window.location.reload();
-        }
+            // Recarregar página para aplicar mudanças
+            window.location.reload();
+          },
+        });
+        setShowConfirmModal(true);
+        setIsImporting(false);
         return;
       }
 
@@ -204,63 +221,80 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
       const isSingleCategory = importResult.isSingleCategory;
       const category = importResult.category;
       
-      // Se tem credenciais, restaurar no localStorage
+      // Verificar se o torneio existe (apenas para backup completo)
+      let tournamentCheck = null;
+      if (!isSingleCategory && checkTournamentExists) {
+        tournamentCheck = checkTournamentExists(importResult.tournament.nome);
+      }
+      
+      // Preparar dados de confirmação
+      const actionTitle = isSingleCategory 
+        ? `Restaurar categoria "${category}"?`
+        : `Restaurar torneio "${importResult.tournament.nome}"?`;
+      
+      let actionMessage = isSingleCategory 
+        ? `Você está prestes a restaurar dados da categoria "${category}".`
+        : `Você está prestes a restaurar o torneio "${importResult.tournament.nome}".`;
+      
+      // Adicionar informação sobre criação ou substituição
+      if (!isSingleCategory && tournamentCheck) {
+        if (tournamentCheck.exists) {
+          actionMessage += tournamentCheck.isActive 
+            ? ' Este é o torneio atualmente ativo.'
+            : ' Este torneio já existe na lista.';
+        } else {
+          actionMessage += ' Um novo torneio será criado com os dados do backup.';
+        }
+      }
+      
+      const warnings: string[] = [];
+      if (isSingleCategory) {
+        warnings.push('Dados de outras categorias serão preservados');
+        warnings.push(`Dados da categoria "${category}" serão substituídos`);
+      }
       if (importResult.credentials) {
-        localStorage.setItem(TOURNAMENT_ID_KEY, importResult.credentials.tournamentId);
-        localStorage.setItem(ADMIN_TOKEN_KEY, importResult.credentials.adminToken);
-        // Disparar evento para sincronizar com useLocalStorage
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: TOURNAMENT_ID_KEY,
-          newValue: importResult.credentials.tournamentId,
-        }));
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: ADMIN_TOKEN_KEY,
-          newValue: importResult.credentials.adminToken,
-        }));
+        warnings.push('Credenciais de sincronização e configurações serão restauradas');
       }
       
-      // Se tem estado de compartilhamento, restaurar no localStorage
-      // IMPORTANTE: Usar JSON.stringify para garantir que boolean seja preservado corretamente
-      if (importResult.sharingEnabled !== undefined) {
-        const sharingValue = JSON.stringify(importResult.sharingEnabled);
-        localStorage.setItem(SHARING_ENABLED_KEY, sharingValue);
-        // Disparar evento para sincronizar com useLocalStorage
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: SHARING_ENABLED_KEY,
-          newValue: sharingValue,
-        }));
-      }
+      // Contar apenas grupos da Fase 1 (fase inicial)
+      const phase1Groups = importResult.tournament.grupos.filter(g => g.fase === 1);
       
-      // Confirmação antes de importar
-      const actionText = isSingleCategory 
-        ? `restaurar dados da categoria "${category}"`
-        : `substituir completamente todos os dados atuais`;
-      
-      const warningText = isSingleCategory
-        ? `\n⚠️ Dados de outras categorias serão preservados.\nDados da categoria "${category}" serão substituídos.`
-        : `\n⚠️ ATENÇÃO: Todos os dados atuais serão completamente substituídos!\n- Todas as categorias serão substituídas\n- Todos os grupos serão substituídos\n- Toda a lista de espera será substituída\n- Todas as configurações serão substituídas`;
-      
-      const credentialsText = importResult.credentials
-        ? `\n✅ Credenciais de sincronização serão restauradas.`
-        : '';
-      
-      const message = `Você está prestes a ${actionText}.\n\n` +
-        `Dados do backup:\n` +
-        `- Torneio: ${importResult.tournament.nome}\n` +
-        `- Categorias: ${importResult.tournament.categorias.join(', ')}\n` +
-        `- Grupos: ${importResult.tournament.grupos.length}\n` +
-        `- Jogadores: ${importResult.tournament.waitingList.length + importResult.tournament.grupos.reduce((sum, g) => sum + (g.players?.length || 0), 0)}` +
-        warningText +
-        credentialsText +
-        `\n\nDeseja continuar?`;
+      // Contar jogadores únicos (evitar duplicatas entre fases)
+      const uniquePlayerIds = new Set<string>();
+      importResult.tournament.grupos.forEach(g => {
+        g.players?.forEach(p => uniquePlayerIds.add(p.id));
+      });
+      const totalPlayers = importResult.tournament.waitingList.length + uniquePlayerIds.size;
 
-      if (window.confirm(message)) {
-        onImport({
-          tournament: importResult.tournament,
-          isSingleCategory,
-          category,
-        });
-      }
+      setConfirmationData({
+        title: actionTitle,
+        message: actionMessage,
+        details: [
+          { label: 'Torneio', value: importResult.tournament.nome },
+          { label: 'Categorias', value: importResult.tournament.categorias.join(', ') },
+          { label: 'Grupos (Fase 1)', value: `${phase1Groups.length}` },
+          { label: 'Jogadores', value: `${totalPlayers}` },
+        ],
+        warnings: warnings.length > 0 ? warnings : undefined,
+        tournamentExists: tournamentCheck?.exists || false,
+        isActiveTournament: tournamentCheck?.isActive || false,
+        willCreateNew: tournamentCheck ? !tournamentCheck.exists : false,
+        onConfirm: () => {
+          onImport({
+            tournament: importResult.tournament,
+            isSingleCategory,
+            category,
+            credentials: importResult.credentials,
+            sharingEnabled: importResult.sharingEnabled,
+          });
+          setShowConfirmModal(false);
+          setConfirmationData(null);
+          setConfirmReplaceChecked(false);
+        },
+      });
+      setShowConfirmModal(true);
+      setConfirmReplaceChecked(false);
+      setIsImporting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao importar backup');
       throw err;
@@ -310,84 +344,58 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
           Baixar Backup (.json)
         </button>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Salva o arquivo JSON com todos os dados: grupos, jogos, placares e ranking
+          Salva o arquivo JSON com todos os dados e configurações do torneio
         </p>
       </div>
 
-      {/* Modal de Seleção de Categoria para Export */}
+      {/* Modal de Senha para Export */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              📥 Exportar Backup
+              📥 Exportar Backup Completo
             </h3>
 
             <div className="space-y-4">
-              {/* Remover opção de backup de todos os torneios - apenas backup do torneio ativo */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  ℹ️ Este backup incluirá apenas o torneio atualmente ativo.
-                  Para fazer backup de todos os torneios, use a opção no modal de gerenciamento.
+                  ℹ️ Este backup incluirá todas as categorias, grupos, jogos e configurações do torneio.
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Selecionar Categoria
+                  Senha para Proteção <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={exportCategory}
-                  onChange={(e) => {
-                    setExportCategory(e.target.value);
-                    setExportPassword(''); // Limpar senha ao mudar categoria
-                  }}
+                <input
+                  type="password"
+                  value={exportPassword}
+                  onChange={(e) => setExportPassword(e.target.value)}
+                  placeholder="Digite uma senha (mín. 6 caracteres)"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                >
-                  <option value="all">Todas as Categorias</option>
-                  {tournament.categorias.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {exportCategory === 'all' 
-                    ? 'O backup incluirá dados de todas as categorias'
-                    : `O backup incluirá apenas dados da categoria "${exportCategory}"`}
-                </p>
-              </div>
-
-              {/* Campo de senha para backup completo */}
-              {exportCategory === 'all' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Senha para Proteção <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    value={exportPassword}
-                    onChange={(e) => setExportPassword(e.target.value)}
-                    placeholder="Digite uma senha (mín. 6 caracteres)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                  />
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
-                      <span className="text-sm">🔒</span>
-                      <span>
-                        <strong>Dados Sensíveis:</strong> O backup completo incluirá credenciais de acesso criptografadas.
-                        Mantenha a senha segura - você precisará dela para restaurar o backup.
-                      </span>
-                    </p>
-                  </div>
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && exportPassword && exportPassword.length >= 6) {
+                      handleExport();
+                    }
+                  }}
+                />
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                    <span className="text-sm">🔒</span>
+                    <span>
+                      <strong>Dados Sensíveis:</strong> O backup incluirá credenciais de acesso criptografadas.
+                      Mantenha a senha segura - você precisará dela para restaurar o backup.
+                    </span>
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
                   setShowExportModal(false);
-                  setExportCategory('all');
                   setExportPassword('');
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
@@ -396,7 +404,7 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
               </button>
               <button
                 onClick={handleExport}
-                disabled={exportCategory === 'all' && (!exportPassword || exportPassword.length < 6)}
+                disabled={!exportPassword || exportPassword.length < 6}
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Exportar
@@ -507,6 +515,122 @@ export function BackupPanel({ tournament, onImport }: BackupPanelProps) {
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isImporting ? 'Importando...' : 'Importar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Restauração */}
+      {showConfirmModal && confirmationData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {confirmationData.title}
+            </h3>
+
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              {confirmationData.message}
+            </p>
+
+            {/* Aviso sobre criação de novo torneio */}
+            {confirmationData.willCreateNew && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 text-lg">ℹ️</span>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                      Novo Torneio
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Como este torneio não existe, um novo será criado com os dados do backup.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Detalhes do backup */}
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 mb-4 space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                📋 Dados do Backup:
+              </h4>
+              {confirmationData.details.map((detail, index) => (
+                <div key={index} className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">{detail.label}:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{detail.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Avisos */}
+            {confirmationData.warnings && confirmationData.warnings.length > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-yellow-600 dark:text-yellow-400 text-lg">⚠️</span>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                      Atenção:
+                    </h4>
+                    <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                      {confirmationData.warnings.map((warning, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span>•</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Checkbox de confirmação para substituir torneio existente */}
+            {confirmationData.tournamentExists && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmReplaceChecked}
+                    onChange={(e) => setConfirmReplaceChecked(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 dark:focus:ring-red-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                      {confirmationData.isActiveTournament 
+                        ? '⚠️ Confirmo que desejo substituir TODOS os dados do torneio ativo'
+                        : '⚠️ Confirmo que desejo substituir TODOS os dados deste torneio'}
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                      Esta ação não pode ser desfeita. Todos os dados atuais serão perdidos.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setConfirmationData(null);
+                  setConfirmReplaceChecked(false);
+                  setIsImporting(false);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmationData.onConfirm) {
+                    confirmationData.onConfirm();
+                  }
+                }}
+                disabled={confirmationData.tournamentExists && !confirmReplaceChecked}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirmar Restauração
               </button>
             </div>
           </div>

@@ -7,12 +7,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { generateTournamentShare, SHARING_ENABLED_KEY, getAdminToken, setAdminToken } from '@/hooks/useTournamentSync';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useTournamentManager } from '@/hooks/useTournamentManager';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 
 interface ShareTournamentProps {
   onClose: () => void;
@@ -23,8 +22,11 @@ interface ShareTournamentProps {
 
 export function ShareTournament({ onClose, onShareGenerated, tournamentId: externalTournamentId, isViewer = false }: ShareTournamentProps) {
   const [tournamentId, setTournamentId] = useLocalStorage<string | null>(TOURNAMENT_ID_KEY, null);
-  const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const { activeTournamentId } = useTournamentManager();
+  
+  // Obter adminToken específico do torneio
+  const currentTournamentId = activeTournamentId || externalTournamentId || tournamentId;
+  const adminToken = currentTournamentId ? getAdminToken(currentTournamentId) : null;
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
   const sharingKey = useMemo(() => {
@@ -67,14 +69,11 @@ export function ShareTournament({ onClose, onShareGenerated, tournamentId: exter
       return;
     }
 
-    // Modo admin: usar activeTournamentId como prioridade, depois externalTournamentId, depois tournamentId
-    const currentTournamentId = activeTournamentId || externalTournamentId || tournamentId;
-    
     if (!currentTournamentId) {
       // Só gerar novo ID se não houver nenhum (compatibilidade com torneios antigos)
       const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
       setTournamentId(newId);
-      setAdminToken(newToken);
+      setAdminToken(newId, newToken);
       
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       const link = `${baseUrl}/torneio/${newId}`;
@@ -92,13 +91,13 @@ export function ShareTournament({ onClose, onShareGenerated, tournamentId: exter
       // Gerar adminToken apenas se não existir
       if (!adminToken) {
         const { adminToken: newToken } = generateTournamentShare();
-        setAdminToken(newToken);
+        setAdminToken(currentTournamentId, newToken);
       }
       
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       setShareLink(`${baseUrl}/torneio/${currentTournamentId}`);
     }
-  }, [tournamentId, adminToken, setTournamentId, setAdminToken, onShareGenerated, externalTournamentId, isViewer, sharingEnabled, activeTournamentId]);
+  }, [tournamentId, adminToken, setTournamentId, onShareGenerated, externalTournamentId, isViewer, sharingEnabled, activeTournamentId, currentTournamentId]);
 
   const handleCopyLink = async () => {
     if (!shareLink) return;

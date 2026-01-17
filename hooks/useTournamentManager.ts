@@ -10,11 +10,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { useLocalStorage } from './useLocalStorage';
 import type { TournamentMetadata, TournamentList, Tournament } from '@/types';
 import { createEmptyTournament, isValidTournamentStructure } from '@/services/backupService';
+import { getAdminTokenKey, getAdminToken, setAdminToken, removeAdminToken } from './useTournamentSync';
 
 const TOURNAMENT_LIST_KEY = 'beachtennis-tournament-list';
 const OLD_TOURNAMENT_KEY = 'beachtennis-tournament'; // Chave antiga (formato único)
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const ADMIN_TOKEN_KEY_BASE = 'beachtennis-admin-token'; // Token global (deprecated)
 
 /**
  * Gerar adminToken aleatório seguro
@@ -101,6 +102,13 @@ export function useTournamentManager() {
         localStorage.setItem(TOURNAMENT_ID_KEY, oldTournamentId);
       }
 
+      // Migrar adminToken global para adminToken específico do torneio
+      const globalAdminToken = localStorage.getItem(ADMIN_TOKEN_KEY_BASE);
+      if (globalAdminToken) {
+        setAdminToken(oldTournamentId, globalAdminToken);
+        console.log('✅ AdminToken global migrado para torneio específico:', oldTournamentId);
+      }
+
       console.log('✅ Migração concluída! Torneio migrado com ID:', oldTournamentId);
       setMigrationDone(true);
     } catch (error) {
@@ -108,6 +116,45 @@ export function useTournamentManager() {
       setMigrationDone(true);
     }
   }, [tournamentList, migrationDone, setTournamentList]);
+
+  /**
+   * Migração de adminToken global para adminToken por torneio
+   * Executa uma vez para todos os torneios existentes
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (tournamentList.tournaments.length === 0) return;
+
+    // Verificar se já foi migrado
+    const migrationKey = 'beachtennis-admin-token-migration-done';
+    if (localStorage.getItem(migrationKey) === 'true') return;
+
+    const globalAdminToken = localStorage.getItem(ADMIN_TOKEN_KEY_BASE);
+    if (!globalAdminToken) {
+      // Não há token global para migrar
+      localStorage.setItem(migrationKey, 'true');
+      return;
+    }
+
+    console.log('🔄 Iniciando migração de adminToken global para tokens por torneio...');
+    
+    // Migrar token global para todos os torneios que não têm token específico
+    let migratedCount = 0;
+    for (const tournament of tournamentList.tournaments) {
+      const specificToken = getAdminToken(tournament.id);
+      if (!specificToken) {
+        setAdminToken(tournament.id, globalAdminToken);
+        migratedCount++;
+      }
+    }
+
+    if (migratedCount > 0) {
+      console.log(`✅ Migração concluída! ${migratedCount} torneio(s) receberam adminToken específico.`);
+    }
+
+    // Marcar migração como concluída
+    localStorage.setItem(migrationKey, 'true');
+  }, [tournamentList]);
 
   /**
    * Obter ID do torneio ativo
@@ -164,13 +211,10 @@ export function useTournamentManager() {
     localStorage.setItem(tournamentStorageKey, JSON.stringify(emptyTournament));
     console.log(`✅ [createTournament] Torneio criado com categorias:`, emptyTournament.categorias);
 
-    // Gerar adminToken global apenas se não existir
+    // Gerar adminToken específico para este torneio
     if (typeof window !== 'undefined') {
-      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
-      if (!existingToken) {
-        const adminToken = generateAdminToken();
-        localStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
-      }
+      const adminToken = generateAdminToken();
+      setAdminToken(newId, adminToken);
     }
 
     // Atualizar tournamentId no localStorage (compatibilidade)
@@ -225,7 +269,7 @@ export function useTournamentManager() {
   const archiveTournament = useCallback(async (id: string) => {
     // Remover do Redis quando arquivar
     if (typeof window !== 'undefined') {
-      const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      const adminToken = getAdminToken(id);
       
       console.log('📦 [Archive] Iniciando arquivamento do torneio:', id);
       console.log('📦 [Archive] AdminToken disponível:', !!adminToken);
@@ -280,7 +324,7 @@ export function useTournamentManager() {
       
       if (sharingEnabled) {
         // Se compartilhamento está habilitado, restaurar no Redis
-        const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+        const adminToken = getAdminToken(id);
         const tournamentStorageKey = `beachtennis-tournament-${id}`;
         const tournamentData = localStorage.getItem(tournamentStorageKey);
         
@@ -320,9 +364,9 @@ export function useTournamentManager() {
    * Deletar torneio
    */
   const deleteTournament = useCallback(async (id: string) => {
-    // Remover do Redis se houver adminToken global
+    // Remover do Redis se houver adminToken do torneio
     if (typeof window !== 'undefined') {
-      const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      const adminToken = getAdminToken(id);
       
       if (adminToken) {
         try {
@@ -369,12 +413,14 @@ export function useTournamentManager() {
       const tournamentStorageKey = `beachtennis-tournament-${id}`;
       localStorage.removeItem(tournamentStorageKey);
 
+      // Remover adminToken específico do torneio
+      removeAdminToken(id);
 
       // Remover sharingEnabled específico do torneio
       const sharingKey = `beachtennis-sharing-enabled-${id}`;
       localStorage.removeItem(sharingKey);
 
-      // Se era o torneio ativo, limpar tournamentId (mas manter adminToken global)
+      // Se era o torneio ativo, limpar tournamentId
       if (tournamentList.activeTournamentId === id) {
         localStorage.removeItem(TOURNAMENT_ID_KEY);
       }
@@ -394,11 +440,11 @@ export function useTournamentManager() {
     if (typeof window !== 'undefined') {
       localStorage.setItem(TOURNAMENT_ID_KEY, id);
       
-      // Garantir que existe adminToken global (gerar se não existir)
-      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      // Garantir que existe adminToken para este torneio (gerar se não existir)
+      const existingToken = getAdminToken(id);
       if (!existingToken) {
         const newToken = generateAdminToken();
-        localStorage.setItem(ADMIN_TOKEN_KEY, newToken);
+        setAdminToken(id, newToken);
       }
     }
   }, [setTournamentList]);

@@ -19,8 +19,8 @@ import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournam
 import { ShareTournament } from '@/components/ShareTournament';
 import { TournamentSelector } from '@/components/TournamentSelector';
 import type { TournamentMetadata, Tournament } from '@/types';
+import { getAdminToken, setAdminToken as setAdminTokenForTournament } from '@/hooks/useTournamentSync';
 
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
 
 export default function ConfigPage() {
@@ -39,7 +39,8 @@ export default function ConfigPage() {
     deleteTournament,
     activateTournament,
   } = useTournamentManager();
-  const [adminToken, setAdminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
+  // Obter adminToken específico do torneio ativo
+  const adminToken = activeTournamentId ? getAdminToken(activeTournamentId) : null;
   const [showTournamentsModal, setShowTournamentsModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -71,12 +72,12 @@ export default function ConfigPage() {
   
   // Gerar adminToken automaticamente se não existir (primeira vez)
   useEffect(() => {
-    if (isMounted && !adminToken) {
-      // Gerar novo token se não existir
+    if (isMounted && activeTournamentId && !adminToken) {
+      // Gerar novo token para este torneio se não existir
       const { adminToken: newAdminToken } = generateTournamentShare();
-      setAdminToken(newAdminToken);
+      setAdminTokenForTournament(activeTournamentId, newAdminToken);
     }
-  }, [isMounted, adminToken, setAdminToken]);
+  }, [isMounted, activeTournamentId, adminToken]);
 
   // Handler para toggle de compartilhamento
   const handleToggleSharing = async (enabled: boolean) => {
@@ -90,10 +91,10 @@ export default function ConfigPage() {
         if (typeof window !== 'undefined') {
           localStorage.setItem(TOURNAMENT_ID_KEY, activeTournamentId);
         }
-        // Gerar adminToken global se não existir (será usado para todos os torneios)
-        if (!adminToken) {
+        // Gerar adminToken para este torneio se não existir
+        if (!adminToken && activeTournamentId) {
           const { adminToken: newToken } = generateTournamentShare();
-          setAdminToken(newToken);
+          setAdminTokenForTournament(activeTournamentId, newToken);
         }
         
         // Se o torneio já existe no Redis com token diferente, tentar deletar primeiro
@@ -121,13 +122,13 @@ export default function ConfigPage() {
             // Ignorar erro de verificação
           }
         }
-      } else if (!tournamentId || !adminToken) {
+      } else if (!tournamentId) {
         // Fallback: gerar credenciais apenas se não houver activeTournamentId
         const { tournamentId: newId, adminToken: newToken } = generateTournamentShare();
         if (typeof window !== 'undefined') {
           localStorage.setItem(TOURNAMENT_ID_KEY, newId);
+          setAdminTokenForTournament(newId, newToken);
         }
-        setAdminToken(newToken);
       }
       setSharingEnabled(enabled);
     } else {
@@ -287,6 +288,198 @@ export default function ConfigPage() {
     } catch (error) {
       console.error('Erro ao criar backup:', error);
       alert('Erro ao criar backup. Verifique o console para mais detalhes.');
+    }
+  };
+
+  /**
+   * Verifica se um torneio existe pelo nome
+   */
+  const checkTournamentExists = (tournamentName: string): { exists: boolean; isActive: boolean } => {
+    const existing = tournamentList.tournaments.find(
+      t => t.name.toLowerCase() === tournamentName.toLowerCase()
+    );
+    
+    if (existing) {
+      return {
+        exists: true,
+        isActive: existing.id === activeTournamentId,
+      };
+    }
+    
+    return {
+      exists: false,
+      isActive: false,
+    };
+  };
+
+  /**
+   * Aguarda até que um torneio específico esteja ativo E que o hook useTournament tenha sido atualizado
+   */
+  const waitForTournamentActive = (tournamentId: string, maxAttempts: number = 30): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      
+      const checkActive = () => {
+        attempts++;
+        
+        // 1. Verificar no localStorage se o torneio está ativo
+        const storedListStr = localStorage.getItem('beachtennis-tournament-list');
+        if (storedListStr) {
+          try {
+            const storedList = JSON.parse(storedListStr);
+            if (storedList.activeTournamentId === tournamentId) {
+              // 2. Verificar se os dados do torneio existem no localStorage
+              const tournamentKey = `beachtennis-tournament-${tournamentId}`;
+              const tournamentData = localStorage.getItem(tournamentKey);
+              
+              if (tournamentData) {
+                console.log(`✅ Torneio ${tournamentId} confirmado como ativo e dados existem (tentativa ${attempts})`);
+                resolve(true);
+                return;
+              } else {
+                console.log(`⏳ Torneio ${tournamentId} ativo mas dados ainda não disponíveis (tentativa ${attempts})`);
+              }
+            }
+          } catch (e) {
+            console.error('Erro ao verificar torneio ativo:', e);
+          }
+        }
+        
+        // Se não está ativo ainda e não excedeu tentativas, tentar novamente
+        if (attempts < maxAttempts) {
+          setTimeout(checkActive, 150); // Aumentado para 150ms
+        } else {
+          console.warn(`⚠️ Timeout: torneio ${tournamentId} não foi ativado após ${maxAttempts} tentativas`);
+          resolve(false);
+        }
+      };
+      
+      checkActive();
+    });
+  };
+
+  /**
+   * Handler para importar torneio com lógica inteligente:
+   * - Se o torneio do backup não existe, cria um novo
+   * - Se o torneio já existe, substitui os dados
+   * A confirmação já foi feita no BackupPanel
+   */
+  const handleImportTournament = async (importData: { 
+    tournament: Tournament; 
+    isSingleCategory: boolean; 
+    category?: string;
+    credentials?: { tournamentId: string; adminToken: string };
+    sharingEnabled?: boolean;
+  }) => {
+    const backupTournamentName = importData.tournament.nome;
+    
+    // Verificar se já existe um torneio com o mesmo nome
+    const existingTournament = tournamentList.tournaments.find(
+      t => t.name.toLowerCase() === backupTournamentName.toLowerCase()
+    );
+
+    if (existingTournament) {
+      // Torneio já existe - substituir dados
+      console.log('📥 Importando para torneio existente:', existingTournament.id);
+      
+      // Ativar o torneio existente antes de importar
+      activateTournament(existingTournament.id);
+      
+      // Aguardar até que o torneio esteja confirmado como ativo
+      const isActive = await waitForTournamentActive(existingTournament.id);
+      
+      if (isActive) {
+        console.log('📥 Iniciando importação DIRETA para torneio existente');
+        
+        // IMPORTAR DIRETAMENTE NO LOCALSTORAGE, sem usar o hook
+        const tournamentKey = `beachtennis-tournament-${existingTournament.id}`;
+        const newTournament: Tournament = {
+          version: importData.tournament.version || '0.4.0',
+          nome: importData.tournament.nome,
+          categorias: importData.tournament.categorias || [],
+          gameConfig: importData.tournament.gameConfig,
+          grupos: importData.tournament.grupos || [],
+          waitingList: importData.tournament.waitingList || [],
+          completedCategories: importData.tournament.completedCategories || [],
+          crossGroupTiebreaks: importData.tournament.crossGroupTiebreaks || [],
+        };
+        
+        localStorage.setItem(tournamentKey, JSON.stringify(newTournament));
+        console.log(`✅ Dados importados diretamente na chave: ${tournamentKey}`);
+        
+        // Restaurar credenciais se existirem
+        if (importData.credentials) {
+          localStorage.setItem('beachtennis-tournament-id', importData.credentials.tournamentId);
+          setAdminTokenForTournament(existingTournament.id, importData.credentials.adminToken);
+        }
+        
+        // Restaurar sharingEnabled se existir
+        if (importData.sharingEnabled !== undefined) {
+          const sharingKey = `beachtennis-sharing-enabled-${existingTournament.id}`;
+          localStorage.setItem(sharingKey, JSON.stringify(importData.sharingEnabled));
+        }
+        
+        // Aguardar um pouco e recarregar
+        setTimeout(() => {
+          console.log('🔄 Recarregando página para aplicar mudanças');
+          window.location.reload();
+        }, 300);
+      } else {
+        console.error('❌ Falha ao ativar torneio existente');
+        alert('Erro ao ativar o torneio. Tente novamente.');
+      }
+    } else {
+      // Torneio não existe - criar novo
+      console.log('🆕 Criando novo torneio:', backupTournamentName);
+      
+      // Criar novo torneio com as categorias do backup (já ativa automaticamente)
+      const newTournamentId = createTournament(backupTournamentName, importData.tournament.categorias);
+      
+      console.log('✅ Torneio criado com ID:', newTournamentId);
+      
+      // Aguardar até que o torneio esteja confirmado como ativo
+      const isActive = await waitForTournamentActive(newTournamentId);
+      
+      if (isActive) {
+        console.log('📥 Iniciando importação DIRETA para torneio recém-criado');
+        
+        // IMPORTAR DIRETAMENTE NO LOCALSTORAGE, sem usar o hook
+        const tournamentKey = `beachtennis-tournament-${newTournamentId}`;
+        const newTournament: Tournament = {
+          version: importData.tournament.version || '0.4.0',
+          nome: importData.tournament.nome,
+          categorias: importData.tournament.categorias || [],
+          gameConfig: importData.tournament.gameConfig,
+          grupos: importData.tournament.grupos || [],
+          waitingList: importData.tournament.waitingList || [],
+          completedCategories: importData.tournament.completedCategories || [],
+          crossGroupTiebreaks: importData.tournament.crossGroupTiebreaks || [],
+        };
+        
+        localStorage.setItem(tournamentKey, JSON.stringify(newTournament));
+        console.log(`✅ Dados importados diretamente na chave: ${tournamentKey}`);
+        
+        // Restaurar credenciais se existirem
+        if (importData.credentials) {
+          localStorage.setItem('beachtennis-tournament-id', importData.credentials.tournamentId);
+          setAdminTokenForTournament(newTournamentId, importData.credentials.adminToken);
+        }
+        
+        // Restaurar sharingEnabled se existir
+        if (importData.sharingEnabled !== undefined) {
+          const sharingKey = `beachtennis-sharing-enabled-${newTournamentId}`;
+          localStorage.setItem(sharingKey, JSON.stringify(importData.sharingEnabled));
+        }
+        
+        // Aguardar um pouco e recarregar
+        setTimeout(() => {
+          console.log('🔄 Recarregando página para aplicar mudanças');
+          window.location.reload();
+        }, 300);
+      } else {
+        console.error('❌ Falha ao ativar torneio recém-criado');
+        alert('Erro ao criar e ativar o novo torneio. Tente novamente.');
+      }
     }
   };
 
@@ -751,8 +944,7 @@ export default function ConfigPage() {
   };
 
   // Evita erro de hydration - só renderiza após montar no cliente
-  // Também aguarda geração do adminToken se necessário
-  if (!isMounted || !adminToken) {
+  if (!isMounted) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -768,6 +960,20 @@ export default function ConfigPage() {
   // Verificar se não há torneios (após montar)
   const hasNoTournaments = tournamentList.tournaments.length === 0;
   const showNoTournamentsError = hasNoTournaments;
+  
+  // Se há torneios mas não há adminToken, aguardar geração
+  if (!hasNoTournaments && activeTournamentId && !adminToken) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Jogadores na lista de espera da categoria selecionada (para o formulário)
   const waitingPlayers = selectedCategory 
@@ -1474,7 +1680,8 @@ export default function ConfigPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <BackupPanel 
                 tournament={tournament} 
-                onImport={importTournament}
+                onImport={handleImportTournament}
+                checkTournamentExists={checkTournamentExists}
               />
             </div>
           </div>
@@ -2047,6 +2254,7 @@ export default function ConfigPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -163,8 +163,23 @@ export async function exportTournament(
   // 3. Estamos no navegador (localStorage disponível)
   if (isFullBackup && password && typeof window !== 'undefined') {
     const tournamentId = localStorage.getItem('beachtennis-tournament-id');
-    const adminToken = localStorage.getItem('beachtennis-admin-token');
-    const sharingEnabled = localStorage.getItem('beachtennis-sharing-enabled') === 'true';
+    // Obter adminToken específico do torneio
+    const adminTokenKey = `beachtennis-admin-token-${tournamentId}`;
+    let adminToken = localStorage.getItem(adminTokenKey);
+    
+    // Fallback: tentar token global (compatibilidade)
+    if (!adminToken) {
+      adminToken = localStorage.getItem('beachtennis-admin-token');
+    }
+    
+    // Obter sharingEnabled específico do torneio
+    const sharingKey = `beachtennis-sharing-enabled-${tournamentId}`;
+    let sharingEnabled = localStorage.getItem(sharingKey) === 'true';
+    
+    // Fallback: tentar chave global (compatibilidade)
+    if (!sharingEnabled) {
+      sharingEnabled = localStorage.getItem('beachtennis-sharing-enabled') === 'true';
+    }
 
     if (tournamentId && adminToken) {
       // Criptografar credenciais
@@ -200,16 +215,7 @@ function generateBackupFilename(tournament: Tournament, categoria?: string): str
     .toLowerCase()
     .substring(0, 30);
   
-  // Sanitiza nome da categoria (se houver)
-  const categoryName = categoria
-    ? categoria
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .replace(/\s+/g, '-')
-        .toLowerCase()
-        .substring(0, 20)
-    : 'todas';
-  
-  return `backup-${tournamentName}-${categoryName}-${dateStr}-${timeStr}.json`;
+  return `backup-${tournamentName}-${dateStr}-${timeStr}.json`;
 }
 
 /**
@@ -227,7 +233,7 @@ export async function downloadBackup(
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
-  // Gera nome do arquivo com nome do torneio, categoria e data
+  // Gera nome do arquivo com nome do torneio e data
   const filename = generateBackupFilename(tournament, categoria);
 
   // Cria link temporário e aciona download
@@ -263,7 +269,7 @@ export async function exportAllTournaments(
   const credentials: Record<string, { tournamentId: string; adminToken: string }> = {};
   const sharingEnabled: Record<string, boolean> = {};
 
-  // Obter adminToken global (usado para todos os torneios)
+  // Obter adminToken global (fallback para compatibilidade)
   const globalAdminToken = localStorage.getItem('beachtennis-admin-token');
 
   for (const metadata of tournamentList.tournaments) {
@@ -271,11 +277,18 @@ export async function exportAllTournaments(
     const sharingKey = `beachtennis-sharing-enabled-${tournamentId}`;
     const sharingValue = localStorage.getItem(sharingKey);
 
-    // Se existe adminToken global, usar para todos os torneios
-    if (globalAdminToken) {
+    // Tentar obter adminToken específico do torneio primeiro
+    const specificAdminTokenKey = `beachtennis-admin-token-${tournamentId}`;
+    const specificAdminToken = localStorage.getItem(specificAdminTokenKey);
+    
+    // Usar token específico ou fallback para global
+    const adminToken = specificAdminToken || globalAdminToken;
+
+    // Se existe adminToken (específico ou global), adicionar às credenciais
+    if (adminToken) {
       credentials[tournamentId] = {
         tournamentId: tournamentId,
-        adminToken: globalAdminToken,
+        adminToken: adminToken,
       };
     }
 

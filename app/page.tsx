@@ -19,17 +19,18 @@ import { ShareTournament } from '@/components/ShareTournament';
 import { TournamentSelector } from '@/components/TournamentSelector';
 import { detectCrossGroupTies } from '@/services/phaseGenerator';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { SHARING_ENABLED_KEY, getAdminToken } from '@/hooks/useTournamentSync';
 
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id'; // Mantido apenas para compatibilidade com hooks
 
 export default function Home() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [adminToken] = useLocalStorage<string | null>(ADMIN_TOKEN_KEY, null);
   const { activeTournamentId, tournamentList, activeTournamentMetadata } = useTournamentManager();
+  
+  // Obter adminToken específico do torneio ativo
+  const adminToken = activeTournamentId ? getAdminToken(activeTournamentId) : null;
   
   // Determinar chave de sharingEnabled baseada no torneio ativo
   // Usar apenas activeTournamentId (não precisa mais de fallback para compatibilidade)
@@ -470,17 +471,6 @@ export default function Home() {
               >
                 <span>📄</span>
                 <span>Gerar PDF do Torneio</span>
-              </button>
-              
-              <button
-                onClick={async () => {
-                  const { downloadBackup } = await import('@/services/backupService');
-                  await downloadBackup(tournament, selectedCategory);
-                }}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
-              >
-                <span>💾</span>
-                <span>Realizar Backup</span>
               </button>
               
               <button

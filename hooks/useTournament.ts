@@ -131,6 +131,9 @@ export function useTournament() {
     }
   }, [activeTournamentId, getStorageKey]);
 
+  // Flag para indicar se há migração pendente
+  const [pendingMigration, setPendingMigration] = useState<Tournament | null>(null);
+
   // Valida estrutura do torneio ao carregar
   const [tournament, setTournament] = useState<Tournament>(() => {
     // Verifica se é da v0.3.0 e precisa migrar
@@ -160,8 +163,8 @@ export function useTournament() {
         grupos: groupsWithMatches,
       };
       
-      // Salva estrutura migrada
-      setTimeout(() => setRawTournament(finalTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(finalTournament);
       return finalTournament;
     }
     
@@ -184,7 +187,8 @@ export function useTournament() {
         ...rawTournament,
         version: '0.4.0',
       };
-      setTimeout(() => setRawTournament(tournamentWithVersion), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(tournamentWithVersion);
       return tournamentWithVersion;
     }
     
@@ -227,7 +231,8 @@ export function useTournament() {
           return group;
         })
       };
-      setTimeout(() => setRawTournament(fixedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(fixedTournament);
       console.log('✅ Nomes dos grupos corrigidos!');
       return fixedTournament;
     }
@@ -288,7 +293,8 @@ export function useTournament() {
         })
       };
       
-      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(cleanedTournament);
       console.log('✅ qualificationType da Fase 2 corrigido!');
       return cleanedTournament;
     }
@@ -330,13 +336,22 @@ export function useTournament() {
           return group;
         })
       };
-      setTimeout(() => setRawTournament(cleanedTournament), 0);
+      // Marca migração como pendente para ser salva no useEffect
+      setPendingMigration(cleanedTournament);
       console.log('✅ qualificationType limpo da fase atual!');
       return cleanedTournament;
     }
     
     return rawTournament;
   });
+
+  // Salva migrações pendentes após montagem do componente
+  useEffect(() => {
+    if (pendingMigration) {
+      setRawTournament(pendingMigration);
+      setPendingMigration(null);
+    }
+  }, [pendingMigration, setRawTournament]);
 
   // Sincroniza com rawTournament
   useEffect(() => {

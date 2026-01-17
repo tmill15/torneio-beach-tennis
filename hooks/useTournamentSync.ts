@@ -12,8 +12,51 @@ import { useTournamentManager } from './useTournamentManager';
 import type { Tournament } from '@/types';
 
 const TOURNAMENT_ID_KEY = 'beachtennis-tournament-id';
-const ADMIN_TOKEN_KEY = 'beachtennis-admin-token';
+const ADMIN_TOKEN_KEY_BASE = 'beachtennis-admin-token'; // Token global (deprecated)
 export const SHARING_ENABLED_KEY = 'beachtennis-sharing-enabled'; // Chave base (compatibilidade)
+
+/**
+ * Gera chave de adminToken para um torneio específico
+ */
+export function getAdminTokenKey(tournamentId: string): string {
+  return `beachtennis-admin-token-${tournamentId}`;
+}
+
+/**
+ * Obtém adminToken para um torneio específico
+ * Retorna token específico ou token global (fallback para compatibilidade)
+ */
+export function getAdminToken(tournamentId: string | null): string | null {
+  if (!tournamentId || typeof window === 'undefined') return null;
+  
+  // Tentar token específico do torneio
+  const specificKey = getAdminTokenKey(tournamentId);
+  const specificToken = localStorage.getItem(specificKey);
+  if (specificToken) return specificToken;
+  
+  // Fallback: token global (compatibilidade com versões antigas)
+  return localStorage.getItem(ADMIN_TOKEN_KEY_BASE);
+}
+
+/**
+ * Define adminToken para um torneio específico
+ */
+export function setAdminToken(tournamentId: string, adminToken: string): void {
+  if (typeof window === 'undefined') return;
+  
+  const key = getAdminTokenKey(tournamentId);
+  localStorage.setItem(key, adminToken);
+}
+
+/**
+ * Remove adminToken de um torneio específico
+ */
+export function removeAdminToken(tournamentId: string): void {
+  if (typeof window === 'undefined') return;
+  
+  const key = getAdminTokenKey(tournamentId);
+  localStorage.removeItem(key);
+}
 
 interface UseTournamentSyncOptions {
   tournament: Tournament;
@@ -51,10 +94,12 @@ export function useTournamentSync({
 }: UseTournamentSyncOptions): UseTournamentSyncResult {
   const { activeTournamentId } = useTournamentManager();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [storedAdminToken, setStoredAdminToken] = useLocalStorage<string | null>(
-    ADMIN_TOKEN_KEY,
-    null
-  );
+  
+  // Usar tournamentId externo, activeTournamentId do manager, ou do localStorage (compatibilidade)
+  const tournamentId = externalTournamentId || activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
+  
+  // Obter adminToken específico do torneio (ou fallback para global)
+  const storedAdminToken = tournamentId ? getAdminToken(tournamentId) : null;
 
   // Determinar chave de sharingEnabled baseada no torneio ativo
   const getSharingKey = useCallback(() => {
@@ -78,9 +123,6 @@ export function useTournamentSync({
   const retryCount = useRef(0);
   const maxRetries = 3; // Tentativas imediatas com backoff exponencial
   const retryDelays = [2000, 4000, 8000]; // 2s, 4s, 8s
-
-  // Usar tournamentId externo, activeTournamentId do manager, ou do localStorage (compatibilidade)
-  const tournamentId = externalTournamentId || activeTournamentId || (typeof window !== 'undefined' ? localStorage.getItem(TOURNAMENT_ID_KEY) : null);
 
   // Modo Viewer: usar SWR para buscar dados
   const { data: viewerData, error: viewerError } = useSWR(
