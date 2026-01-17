@@ -147,21 +147,24 @@ export function ScoreInput({
         );
       })}
 
-      <div className="flex gap-3 pt-2">
-        <button
-          onClick={() => onSave(sets)}
-          disabled={disabled || sets.every(s => s.gamesA === 0 && s.gamesB === 0)}
-          className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Salvar Parcial
-        </button>
+      <div className="flex gap-3 pt-2 items-stretch">
+        {/* Botão Salvar Parcial */}
+        <div className="flex-1 min-w-0 flex">
+          <button
+            onClick={() => onSave(sets)}
+            disabled={disabled || sets.every(s => s.gamesA === 0 && s.gamesB === 0)}
+            className="w-full px-4 py-2 min-h-[2.75rem] bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            Salvar Parcial
+          </button>
+        </div>
         
         {/* Botão Finalizar com Tooltip de Erros */}
-        <div className="flex-1 relative group">
+        <div className="flex-1 min-w-0 relative group flex">
           <button
             onClick={handleFinalizeClick}
             disabled={disabled || !validationStatus.canFinalize}
-            className="w-full px-4 py-2 bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-2 min-h-[2.75rem] bg-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             Finalizar Jogo
           </button>
