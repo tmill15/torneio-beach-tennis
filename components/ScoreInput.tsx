@@ -26,14 +26,25 @@ export function ScoreInput({
   onFinalize,
   disabled = false,
 }: ScoreInputProps) {
-  const [sets, setSets] = useState<SetScore[]>(
-    initialSets.length > 0 
-      ? initialSets 
-      : Array.from({ length: gameConfig.quantidadeSets }, () => ({
-          gamesA: 0,
-          gamesB: 0,
-        }))
-  );
+  const [sets, setSets] = useState<SetScore[]>(() => {
+    // Sempre garantir que temos a quantidade correta de sets baseado em gameConfig
+    const requiredSetsCount = gameConfig.quantidadeSets;
+    
+    if (initialSets.length > 0) {
+      // Se há sets iniciais, completar com sets vazios se necessário
+      const completeSets = [...initialSets];
+      while (completeSets.length < requiredSetsCount) {
+        completeSets.push({ gamesA: 0, gamesB: 0 });
+      }
+      return completeSets.slice(0, requiredSetsCount);
+    }
+    
+    // Se não há sets iniciais, criar todos vazios
+    return Array.from({ length: requiredSetsCount }, () => ({
+      gamesA: 0,
+      gamesB: 0,
+    }));
+  });
   
   const [showWarningsModal, setShowWarningsModal] = useState(false);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
@@ -64,6 +75,31 @@ export function ScoreInput({
       if (set.gamesA > set.gamesB) setsA++;
       else if (set.gamesB > set.gamesA) setsB++;
     });
+
+    // Para jogos de 3 sets, validar número mínimo de sets necessários
+    if (gameConfig.quantidadeSets === 3) {
+      const setsNeeded = Math.ceil(gameConfig.quantidadeSets / 2); // 2 sets para vencer
+      
+      // Se nenhum lado tem sets suficientes para vencer
+      if (setsA < setsNeeded && setsB < setsNeeded) {
+        // Verificar quantos sets já foram jogados
+        if (filledSets.length < 2) {
+          return { 
+            canFinalize: false, 
+            errors: ['Em jogos de 3 sets, é necessário jogar pelo menos 2 sets para definir um vencedor (2x0)'], 
+            warnings: [] 
+          };
+        }
+        // Se já jogaram 2 sets e está 1x1, precisa do terceiro
+        if (filledSets.length === 2 && setsA === 1 && setsB === 1) {
+          return { 
+            canFinalize: false, 
+            errors: ['Placar está 1x1. É necessário jogar o terceiro set para definir o vencedor'], 
+            warnings: [] 
+          };
+        }
+      }
+    }
 
     if (!(setsA > setsB || setsB > setsA)) {
       return { canFinalize: false, errors: ['Não há vencedor definido'], warnings: [] };

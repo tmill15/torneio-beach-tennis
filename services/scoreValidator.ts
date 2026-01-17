@@ -69,12 +69,6 @@ export function validateMatchScore(
     }
   }
 
-  // 5. Detectar possível inversão de placar
-  const inversionWarning = detectScoreInversion(sets, config);
-  if (inversionWarning) {
-    warnings.push(inversionWarning);
-  }
-
   return {
     isValid: errors.length === 0,
     errors,
@@ -226,47 +220,6 @@ function validateTieBreakSet(
   }
 
   return { isValid: errors.length === 0, errors, warnings };
-}
-
-/**
- * Detecta possível inversão de placar entre sets
- */
-function detectScoreInversion(
-  sets: SetScore[],
-  config: ScoreValidationConfig
-): string | null {
-  if (sets.length < 2) return null;
-
-  // Verificar se há alternância suspeita de vencedor entre sets
-  const winners = sets.map(s => (s.gamesA > s.gamesB ? 'A' : 'B'));
-  
-  // Se houve vitória em 2x0, não deveria haver um terceiro set
-  if (sets.length === 3 && winners[0] === winners[1]) {
-    return (
-      `⚠️ Possível erro: ${winners[0]} venceu os 2 primeiros sets. ` +
-      `O terceiro set não deveria existir. Verifique se o placar do Set 2 foi digitado invertido.`
-    );
-  }
-
-  // Verificar se há padrão de inversão (ex: A-B-A quando esperado seria A-A)
-  if (sets.length === 3) {
-    const firstWinner = winners[0];
-    const secondWinner = winners[1];
-    const thirdWinner = winners[2];
-
-    if (firstWinner === thirdWinner && secondWinner !== firstWinner) {
-      // Padrão A-B-A ou B-A-B pode indicar inversão no meio
-      const setsWonFirst = winners.filter(w => w === firstWinner).length;
-      if (setsWonFirst === 2) {
-        return (
-          `⚠️ Possível inversão de placar no Set 2. ` +
-          `Verifique se os lados foram trocados na digitação.`
-        );
-      }
-    }
-  }
-
-  return null;
 }
 
 /**
