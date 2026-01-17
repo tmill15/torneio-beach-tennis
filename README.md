@@ -7,12 +7,14 @@ App PWA para gestão completa de torneios de Beach Tennis em modo Round Robin.
 - ✅ **Progressive Web App (PWA)** - Instalável e funciona offline
 - 🎯 **Round Robin Automático** - Gera partidas "todos contra todos"
 - 📊 **Ranking em Tempo Real** - Atualização automática após cada jogo
+- 🗂️ **Múltiplos Torneios** - Crie, gerencie e alterne entre vários torneios
 - ⚙️ **Configurações Simplificadas** - 1 ou 3 sets, 4 ou 6 games, tie-break de 7 ou 10 pontos
-- 💾 **Backup/Restore** - Export/Import completo em JSON
+- 💾 **Backup/Restore** - Export/Import completo em JSON por torneio
 - 📱 **Mobile-First** - Design otimizado para dispositivos móveis
 - 🌙 **Dark Mode** - Suporte a tema escuro
 - 🔄 **Sincronização Multi-Dispositivo** - Compartilhe torneios e sincronize em tempo real
 - 🔗 **Compartilhamento** - Link público e QR Code para espectadores
+- 🔐 **Segurança por Torneio** - Token de admin único para cada torneio
 
 ## 🚀 Início Rápido
 
@@ -48,6 +50,44 @@ npm run dev
 Abra [http://localhost:3000](http://localhost:3000) no navegador.
 
 **Nota:** O Redis é necessário para o sistema de sincronização funcionar. Em desenvolvimento, ele roda localmente via Docker. Em produção, usa Upstash Redis via Vercel Marketplace.
+
+## 🗂️ Gerenciamento de Múltiplos Torneios
+
+O sistema permite criar e gerenciar **múltiplos torneios simultaneamente**:
+
+### Criar Novo Torneio
+1. Clique no botão **"Criar Novo Torneio"** no topo da página
+2. Digite o nome do torneio
+3. Confirme a criação
+4. O novo torneio é automaticamente ativado
+
+### Alternar Entre Torneios
+- Use o **dropdown no topo** para alternar entre torneios ativos
+- A mudança é instantânea, sem recarregar a página
+- Cada torneio mantém suas próprias configurações, jogadores e jogos
+
+### Gerenciar Torneios
+Acesse **"Gerenciar Torneios"** para:
+- **Visualizar todos os torneios** (ativos e arquivados)
+- **Filtrar** por status: Todos, Ativos ou Arquivados
+- **Selecionar** um torneio para torná-lo ativo
+- **Editar** o nome do torneio
+- **Arquivar** torneios finalizados (ficam ocultos do dropdown)
+- **Desarquivar** torneios arquivados
+- **Deletar** torneios permanentemente
+- **Fazer backup** de todos os torneios de uma vez
+
+### Compartilhamento Individual
+- Cada torneio tem seu próprio **token de administrador**
+- Você pode compartilhar torneios diferentes em dispositivos diferentes
+- O token é único por torneio, garantindo segurança e isolamento
+
+### Backup e Restauração
+- **Backup completo** inclui credenciais de compartilhamento (criptografadas)
+- Ao restaurar, o sistema verifica se o torneio já existe:
+  - Se existe: Solicita confirmação para sobrescrever
+  - Se não existe: Cria automaticamente o torneio e restaura os dados
+- **Backup de múltiplos torneios** disponível no modal de gerenciamento
 
 ## 📖 Como Usar
 
@@ -88,8 +128,15 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 1. Em Configurações → Backup & Restauração
 2. Clique em "Baixar Backup (.json)"
 3. Para restaurar, selecione o arquivo JSON
-4. **Backup Completo:** Inclui credenciais de sincronização (criptografadas com senha) e estado de compartilhamento
-5. **Backup de Categoria:** Exporta apenas uma categoria específica (sem credenciais)
+4. **Backup Completo do Torneio:** 
+   - Inclui todas as configurações, jogadores, grupos, jogos e placares
+   - Inclui credenciais de sincronização (criptografadas)
+   - Inclui estado de compartilhamento
+   - Ao restaurar, o sistema detecta se o torneio existe e oferece opções adequadas
+5. **Backup de Todos os Torneios:** 
+   - Disponível no modal "Gerenciar Torneios"
+   - Exporta todos os torneios de uma vez
+   - Útil para migração completa de dispositivo
 
 ## 🏗️ Estrutura do Projeto
 
@@ -103,6 +150,7 @@ torneio-beach-tennis/
 │   ├── config/            # Tela de configuração
 │   ├── torneio/           # Páginas públicas
 │   │   └── [id]/         # Visualização pública
+│   ├── torneios/          # Gerenciamento de torneios
 │   ├── layout.tsx         # Layout principal com PWA meta tags
 │   └── page.tsx           # Dashboard principal
 ├── components/            # Componentes React
@@ -111,19 +159,22 @@ torneio-beach-tennis/
 │   ├── GameConfigForm.tsx # Config de jogo
 │   ├── GroupCard.tsx     # Card de grupo
 │   ├── MatchList.tsx     # Lista de jogos
-│   ├── ScoreInput.tsx    # Input de placar
+│   ├── ScoreInput.tsx    # Input de placar (com validação ITF/CBT)
 │   ├── ShareTournament.tsx # Compartilhamento
-│   └── SyncStatus.tsx    # Status de sincronização
+│   ├── SyncStatus.tsx    # Status de sincronização
+│   └── TournamentSelector.tsx # Seletor de torneios
 ├── hooks/                 # Custom Hooks
 │   ├── useLocalStorage.ts
 │   ├── useTournament.ts
+│   ├── useTournamentManager.ts # Gerenciamento de múltiplos torneios
 │   └── useTournamentSync.ts # Sincronização
 ├── services/              # Lógica de negócio
 │   ├── backupService.ts
 │   ├── enrollmentService.ts
 │   ├── groupGenerator.ts
 │   ├── matchGenerator.ts  # Round Robin
-│   └── rankingService.ts
+│   ├── rankingService.ts
+│   └── scoreValidator.ts  # Validação ITF/CBT
 ├── types/                 # Interfaces TypeScript
 │   └── index.ts
 ├── lib/                   # Utilitários
@@ -233,7 +284,7 @@ Critérios de classificação (nesta ordem):
 - **TTL:** 10 dias (renovado automaticamente a cada sync)
 
 ### Bibliotecas
-- **PWA:** next-pwa
+- **PWA:** @ducanh2912/next-pwa
 - **QR Code:** qrcode.react
 - **PDF:** jspdf
 - **UUID:** uuid
@@ -267,8 +318,9 @@ Dados são salvos automaticamente no dispositivo e sincronizados quando online.
 ### Sincronização Multi-Dispositivo
 - **Admin:** Alterações são salvas automaticamente após 2 segundos
 - **Espectador:** Dados atualizam automaticamente a cada 1 minuto
-- **Compartilhamento:** Gere um link público ou QR Code para compartilhar
-- **Segurança:** Apenas admins podem editar (controle via token)
+- **Compartilhamento:** Gere um link público ou QR Code para compartilhar cada torneio
+- **Segurança:** Cada torneio tem seu próprio token de admin único
+- **Isolamento:** Compartilhe torneios diferentes em dispositivos diferentes sem conflitos
 
 ## 🧪 Testes
 
