@@ -35,7 +35,9 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: minor
+          # default_bump: false → Só faz bump se houver commits relevantes (feat, fix, etc)
+          # Se todos os commits forem skip (chore, docs, etc), não gera release
+          default_bump: false
           release_branches: main
           custom_release_rules: |
             feat:minor
@@ -52,12 +54,16 @@ jobs:
       - name: Check if version was bumped
         id: check_version
         run: |
-          if [ "${{ steps.version.outputs.new_version }}" != "" ]; then
+          NEW_TAG="${{ steps.version.outputs.new_tag }}"
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          
+          # Verificar se houve bump (new_tag não vazio e diferente de "")
+          if [ -n "$NEW_TAG" ] && [ "$NEW_TAG" != "" ]; then
             echo "bumped=true" >> $GITHUB_OUTPUT
-            echo "Version bumped to ${{ steps.version.outputs.new_version }}"
+            echo "✅ Version bumped to $NEW_VERSION (tag: $NEW_TAG)"
           else
             echo "bumped=false" >> $GITHUB_OUTPUT
-            echo "No version bump needed"
+            echo "⏭️  No version bump needed (only skip commits found)"
           fi
 
       - name: Update package.json version
