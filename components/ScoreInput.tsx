@@ -37,6 +37,9 @@ export function ScoreInput({
   
   const [showWarningsModal, setShowWarningsModal] = useState(false);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  
+  // Verificar se há placar parcial salvo
+  const hasPartialScore = initialSets.length > 0 && initialSets.some(s => s.gamesA > 0 || s.gamesB > 0);
 
   const handleSetChange = (index: number, field: 'gamesA' | 'gamesB', value: string) => {
     const numValue = Math.max(0, parseInt(value) || 0);
@@ -110,17 +113,32 @@ export function ScoreInput({
     onFinalize(filledSets);
   };
 
+  const handleSavePartial = () => {
+    const filledSets = sets.filter(s => s.gamesA > 0 || s.gamesB > 0);
+    if (filledSets.length > 0) {
+      onSave(filledSets);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {sets.map((set, index) => {
+        const isSetFilled = set.gamesA > 0 || set.gamesB > 0;
         return (
           <div
             key={index}
             className="flex items-center gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           >
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-              Set {index + 1}
-            </span>
+            <div className="flex items-center gap-2 w-16">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Set {index + 1}
+              </span>
+              {hasPartialScore && isSetFilled && (
+                <span className="text-xs text-blue-600 dark:text-blue-400" title="Placar parcial salvo">
+                  ●
+                </span>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               <input
@@ -151,7 +169,7 @@ export function ScoreInput({
         {/* Botão Salvar Parcial */}
         <div className="flex-1 min-w-0 flex">
           <button
-            onClick={() => onSave(sets)}
+            onClick={handleSavePartial}
             disabled={disabled || sets.every(s => s.gamesA === 0 && s.gamesB === 0)}
             className="w-full px-4 py-2 min-h-[2.75rem] bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
