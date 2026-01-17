@@ -246,10 +246,18 @@ A classificação depende do número de grupos na Fase 2:
 **Nota:** Participantes que não completam um grupo na Fase 1 ficam na lista de espera até formar um novo grupo completo.
 
 ### Ranking e Desempate
-Critérios de classificação (nesta ordem):
+
+#### Critérios Dentro do Grupo
+Classificação de jogadores no mesmo grupo (nesta ordem):
 1. **Vitórias** (matches ganhos)
-2. **Saldo de Sets** (sets ganhos - perdidos)
-3. **Saldo de Games** (games ganhos - perdidos)
+2. **Saldo de Games** (games ganhos - perdidos)
+3. **Empate Técnico** (decisão manual, sorteio ou partida extra)
+
+#### Critérios Entre Grupos (Repescagem)
+Classificação de jogadores de grupos diferentes (nesta ordem):
+1. **Vitórias** (matches ganhos)
+2. **Saldo de Games** (games ganhos - perdidos)
+3. **Games Ganhos** (total de games ganhos)
 4. **Empate Técnico** (decisão manual, sorteio ou partida extra)
 
 **Desempate entre Grupos:**
