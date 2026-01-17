@@ -211,12 +211,20 @@ export default function ConfigPage() {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   
+  // Estados para modais de confirmação
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalData, setConfirmModalData] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDangerous?: boolean;
+  } | null>(null);
+  
   // Estados para modais de export/import
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportCategory, setExportCategory] = useState<string>('all');
   const [importCategory, setImportCategory] = useState<string>('');
-  const [importOverwrite, setImportOverwrite] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importFileInfo, setImportFileInfo] = useState<{ totalPlayers: number; categoria?: string } | null>(null);
 
@@ -667,17 +675,17 @@ export default function ConfigPage() {
     
     const playersCount = phase1Groups.flatMap(g => g.players).length;
     
-    const message = `Tem certeza que deseja resortear a Fase 1?\n\n` +
-      `Isso irá:\n` +
-      `- Apagar ${phase1Groups.length} grupo(s) da Fase 1\n` +
-      `- Apagar todos os jogos e placares desta fase\n` +
-      `- Resortear os ${playersCount} jogadores em novos grupos\n\n` +
-      `⚠️ Os mesmos jogadores permanecerão no torneio (não voltam para lista de espera)\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      redrawGroupsInPlace(categoria, 1);
-    }
+    setConfirmModalData({
+      title: '⚠️ Resortear Fase 1',
+      message: `Tem certeza que deseja resortear a Fase 1?\n\nIsso irá:\n• Apagar ${phase1Groups.length} grupo(s) da Fase 1\n• Apagar todos os jogos e placares desta fase\n• Resortear os ${playersCount} jogadores em novos grupos\n\n⚠️ Os mesmos jogadores permanecerão no torneio (não voltam para lista de espera)\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        redrawGroupsInPlace(categoria, 1);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Limpar toda a lista de espera de uma categoria
@@ -689,15 +697,17 @@ export default function ConfigPage() {
       return;
     }
 
-    const message = `⚠️ ATENÇÃO: Remover TODOS os jogadores da lista de espera?\n\n` +
-      `Categoria: ${categoria}\n` +
-      `Jogadores: ${playersInCategory.length}\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      // Limpar toda a lista de espera da categoria em uma única operação
-      clearWaitingList(categoria);
-    }
+    setConfirmModalData({
+      title: '⚠️ Limpar Lista de Espera',
+      message: `Remover TODOS os jogadores da lista de espera?\n\nCategoria: ${categoria}\nJogadores: ${playersInCategory.length}\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        clearWaitingList(categoria);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Limpar todos os jogadores do torneio de uma categoria
@@ -731,17 +741,17 @@ export default function ConfigPage() {
 
     const playersCount = groupsInCategory.flatMap(g => g.players).length;
 
-    const message = `⚠️ ATENÇÃO: Remover TODOS os grupos e jogadores do torneio?\n\n` +
-      `Categoria: ${categoria}\n` +
-      `Grupos: ${groupsInCategory.length}\n` +
-      `Jogadores: ${playersCount}\n\n` +
-      `Os jogadores retornarão para a lista de espera.\n\n` +
-      `Esta ação não pode ser desfeita!`;
-    
-    if (window.confirm(message)) {
-      // Limpar completamente a categoria (remove todos os grupos e retorna jogadores para lista de espera)
-      clearCategory(categoria);
-    }
+    setConfirmModalData({
+      title: '⚠️ Limpar Torneio',
+      message: `Remover TODOS os grupos e jogadores do torneio?\n\nCategoria: ${categoria}\nGrupos: ${groupsInCategory.length}\nJogadores: ${playersCount}\n\nOs jogadores retornarão para a lista de espera.\n\nEsta ação não pode ser desfeita!`,
+      onConfirm: () => {
+        clearCategory(categoria);
+        setShowConfirmModal(false);
+        setConfirmModalData(null);
+      },
+      isDangerous: true,
+    });
+    setShowConfirmModal(true);
   };
 
   // Export de jogadores com opções
@@ -879,26 +889,6 @@ export default function ConfigPage() {
 
       console.log(`🎯 Importando ${data.players.length} jogador(es) para categoria "${targetCategory}"`);
 
-      // Se sobrescrever, remover jogadores existentes
-      if (importOverwrite) {
-        console.log('🗑️ Modo sobrescrever ativo, removendo jogadores existentes...');
-        
-        // Remover da lista de espera
-        const playersToRemove = tournament.waitingList
-          .filter(p => p.categoria === targetCategory);
-        console.log(`Removendo ${playersToRemove.length} jogador(es) da lista de espera`);
-        playersToRemove.forEach(p => removePlayer(p.id));
-
-        // Remover grupos da categoria (resortear Fase 1)
-        const phase1Groups = tournament.grupos.filter(
-          g => g.categoria === targetCategory && g.fase === 1
-        );
-        if (phase1Groups.length > 0) {
-          console.log(`Removendo ${phase1Groups.length} grupo(s) da Fase 1`);
-          resetAndRedrawGroups(targetCategory, 1);
-        }
-      }
-
       // Adicionar jogadores de uma vez (evita problemas de estado)
       let skippedCount = 0;
       let duplicateCount = 0;
@@ -949,7 +939,6 @@ export default function ConfigPage() {
       setShowImportModal(false);
       setImportFile(null);
       setImportFileInfo(null);
-      setImportOverwrite(false);
       
       const skippedMessages = [];
       if (skippedCount > 0) skippedMessages.push(`${skippedCount} sem nome`);
@@ -1257,9 +1246,17 @@ export default function ConfigPage() {
                           {/* Botão de remover */}
                           <button
                             onClick={() => {
-                              if (window.confirm(`Remover categoria "${cat}"?`)) {
-                                removeCategory(cat);
-                              }
+                              setConfirmModalData({
+                                title: '⚠️ Remover Categoria',
+                                message: `Você está prestes a remover a categoria "${cat}".\n\nTodos os dados associados a esta categoria serão perdidos.\n\nEsta ação não pode ser desfeita!`,
+                                onConfirm: () => {
+                                  removeCategory(cat);
+                                  setShowConfirmModal(false);
+                                  setConfirmModalData(null);
+                                },
+                                isDangerous: true,
+                              });
+                              setShowConfirmModal(true);
                             }}
                             className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
                           >
@@ -1805,40 +1802,18 @@ export default function ConfigPage() {
                 </p>
               </div>
 
-              <div className="flex items-start">
-                <input
-                  type="checkbox"
-                  id="overwrite-checkbox"
-                  checked={importOverwrite}
-                  onChange={(e) => setImportOverwrite(e.target.checked)}
-                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
-                />
-                <label
-                  htmlFor="overwrite-checkbox"
-                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
-                >
-                  <strong>Sobrescrever jogadores existentes</strong>
-                  <br />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Remove todos os jogadores da categoria antes de importar
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-200 flex items-start gap-2">
+                  <span className="text-lg">ℹ️</span>
+                  <span>
+                    Os jogadores serão <strong>adicionados</strong> à lista de espera da categoria selecionada, sem remover jogadores existentes.
                   </span>
-                </label>
+                </p>
               </div>
-
-              {importOverwrite && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                  <p className="text-sm text-yellow-900 dark:text-yellow-200 flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
-                    <span>
-                      <strong>Atenção:</strong> Todos os jogadores da categoria "{importCategory}" serão removidos (torneio + espera) antes da importação!
-                    </span>
-                  </p>
-                </div>
-              )}
             </div>
 
             {importFileInfo && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                 <p className="text-sm text-blue-900 dark:text-blue-200">
                   📄 <strong>Arquivo:</strong> {importFile?.name}<br />
                   👥 <strong>Jogadores:</strong> {importFileInfo.totalPlayers}
@@ -1858,7 +1833,6 @@ export default function ConfigPage() {
                   setShowImportModal(false);
                   setImportFile(null);
                   setImportFileInfo(null);
-                  setImportOverwrite(false);
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
               >
@@ -2279,6 +2253,55 @@ export default function ConfigPage() {
         </div>
       )}
 
+      {/* Modal de Confirmação Genérico */}
+      {showConfirmModal && confirmModalData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {confirmModalData.title}
+            </h3>
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {confirmModalData.message}
+              </p>
+
+              {confirmModalData.isDangerous && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                  <p className="text-sm text-red-900 dark:text-red-200 flex items-start gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <span>
+                      <strong>Atenção:</strong> Esta ação é irreversível!
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setConfirmModalData(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmModalData.onConfirm}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  confirmModalData.isDangerous
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-primary hover:bg-primary-dark text-white'
+                }`}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
