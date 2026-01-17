@@ -15,7 +15,7 @@ import { BackupPanel } from '@/components/BackupPanel';
 import { getWaitingListStats } from '@/services/enrollmentService';
 import { validateThreePhaseTournament } from '@/services/phaseValidation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { generateTournamentShare, SHARING_ENABLED_KEY } from '@/hooks/useTournamentSync';
+import { generateTournamentShare, SHARING_ENABLED_KEY, useTournamentSync } from '@/hooks/useTournamentSync';
 import { ShareTournament } from '@/components/ShareTournament';
 import { TournamentSelector } from '@/components/TournamentSelector';
 import type { TournamentMetadata, Tournament } from '@/types';
@@ -131,6 +131,15 @@ export default function ConfigPage() {
         }
       }
       setSharingEnabled(enabled);
+      
+      // Disparar sync imediato após ativar o compartilhamento
+      // para garantir que o torneio seja salvo no Redis
+      setTimeout(() => {
+        if (forceSync) {
+          console.log('🚀 Forçando sincronização inicial após ativar compartilhamento');
+          forceSync();
+        }
+      }, 500); // Aguardar um pouco para garantir que o estado foi atualizado
     } else {
       // Desativar: apagar dados do Redis e salvar estado
       if (tournamentId && adminToken) {
@@ -178,6 +187,21 @@ export default function ConfigPage() {
     getMaxPhase,
     isPhaseComplete,
   } = useTournament();
+
+  // Hook de sincronização
+  const { syncStatus, retrySync, forceSync } = useTournamentSync({
+    tournament,
+    isAdmin: !!adminToken,
+    sharingEnabled,
+    onTournamentUpdate: (updatedTournament) => {
+      // Atualizar o torneio local com dados do servidor (apenas no modo espectador)
+      if (!adminToken && activeTournamentId) {
+        const storageKey = `beachtennis-tournament-${activeTournamentId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedTournament));
+        window.location.reload();
+      }
+    },
+  });
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');

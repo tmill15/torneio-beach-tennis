@@ -215,6 +215,10 @@ export function useTournamentManager() {
     if (typeof window !== 'undefined') {
       const adminToken = generateAdminToken();
       setAdminToken(newId, adminToken);
+      
+      // Garantir que sharingEnabled seja inicializado como false para novos torneios
+      const sharingKey = `beachtennis-sharing-enabled-${newId}`;
+      localStorage.setItem(sharingKey, JSON.stringify(false));
     }
 
     // Atualizar tournamentId no localStorage (compatibilidade)

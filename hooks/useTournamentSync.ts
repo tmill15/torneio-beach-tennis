@@ -314,12 +314,23 @@ export function useTournamentSync({
     ? `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/torneio/${tournamentId}`
     : null;
 
+  // Função para forçar sync imediato (útil quando ativar compartilhamento pela primeira vez)
+  const forceSync = useCallback(() => {
+    // Limpar debounce e disparar sync imediatamente
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    performSync(true);
+  }, [performSync]);
+
   return {
     syncStatus,
     shareLink,
     tournamentId,
     viewerError: !isAdmin ? viewerError : undefined,
     retrySync,
+    forceSync,
   };
 }
 
