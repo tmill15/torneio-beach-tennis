@@ -71,6 +71,7 @@ interface UseTournamentSyncResult {
   tournamentId: string | null;
   viewerError?: any; // Erro do SWR (para detectar torneio não encontrado)
   retrySync: () => void; // Função para forçar retry manual
+  forceSync: () => void; // Função para forçar sincronização imediata
 }
 
 const fetcher = async (url: string) => {
