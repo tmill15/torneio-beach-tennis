@@ -1663,48 +1663,53 @@ export default function ConfigPage() {
               </button>
             </div>
 
-            {/* Filtros */}
-            <div className="mb-6 flex flex-wrap gap-2 items-center">
-              <button
-                onClick={() => setTournamentFilter('active')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  tournamentFilter === 'active'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                Ativos ({getTournaments('active').length})
-              </button>
-              <button
-                onClick={() => setTournamentFilter('archived')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  tournamentFilter === 'archived'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                Arquivados ({getTournaments('archived').length})
-              </button>
-              <button
-                onClick={() => setTournamentFilter('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  tournamentFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                Todos ({getTournaments().length})
-              </button>
-              <div className="ml-auto flex gap-2">
+            {/* Filtros e Ações */}
+            <div className="mb-6 flex flex-col md:flex-row md:items-center gap-2">
+              {/* Botões de Filtro */}
+              <div className="flex gap-2 flex-1 md:flex-initial">
+                <button
+                  onClick={() => setTournamentFilter('active')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'active'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Ativos ({getTournaments('active').length})
+                </button>
+                <button
+                  onClick={() => setTournamentFilter('archived')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'archived'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Arquivados ({getTournaments('archived').length})
+                </button>
+                <button
+                  onClick={() => setTournamentFilter('all')}
+                  className={`flex-1 md:flex-initial px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
+                    tournamentFilter === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Todos ({getTournaments().length})
+                </button>
+              </div>
+              
+              {/* Botões de Ação */}
+              <div className="flex gap-2 md:ml-auto">
                 <button
                   onClick={handleBackupAllTournaments}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 md:flex-initial px-3 md:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-sm md:text-base"
                 >
                   💾 Backup Torneios
                 </button>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 md:flex-initial px-3 md:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm md:text-base"
                 >
                   + Criar Novo
                 </button>
