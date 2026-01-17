@@ -70,16 +70,16 @@ Desenvolver uma aplicação PWA completa para gestão de torneios de Beach Tenni
 
 ## 🎉 Status do Projeto: ATIVO EM DESENVOLVIMENTO
 
-**Última atualização:** 14/01/2026  
-**Versão:** v0.4.0  
+**Última atualização:** 17/01/2026  
+**Versão:** v0.7.0  
 **Status:** ✅ Pronto para uso com sincronização em tempo real
 
 Todas as funcionalidades core foram implementadas e testadas. O sistema está pronto para gerenciar torneios de Beach Tennis com 3 fases progressivas e sincronização multi-dispositivo em tempo real!
 
 **Melhorias Recentes:**
-- ✅ Campo `isFullBackup` explícito no formato de backup para detecção precisa
-- ✅ Correção de tipos TypeScript no serviço de backup (compatibilidade com Web Crypto API)
-- ✅ Lógica de detecção de backup completo vs categoria específica aprimorada
+- ✅ Biblioteca PWA modernizada (`@ducanh2912/next-pwa`) para compatibilidade com Next.js 14
+- ✅ Sistema de validação de placares simplificado (removida detecção de inversão)
+- ✅ Correções de build e tipos TypeScript para deploy estável na Vercel
 
 ## 📦 Status dos Módulos
 
@@ -232,6 +232,45 @@ Todas as funcionalidades core foram implementadas e testadas. O sistema está pr
 - [x] Tema claro/escuro implementado
 
 ## 🔄 Histórico de Versões
+
+### v0.7.1 - Atualização: PWA e Validação de Placares ✅
+**Data:** 17/01/2026
+
+**Atualizado:**
+- 🔄 **Biblioteca PWA modernizada:** Substituído `next-pwa` (v5.6.0) por `@ducanh2912/next-pwa` (v10.2.9)
+  - **Motivo:** Versão antiga tinha dependências incompatíveis com Next.js 14
+  - **Benefício:** Build mais rápido e compatibilidade garantida
+  - **Resultado:** Deploy na Vercel funcionando perfeitamente
+- 🔄 **Validação de placares simplificada:** Removida detecção automática de inversão de placares
+  - **Motivo:** Causava falsos positivos e confusão
+  - **Mantido:** Validação de regras ITF/CBT (placares inválidos, tie-breaks, sets mínimos)
+  - **Resultado:** Sistema mais focado e menos intrusivo
+
+**Corrigido:**
+- 🐛 **Erro de build na Vercel:** Resolvido problema com dependências do Babel
+- 🐛 **Tipos TypeScript:** Adicionado `forceSync` e `sharingEnabled` aos tipos corretos
+- 🐛 **Booleano explícito:** Correção de tipo em `isPhaseActuallyComplete`
+
+**Modificado:**
+- 🔄 `services/scoreValidator.ts`:
+  - Removida função `detectScoreInversion`
+  - Validação focada apenas em regras do jogo
+- 🔄 `next.config.mjs`:
+  - Atualizado para usar `@ducanh2912/next-pwa`
+  - Configuração modernizada e simplificada
+- 🔄 `hooks/useTournamentSync.ts`:
+  - Adicionado `forceSync` ao tipo de retorno
+  - Adicionado `sharingEnabled` às opções
+- 🔄 `package.json`:
+  - Dependências do Babel adicionadas para compatibilidade
+
+**Benefícios:**
+- ✅ **Build estável:** Sem erros de dependências
+- ✅ **PWA moderno:** Compatível com Next.js 14
+- ✅ **Validação focada:** Apenas regras reais do jogo
+- ✅ **Deploy confiável:** Vercel build funcionando 100%
+
+---
 
 ### v0.4.1 - Correções: Modo Espectador e Proteção de Dados ✅
 **Data:** 14/01/2026
@@ -2194,7 +2233,7 @@ Beach Tennis é jogado em DUPLAS, não em simples. Esta versão corrige a estrut
 - **Persistência:** LocalStorage + Vercel KV (produção) / Redis (dev)
 - **Sincronização:** SWR para viewers, debounce para admins
 - **Validação:** Zod
-- **PWA:** next-pwa
+- **PWA:** @ducanh2912/next-pwa
 - **Cache/DB:** Vercel KV (produção), Redis 7 (desenvolvimento)
 
 ### Decisões Técnicas
