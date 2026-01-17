@@ -20,6 +20,18 @@ export function GameConfigForm({ config, onChange, disabled = false }: GameConfi
         Configurações de Jogo
       </h3>
 
+      {/* Aviso quando configurações estão bloqueadas */}
+      {disabled && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+            <span className="text-lg">🔒</span>
+            <span>
+              <strong>Configurações bloqueadas:</strong> Não é possível alterar as regras do jogo após o início das partidas. Já existem placares registrados.
+            </span>
+          </p>
+        </div>
+      )}
+
       {/* Quantidade de Sets */}
       <div>
         <label htmlFor="quantidadeSets" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

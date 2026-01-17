@@ -1275,6 +1275,7 @@ export default function ConfigPage() {
               <GameConfigForm
                 config={tournament.gameConfig}
                 onChange={updateGameConfig}
+                disabled={tournament.grupos.some(g => g.matches.some(m => m.sets.some(s => s.gamesA > 0 || s.gamesB > 0)))}
               />
             </div>
           </div>
