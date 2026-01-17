@@ -494,9 +494,9 @@ export default function TournamentViewerPage() {
               // - Para Fase 1 e 2: fase está concluída se existe uma fase seguinte (getMaxPhase > selectedPhase)
               // - Para Fase 3: fase está concluída se a categoria está em completedCategories
               const maxPhase = isValidCategory ? getMaxPhase(selectedCategory) : 0;
-              const isPhaseActuallyComplete = isValidCategory && (selectedPhase === 3
+              const isPhaseActuallyComplete = !!(isValidCategory && (selectedPhase === 3
                 ? (tournament.completedCategories || []).includes(selectedCategory)
-                : maxPhase > selectedPhase);
+                : maxPhase > selectedPhase));
 
               return (
                 <GroupCard

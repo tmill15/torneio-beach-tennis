@@ -62,6 +62,7 @@ interface UseTournamentSyncOptions {
   tournament: Tournament;
   tournamentId?: string;
   isAdmin: boolean;
+  sharingEnabled?: boolean;
   onTournamentUpdate?: (tournament: Tournament) => void;
 }
 
