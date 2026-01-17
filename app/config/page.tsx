@@ -364,9 +364,8 @@ export default function ConfigPage() {
 
   const handleActivate = (tournament: any) => {
     activateTournament(tournament.id);
-    setShowTournamentsModal(false);
-    // Não precisa mais de reload! O sistema de eventos customizados do useLocalStorage
-    // vai notificar automaticamente todos os hooks sobre a mudança
+    // Modal permanece aberto para continuar gerenciando
+    // O sistema de eventos customizados do useLocalStorage notifica automaticamente
   };
 
   const filteredTournaments = tournamentFilter === 'all'
@@ -1753,8 +1752,11 @@ export default function ConfigPage() {
                   return (
                     <div
                       key={tournament.id}
-                      className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[200px] ${
-                        isActive ? 'ring-2 ring-blue-500' : ''
+                      onClick={() => !isActive && handleActivate(tournament)}
+                      className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[200px] transition-all ${
+                        isActive 
+                          ? 'ring-2 ring-blue-500' 
+                          : 'cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 hover:shadow-lg'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
@@ -1797,15 +1799,7 @@ export default function ConfigPage() {
                         </div>
                       </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          {!isActive && (
-                            <button
-                              onClick={() => handleActivate(tournament)}
-                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors whitespace-nowrap"
-                            >
-                              ✅ Selecionar
-                            </button>
-                          )}
+                        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleEditClick(tournament)}
                             className="px-2.5 py-1.5 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-purple-200 text-xs font-medium rounded transition-colors whitespace-nowrap"
